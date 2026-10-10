@@ -1,0 +1,337 @@
+import { z } from "zod";
+
+export const Id = z.string().uuid();
+export const Level = z.enum(["introductory", "intermediate", "advanced"]);
+export const Phase = z.enum([
+  "preparing",
+  "baseline",
+  "teaching",
+  "ready_for_check",
+  "transfer",
+  "report",
+]);
+export type Phase = z.infer<typeof Phase>;
+export const CitationSchema = z.object({
+  messageId: Id,
+  quote: z.string().min(1).max(500),
+});
+export type Citation = z.infer<typeof CitationSchema>;
+export const SourceSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  text: z.string().max(50_000),
+  warnings: z.array(z.string().max(400)).max(20),
+});
+export type Source = z.infer<typeof SourceSchema>;
+export const ControlSchema = z.object({
+  id: z.string().regex(/^[a-z][a-z0-9_]{0,30}$/),
+  label: z.string().max(80),
+  min: z.number().min(-10000),
+  max: z.number().max(10000),
+  step: z.number().positive(),
+  initial: z.number(),
+  unit: z.string().max(20),
+});
+const MetricSchema = z.object({
+  id: z.string().regex(/^[a-z][a-z0-9_]{0,30}$/),
+  label: z.string().max(80),
+  unit: z.string().max(30),
+  base: z.number(),
+  factors: z
+    .array(z.object({ controlId: z.string(), coefficient: z.number() }))
+    .max(6),
+});
+export const BoardSchema = z.object({
+  kind: z.enum([
+    "cnn",
+    "causal",
+    "sequence",
+    "classification",
+    "comparison",
+    "custom",
+    "text",
+  ]),
+  version: z.literal(1),
+  title: z.string().max(100),
+  instruction: z.string().max(350),
+  assumptions: z.string().max(500),
+  controls: z.array(ControlSchema).max(6),
+  metrics: z.array(MetricSchema).max(6),
+  items: z
+    .array(
+      z.object({
+        id: z.string().max(40),
+        label: z.string().max(100),
+        detail: z.string().max(300),
+      }),
+    )
+    .max(10),
+  groups: z.array(z.string().max(60)).max(5),
+  code: z.string().max(12_000),
+});
+export type Board = z.infer<typeof BoardSchema>;
+export const BoardSubmissionSchema = z
+  .object({
+    version: z.literal(1),
+    inputs: z
+      .record(
+        z.string().max(40),
+        z.union([
+          z.number().finite(),
+          z.string().max(100),
+          z.array(z.string().max(40)).max(10),
+        ]),
+      )
+      .refine((v) => Object.keys(v).length <= 20),
+  })
+  .strict();
+export type BoardSubmission = z.infer<typeof BoardSubmissionSchema>;
+export const BoardOutputSchema = z
+  .object({
+    metrics: z
+      .record(z.string().max(40), z.number().finite())
+      .refine((v) => Object.keys(v).length <= 10),
+    series: z
+      .array(z.object({ x: z.number().finite(), y: z.number().finite() }))
+      .max(200)
+      .optional(),
+  })
+  .strict();
+export type BoardOutput = z.infer<typeof BoardOutputSchema>;
+export type BoardSnapshot = BoardSubmission & {
+  kind: Board["kind"];
+  verified: boolean;
+  metrics?: Record<string, number>;
+};
+
+export const LessonGeneratedSchema = z.object({
+  title: z.string().min(3).max(100),
+  scope: z.string().max(500),
+  objectives: z
+    .array(
+      z.object({
+        id: z.string().regex(/^o[1-3]$/),
+        label: z.string().max(140),
+        criterion: z.string().max(700),
+        sourceIds: z.array(z.string()).min(1).max(10),
+      }),
+    )
+    .min(2)
+    .max(3),
+  knowledge: z.string().min(20).max(7000),
+  concerns: z.array(z.string().max(500)).max(5),
+  misconception: z.string().min(10).max(400),
+  misconceptionCorrection: z.string().min(10).max(700),
+  opening: z.string().min(10).max(400),
+  transfer: z.object({
+    question: z.string().min(10).max(1200),
+    expected: z.string().min(10).max(2200),
+    criteria: z.array(z.string().max(500)).min(1).max(5),
+    arithmetic: z.enum(["cnn", "none"]),
+  }),
+  board: BoardSchema,
+});
+export type LessonGenerated = z.infer<typeof LessonGeneratedSchema>;
+export type Material = {
+  id: string;
+  ownerId: string;
+  name: string;
+  sources: Source[];
+  text: string;
+  expiresAt: string;
+  createdAt: string;
+};
+export type Lesson = LessonGenerated & {
+  id: string;
+  ownerId: string;
+  materialId: string;
+  level: z.infer<typeof Level>;
+  sources: Source[];
+  expiresAt: string;
+  createdAt: string;
+  confirmed: boolean;
+};
+export type LessonPublic = Pick<
+  Lesson,
+  "id" | "title" | "scope" | "level" | "concerns"
+> & { objectives: { id: string; label: string }[] };
+export type Message = {
+  id: string;
+  role: "learner" | "student";
+  text: string;
+  createdAt: string;
+  sequence: number;
+  board?: BoardSnapshot;
+  kind?: "teaching" | "transfer" | "hint";
+};
+export const EvidenceSchema = z.object({
+  objectiveId: z.string(),
+  understanding: z.enum(["missing", "partial", "supported"]),
+  citations: z.array(CitationSchema).max(3),
+});
+export const StudentReplySchema = z.object({
+  studentMessage: z.string().min(1).max(500),
+  move: z.enum([
+    "ask_explanation",
+    "probe_mechanism",
+    "request_example",
+    "surface_misconception",
+    "request_demo",
+    "acknowledge",
+    "redirect",
+  ]),
+  evidence: z.array(EvidenceSchema).max(3),
+  mechanism: z.array(CitationSchema).max(3),
+  demonstration: z.array(CitationSchema).max(3),
+  misconceptionCorrection: z.array(CitationSchema).max(3),
+  unresolvedError: z.boolean(),
+  unresolvedErrorDetail: z.string().max(400),
+  summary: z.string().max(2000),
+});
+export type StudentReply = z.infer<typeof StudentReplySchema>;
+export type Ledger = Pick<
+  StudentReply,
+  | "evidence"
+  | "mechanism"
+  | "demonstration"
+  | "misconceptionCorrection"
+  | "unresolvedError"
+  | "unresolvedErrorDetail"
+  | "summary"
+>;
+export const dimensions = [
+  "accuracy",
+  "mechanism",
+  "evidence",
+  "misconception",
+  "transfer",
+] as const;
+export type Dimension = (typeof dimensions)[number];
+export const DimensionSchema = z.object({
+  score: z.union([z.literal(0), z.literal(1), z.literal(2), z.null()]),
+  status: z.enum(["assessed", "insufficient_evidence", "uncertain"]),
+  explanation: z.string().max(800),
+  citations: z.array(CitationSchema).max(3),
+});
+const FeedbackSchema = z.object({
+  text: z.string().max(600),
+  citations: z.array(CitationSchema).max(3),
+});
+export const ReportGeneratedSchema = z.object({
+  scores: z.object({
+    accuracy: DimensionSchema,
+    mechanism: DimensionSchema,
+    evidence: DimensionSchema,
+    misconception: DimensionSchema,
+    transfer: DimensionSchema,
+  }),
+  criticalMisconception: z.boolean(),
+  strengths: z.array(FeedbackSchema).max(3),
+  nextSteps: z.array(FeedbackSchema).min(1).max(3),
+});
+export type ReportGenerated = z.infer<typeof ReportGeneratedSchema>;
+export type SessionReport = ReportGenerated & {
+  total: number | null;
+  availablePoints: number;
+  earnedPoints: number;
+  overallLabel: "strong_evidence" | "developing" | "incomplete";
+  expectedTransferExplanation: string;
+  transferCorrect: boolean | null;
+};
+export type Session = {
+  id: string;
+  ownerId: string;
+  lessonId: string;
+  phase: Phase;
+  revision: number;
+  nextSequence: number;
+  challengeUsed: boolean;
+  hintUsed: boolean;
+  ledger: Ledger;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+  report?: SessionReport;
+  transferAnswerId?: string;
+  transferSkipped?: boolean;
+  activeOperation?: { id: string; token: string; until: number };
+};
+export type SessionPublic = Pick<
+  Session,
+  "id" | "phase" | "revision" | "challengeUsed" | "hintUsed" | "expiresAt"
+> & {
+  lesson: LessonPublic;
+  messages: Message[];
+  nextCursor?: number;
+  progress: {
+    id: string;
+    label: string;
+    status: "missing" | "partial" | "supported";
+  }[];
+  board?: Board;
+  transferQuestion?: string;
+  numericalCheck?: boolean;
+  report?: SessionReport;
+  pending: boolean;
+};
+export const CreateMaterialSchema = z
+  .object({
+    text: z.string().min(30).max(50_000),
+    name: z.string().max(120).default("Pasted notes"),
+  })
+  .strict();
+export const PrepareSchema = z
+  .object({
+    operationId: Id,
+    materialId: Id,
+    topic: z.string().trim().min(3).max(200),
+    level: Level,
+    sources: z.array(SourceSchema).min(1).max(100),
+  })
+  .strict();
+export const TurnSchema = z
+  .object({
+    operationId: Id,
+    revision: z.number().int().nonnegative(),
+    text: z.string().trim().min(1).max(2000),
+    board: BoardSubmissionSchema.optional(),
+  })
+  .strict();
+export const ActionSchema = z
+  .object({
+    operationId: Id,
+    revision: z.number().int().nonnegative(),
+    action: z.enum(["hint", "continue", "start_transfer", "end"]),
+  })
+  .strict();
+export const TransferSchema = z
+  .object({
+    operationId: Id,
+    revision: z.number().int().nonnegative(),
+    answer: z.string().trim().max(4000),
+    skip: z.boolean(),
+    parameters: z
+      .object({
+        small: z.number().int().nonnegative(),
+        large: z.number().int().nonnegative(),
+      })
+      .optional(),
+  })
+  .strict();
+export const emptyLedger = (): Ledger => ({
+  evidence: [],
+  mechanism: [],
+  demonstration: [],
+  misconceptionCorrection: [],
+  unresolvedError: false,
+  unresolvedErrorDetail: "",
+  summary: "",
+});
+export const publicLesson = (lesson: Lesson): LessonPublic => ({
+  id: lesson.id,
+  title: lesson.title,
+  scope: lesson.scope,
+  level: lesson.level,
+  concerns: lesson.concerns,
+  objectives: lesson.objectives.map(({ id, label }) => ({ id, label })),
+});

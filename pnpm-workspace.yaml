@@ -1,0 +1,8 @@
+allowBuilds:
+  "@firebase/util": false
+  "@google/genai": false
+  esbuild: true
+  protobufjs: false
+  re2: true
+minimumReleaseAgeExclude:
+  - prettier@3.9.10

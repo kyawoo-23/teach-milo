@@ -1,0 +1,44 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: teachback-ai
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/maxScale: "3"
+    spec:
+      serviceAccountName: teachback-runtime@YOUR_PROJECT.iam.gserviceaccount.com
+      containerConcurrency: 10
+      timeoutSeconds: 300
+      containers:
+        - image: REGION-docker.pkg.dev/YOUR_PROJECT/teachback/app:VERSION
+          ports:
+            - containerPort: 8080
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          env:
+            - name: GOOGLE_CLOUD_PROJECT
+              value: YOUR_PROJECT
+            - name: APP_ORIGIN
+              value: https://YOUR_SERVICE_URL
+            - name: GEMINI_MODEL
+              value: gemini-3.8-flash
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: teachback-gemini-key
+                  key: latest
+            - name: RATE_LIMIT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: teachback-rate-limit-secret
+                  key: latest
+            - name: MODEL_CALLS_PER_GLOBAL_DAY
+              value: "1000"
+          startupProbe:
+            httpGet:
+              path: /api/status
+              port: 8080

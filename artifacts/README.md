@@ -1,0 +1,9 @@
+# Recorded demonstration — scripted responses
+
+`teachback-scripted-walkthrough.webm` is a 32-second backup walkthrough of the implemented interface. The visible label identifies its controlled responses. It is **not live Gemini inference** and does not demonstrate the quality of live OCR or assessment.
+
+The recording shows pasted material, extraction review, lesson confirmation, Milo's follow-up and misconception, the deterministic CNN board, an independent check with practice aids hidden, and an evidence-linked report.
+
+The adjacent screenshots show the desktop and mobile layouts. Browser tests generate these files from controlled API fixtures; the application itself has no simulated-response mode.
+
+To regenerate the paced recording, run `pnpm record:walkthrough` and copy the golden-path `video.webm` from `test-results/` into this directory. Use `pnpm test:e2e` to regenerate screenshots and verify desktop/mobile behavior.

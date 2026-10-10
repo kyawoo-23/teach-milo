@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+.env*
+.emulator-data
+test-results
+playwright-report
+artifacts
+*-debug.log

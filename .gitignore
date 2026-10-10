@@ -1,0 +1,11 @@
+node_modules/
+.next/
+.env*
+!.env.example
+.emulator-data/
+*-debug.log
+playwright-report/
+test-results/
+coverage/
+*.tsbuildinfo
+.DS_Store
