@@ -9,3 +9,6 @@ test-results/
 coverage/
 *.tsbuildinfo
 .DS_Store
+.cursor/
+graphify-out/
+.pnpm-store/
