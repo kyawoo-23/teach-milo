@@ -1443,6 +1443,103 @@ input::placeholder {
   font-size: 12px;
   min-height: 35px;
 }
+.understood-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 24px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  overflow: hidden;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.understood-overlay[open] {
+  display: flex;
+}
+.understood-overlay::backdrop {
+  background: #24283eb8;
+}
+.understood-panel {
+  position: relative;
+  z-index: 1;
+  width: min(420px, 100%);
+  background: #fff;
+  border-radius: 22px;
+  padding: 36px 28px 24px;
+  text-align: center;
+  box-shadow: 0 24px 80px #20213e40;
+  animation: understood-in 280ms ease-out;
+}
+@keyframes understood-in {
+  from {
+    transform: translateY(8px);
+  }
+  to {
+    transform: none;
+  }
+}
+.understood-panel h2 {
+  font-size: 32px;
+  margin-top: 8px;
+}
+.understood-panel p {
+  color: var(--muted);
+  margin: 12px auto 0;
+  max-width: 34ch;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.understood-panel .error-notice {
+  margin-top: 18px;
+  text-align: left;
+}
+.understood-panel .modal-actions {
+  margin-top: 28px;
+}
+.understood-panel .quiet-button {
+  width: 100%;
+}
+.confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.confetti i {
+  position: absolute;
+  top: -20px;
+  display: block;
+  opacity: 0;
+  animation-name: confetti-fall;
+  animation-timing-function: cubic-bezier(0.15, 0.6, 0.3, 1);
+  animation-fill-mode: forwards;
+}
+@keyframes confetti-fall {
+  0% {
+    transform: translate3d(0, -8vh, 0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--drift, 0px), 108vh, 0)
+      rotate(var(--spin, 180deg));
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .understood-panel {
+    animation: none;
+  }
+  .confetti {
+    display: none;
+  }
+}
 .load-earlier {
   display: flex;
   margin: 0 auto 20px;

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   ArrowUp,
@@ -40,9 +40,14 @@ export function SessionExperience({ id }: { id: string }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [text, setText] = useState("");
+  const [outgoing, setOutgoing] = useState<Message | null>(null);
+  const pendingSend = useRef<{ text: string; board?: BoardSubmission } | null>(
+    null,
+  );
   const [board, setBoard] = useState<BoardSubmission | undefined>();
   const [boardOpen, setBoardOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
+  const [celebrationDismissed, setCelebrationDismissed] = useState(false);
   const [older, setOlder] = useState<Message[]>([]);
   const [draftsLoaded, setDraftsLoaded] = useState(false);
   const [small, setSmall] = useState("");
@@ -111,10 +116,17 @@ export function SessionExperience({ id }: { id: string }) {
       draftStorage.removeItem(`transfer-draft:${id}`);
   }, [id, session?.phase]);
   useEffect(() => {
+    if (!session || session.phase === "ready_for_check") return;
+    draftStorage.removeItem(`understood-dismissed:${id}`);
+    setCelebrationDismissed(false);
+  }, [id, session]);
+  useEffect(() => {
     if (!draftsLoaded) return;
     if (text) draftStorage.setItem(`draft:${id}`, text);
     else draftStorage.removeItem(`draft:${id}`);
   }, [id, text, draftsLoaded]);
+  const messageCount = session?.messages?.length ?? 0;
+  const outgoingId = outgoing?.id ?? null;
   useEffect(() => {
     endRef.current?.scrollIntoView({
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -122,7 +134,7 @@ export function SessionExperience({ id }: { id: string }) {
         : "smooth",
       block: "end",
     });
-  }, [session?.messages.length, busy]);
+  }, [messageCount, outgoingId, busy]);
   useEffect(() => {
     if (!session?.pending) return;
     const timer = setInterval(() => void load(), 4000);
@@ -154,33 +166,72 @@ export function SessionExperience({ id }: { id: string }) {
       setBusy(false);
     }
   }
-  async function send(event: React.FormEvent) {
-    event.preventDefault();
-    if (!text.trim()) return;
-    if (await mutate("turns", { text, ...(board ? { board } : {}) })) {
-      setText("");
-      setBoard(undefined);
+  async function deliver(payload: { text: string; board?: BoardSubmission }) {
+    const ok = await mutate("turns", {
+      text: payload.text,
+      ...(payload.board ? { board: payload.board } : {}),
+    });
+    if (ok) {
+      setOutgoing(null);
+      pendingSend.current = null;
       composer.current?.focus();
     }
+    return ok;
+  }
+  async function send(event: React.FormEvent) {
+    event.preventDefault();
+    const body = text.trim();
+    if (!body || !session) return;
+    const payload = { text: body, ...(board ? { board } : {}) };
+    pendingSend.current = payload;
+    setOutgoing({
+      id: `local-${session.revision}-${body.length}`,
+      role: "learner",
+      text: body,
+      createdAt: new Date().toISOString(),
+      sequence: Number.MAX_SAFE_INTEGER,
+      kind: "teaching",
+    });
+    setText("");
+    setBoard(undefined);
+    await deliver(payload);
   }
   async function action(
     action: "hint" | "continue" | "start_transfer" | "end",
   ) {
     setEndOpen(false);
-    await mutate("actions", { action });
+    return mutate("actions", { action });
   }
   function attach(snapshot: BoardSubmission) {
     setBoard(snapshot);
     setBoardOpen(false);
     composer.current?.focus();
   }
+  function dismissCelebration() {
+    draftStorage.setItem(`understood-dismissed:${id}`, "1");
+    setCelebrationDismissed(true);
+  }
   const isTeaching =
     session &&
     ["baseline", "teaching", "ready_for_check"].includes(session.phase);
+  const showCelebration =
+    session?.phase === "ready_for_check" &&
+    !celebrationDismissed &&
+    draftStorage.getItem(`understood-dismissed:${id}`) !== "1";
   const unavailable = busy || !!session?.pending;
-  const messages = [...older, ...(session?.messages || [])].filter(
-    (m, i, all) => all.findIndex((x) => x.id === m.id) === i,
-  );
+  const messages = [
+    ...older,
+    ...(session?.messages || []),
+    ...(outgoing &&
+    !(session?.messages || []).some(
+      (m) =>
+        m.role === "learner" &&
+        m.text === outgoing.text &&
+        m.createdAt >= outgoing.createdAt,
+    )
+      ? [outgoing]
+      : []),
+  ].filter((m, i, all) => all.findIndex((x) => x.id === m.id) === i);
   return (
     <div className="session-shell">
       <header className="session-header">
@@ -497,7 +548,16 @@ export function SessionExperience({ id }: { id: string }) {
                   </div>
                 </div>
               )}
-              {error && <ErrorNotice message={error} />}
+              {error && (
+                <ErrorNotice
+                  message={error}
+                  onRetry={
+                    pendingSend.current
+                      ? () => void deliver(pendingSend.current!)
+                      : undefined
+                  }
+                />
+              )}
               <form className="composer" onSubmit={send}>
                 {board && (
                   <div className="attachment-chip">
@@ -592,6 +652,13 @@ export function SessionExperience({ id }: { id: string }) {
               />
             )}
           </Modal>
+          <UnderstoodCelebration
+            open={showCelebration}
+            busy={unavailable}
+            error={error}
+            onDismiss={dismissCelebration}
+            onCloseSession={() => void action("end")}
+          />
           <Modal
             open={endOpen}
             onClose={() => setEndOpen(false)}
@@ -626,6 +693,119 @@ export function SessionExperience({ id }: { id: string }) {
         </main>
       )}
     </div>
+  );
+}
+const CONFETTI_COLORS = ["#655dcc", "#426da9", "#f4d35e", "#f7f4ff", "#8b87e8"];
+function UnderstoodCelebration({
+  open,
+  busy,
+  error,
+  onDismiss,
+  onCloseSession,
+}: {
+  open: boolean;
+  busy: boolean;
+  error: string;
+  onDismiss: () => void;
+  onCloseSession: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const programmaticClose = useRef(false);
+  const pieces = useMemo(
+    () =>
+      Array.from({ length: 42 }, (_, i) => {
+        const n = (i * 47 + 13) % 97;
+        return {
+          id: i,
+          left: `${(n * 11) % 100}%`,
+          delay: `${(i % 14) * 0.08}s`,
+          duration: `${2.6 + (i % 6) * 0.28}s`,
+          color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+          width: 10 + (i % 4) * 4,
+          height: i % 3 === 0 ? 10 + (i % 4) * 4 : 8 + (i % 3) * 3,
+          radius: i % 3 === 0 ? "50%" : "2px",
+          drift: `${((i % 7) - 3) * 18}px`,
+          spin: `${160 + (i % 5) * 70}deg`,
+        };
+      }),
+    [],
+  );
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
+    if (open && !dialog.open) dialog.showModal();
+    else if (!open && dialog.open) {
+      programmaticClose.current = true;
+      dialog.close();
+      programmaticClose.current = false;
+    }
+  }, [open]);
+  function requestDismiss() {
+    if (!programmaticClose.current) onDismiss();
+  }
+  return (
+    <dialog
+      ref={ref}
+      className="understood-overlay"
+      aria-labelledby="understood-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        requestDismiss();
+      }}
+      onClose={requestDismiss}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onDismiss();
+      }}
+    >
+      <div className="confetti" aria-hidden="true">
+        {pieces.map((piece) => (
+          <i
+            key={piece.id}
+            style={{
+              left: piece.left,
+              animationDelay: piece.delay,
+              animationDuration: piece.duration,
+              background: piece.color,
+              width: piece.width,
+              height: piece.height,
+              borderRadius: piece.radius,
+              ["--drift" as string]: piece.drift,
+              ["--spin" as string]: piece.spin,
+            }}
+          />
+        ))}
+      </div>
+      <div
+        className="understood-panel"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <Milo size={88} />
+        <h2 id="understood-title">Milo understood.</h2>
+        <p>
+          Your explanation landed. Close this session for feedback, or stay
+          and keep talking with Milo.
+        </p>
+        {error && <ErrorNotice message={error} />}
+        <div className="modal-actions">
+          <button
+            type="button"
+            className="primary-button full-width"
+            disabled={busy}
+            onClick={onCloseSession}
+          >
+            {busy ? <Spinner label="Closing session" /> : "Close session"}
+          </button>
+          <button
+            type="button"
+            className="quiet-button full-width"
+            disabled={busy}
+            onClick={onDismiss}
+          >
+            Keep chatting
+          </button>
+        </div>
+      </div>
+    </dialog>
   );
 }
 function CheckCircleIcon() {

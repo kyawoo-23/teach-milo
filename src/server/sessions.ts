@@ -14,7 +14,13 @@ import {
   TransferSchema,
   TurnSchema,
 } from "@/lib/contracts";
-import { allowedMoves, readyForCheck, validateStudent } from "@/lib/controller";
+import {
+  allowedMoves,
+  inferLedgerGaps,
+  normalizeStudentReply,
+  readyForCheck,
+  validateStudent,
+} from "@/lib/controller";
 import { validateBoardInputs } from "@/lib/boards";
 import { finalizeReport } from "@/lib/assessment";
 import { AppError } from "@/lib/errors";
@@ -123,12 +129,39 @@ export async function evidenceMessages(
     ...recent,
   ].sort((a, b) => a.sequence - b.sequence);
 }
+async function maybePromoteReady(
+  id: string,
+  session: Session,
+  lesson: Lesson,
+): Promise<Session> {
+  const ledger = inferLedgerGaps(session.ledger);
+  const candidate = { ...session, ledger };
+  if (
+    !["baseline", "teaching"].includes(session.phase) ||
+    !readyForCheck(candidate, lesson)
+  )
+    return candidate;
+  const updated = {
+    ...candidate,
+    phase: "ready_for_check" as const,
+    revision: session.revision + 1,
+    updatedAt: new Date().toISOString(),
+  };
+  await database().collection("sessions").doc(id).update({
+    phase: updated.phase,
+    ledger: updated.ledger,
+    revision: updated.revision,
+    updatedAt: updated.updatedAt,
+  });
+  return updated;
+}
 export async function publicSession(
   id: string,
   ownerId: string,
 ): Promise<SessionPublic> {
-  const session = await readOwned<Session>("sessions", id, ownerId);
-  const lesson = await readOwned<Lesson>("lessons", session.lessonId, ownerId);
+  const initial = await readOwned<Session>("sessions", id, ownerId);
+  const lesson = await readOwned<Lesson>("lessons", initial.lessonId, ownerId);
+  const session = await maybePromoteReady(id, initial, lesson);
   // Once assessment begins, normal session retrieval cannot reopen practice aids.
   const teaching = ["baseline", "teaching", "ready_for_check"].includes(
     session.phase,
@@ -225,28 +258,36 @@ export async function submitTurn(
         },
         ctx,
       );
-      const ledger = validateStudent(response, session, lesson, messages);
+      const replyData = normalizeStudentReply(
+        response,
+        session,
+        lesson,
+        messages,
+      );
+      const ledger = inferLedgerGaps(
+        validateStudent(replyData, session, lesson, messages),
+      );
       const next = {
         ...session,
         ledger,
         challengeUsed:
-          session.challengeUsed || response.move === "surface_misconception",
+          session.challengeUsed || replyData.move === "surface_misconception",
         nextSequence: session.nextSequence + 2,
       };
       next.phase = readyForCheck(next, lesson)
         ? "ready_for_check"
-        : response.move === "redirect" && session.phase === "baseline"
+        : replyData.move === "redirect" && session.phase === "baseline"
           ? "baseline"
           : "teaching";
       const reply: Message = {
         id: randomUUID(),
         role: "student",
         text:
-          response.move === "surface_misconception"
+          replyData.move === "surface_misconception"
             ? lesson.misconception
             : next.phase === "ready_for_check"
               ? "Your explanation has helped me connect the key ideas. Would you like to try a new example on your own, or keep teaching me?"
-              : response.studentMessage,
+              : replyData.studentMessage,
         createdAt: new Date().toISOString(),
         sequence: session.nextSequence + 1,
         kind: "teaching",

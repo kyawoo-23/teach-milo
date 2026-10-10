@@ -41,6 +41,71 @@ export function allowedMoves(session: Session) {
     moves.push("surface_misconception");
   return moves;
 }
+export function normalizeStudentReply(
+  reply: StudentReply,
+  session: Session,
+  lesson: Lesson,
+  messages: Message[],
+): StudentReply {
+  const moves = allowedMoves(session);
+  const move = (
+    moves.includes(reply.move) ? reply.move : moves[0]
+  ) as StudentReply["move"];
+  let studentMessage = reply.studentMessage
+    .replace(/\bmastered\b/gi, "understood")
+    .replace(/\d+\s*\/\s*10/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const question = studentMessage.indexOf("?");
+  if (question !== -1 && studentMessage.indexOf("?", question + 1) !== -1)
+    studentMessage = studentMessage.slice(0, question + 1).trim();
+  const words = studentMessage.split(/\s+/).filter(Boolean);
+  if (words.length > 65) studentMessage = words.slice(0, 65).join(" ");
+  const keep = (citations: Citation[]) =>
+    validCitations(citations, messages, "teaching");
+  const ids = new Set(lesson.objectives.map((o) => o.id));
+  const seen = new Set<string>();
+  const mechanism = keep(reply.mechanism);
+  const evidence = reply.evidence.flatMap((item) => {
+    if (!ids.has(item.objectiveId) || seen.has(item.objectiveId)) return [];
+    seen.add(item.objectiveId);
+    const citations = keep(item.citations);
+    return [
+      {
+        ...item,
+        citations,
+        understanding: citations.length ? item.understanding : "missing",
+      },
+    ];
+  });
+  return {
+    ...reply,
+    move,
+    studentMessage: studentMessage || "Can you say a bit more about that?",
+    mechanism,
+    demonstration: keep(reply.demonstration).length
+      ? keep(reply.demonstration)
+      : inferDemonstration(mechanism, evidence),
+    misconceptionCorrection: keep(reply.misconceptionCorrection),
+    evidence,
+  };
+}
+function inferDemonstration(
+  mechanism: Citation[],
+  evidence: StudentReply["evidence"],
+): Citation[] {
+  if (mechanism.length) return mechanism.slice(0, 3);
+  return evidence
+    .filter((item) => item.understanding === "supported")
+    .flatMap((item) => item.citations)
+    .sort((a, b) => b.quote.length - a.quote.length)
+    .slice(0, 3);
+}
+export function inferLedgerGaps(ledger: Ledger): Ledger {
+  if (ledger.demonstration.length) return ledger;
+  const demonstration = inferDemonstration(ledger.mechanism, ledger.evidence);
+  return demonstration.length ? { ...ledger, demonstration } : ledger;
+}
 export function validateStudent(
   reply: StudentReply,
   session: Session,
@@ -89,20 +154,19 @@ export function validateStudent(
   return ledger;
 }
 export function readyForCheck(session: Session, lesson: Lesson) {
+  const ledger = inferLedgerGaps(session.ledger);
   return (
-    lesson.concerns.length === 0 &&
-    !session.ledger.unresolvedError &&
+    !ledger.unresolvedError &&
     lesson.objectives.every((o) =>
-      session.ledger.evidence.some(
+      ledger.evidence.some(
         (e) =>
           e.objectiveId === o.id &&
           e.understanding === "supported" &&
           e.citations.length > 0,
       ),
     ) &&
-    session.ledger.mechanism.length > 0 &&
-    session.ledger.demonstration.length > 0 &&
-    (!session.challengeUsed ||
-      session.ledger.misconceptionCorrection.length > 0)
+    ledger.mechanism.length > 0 &&
+    ledger.demonstration.length > 0 &&
+    (!session.challengeUsed || ledger.misconceptionCorrection.length > 0)
   );
 }

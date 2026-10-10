@@ -26,8 +26,9 @@ export type Source = z.infer<typeof SourceSchema>;
 export const ControlSchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9_]{0,30}$/),
   label: z.string().max(80),
-  min: z.number().min(-10000),
-  max: z.number().max(10000),
+  // Gemini structured output rejects minimum/maximum on these fields in large schemas.
+  min: z.number(),
+  max: z.number(),
   step: z.number().positive(),
   initial: z.number(),
   unit: z.string().max(20),

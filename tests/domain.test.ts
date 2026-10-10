@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { convolution } from "@/lib/cnn";
 import { finalizeReport } from "@/lib/assessment";
-import { allowedMoves, readyForCheck, validateStudent } from "@/lib/controller";
+import {
+  allowedMoves,
+  normalizeStudentReply,
+  readyForCheck,
+  validateStudent,
+} from "@/lib/controller";
 import { validateBoardInputs } from "@/lib/boards";
 import { validateCalculation } from "@/lib/custom-code";
 import { StudentReplySchema, LessonGeneratedSchema } from "@/lib/contracts";
@@ -67,6 +72,8 @@ describe("server-owned readiness", () => {
     s.ledger = validateStudent(replyFixture(m, true), s, l, [m]);
     expect(readyForCheck(s, l)).toBe(true);
     s.ledger.demonstration = [];
+    expect(readyForCheck(s, l)).toBe(true);
+    s.ledger.mechanism = [];
     expect(readyForCheck(s, l)).toBe(false);
   });
   it("has no turn-count trigger and never forces transfer", () => {
@@ -97,17 +104,36 @@ describe("server-owned readiness", () => {
     const q = replyFixture(m);
     q.studentMessage = "Why? How?";
     expect(() => validateStudent(q, s, l, [m])).toThrow();
+    const fitted = normalizeStudentReply(
+      { ...q, move: "surface_misconception" },
+      { ...s, challengeUsed: true },
+      l,
+      [m],
+    );
+    expect(fitted.studentMessage).toBe("Why?");
+    expect(fitted.move).not.toBe("surface_misconception");
+    expect(() =>
+      validateStudent(fitted, { ...s, challengeUsed: true }, l, [m]),
+    ).not.toThrow();
     expect(
       StudentReplySchema.safeParse({ ...q, move: "declare_mastery" }).success,
     ).toBe(false);
   });
-  it("does not use uncertainty as readiness", () => {
+  it("infers demonstration from mechanism when the model omits it", () => {
     const l = lessonFixture();
-    l.concerns = ["Source contradiction"];
     const s = sessionFixture(l);
     const m = messageFixture();
     s.ledger = validateStudent(replyFixture(m, true), s, l, [m]);
-    expect(readyForCheck(s, l)).toBe(false);
+    s.ledger.demonstration = [];
+    expect(readyForCheck(s, l)).toBe(true);
+  });
+  it("still allows readiness when the lesson has source review notes", () => {
+    const l = lessonFixture();
+    l.concerns = ["The notes omit one secondary example."];
+    const s = sessionFixture(l);
+    const m = messageFixture();
+    s.ledger = validateStudent(replyFixture(m, true), s, l, [m]);
+    expect(readyForCheck(s, l)).toBe(true);
   });
 });
 describe("evidence-based assessment", () => {
@@ -189,7 +215,16 @@ describe("calculation language", () => {
     expect(() => validateCalculation(code, ["size"], ["area"])).toThrow();
   });
   it("exports usable JSON schemas for structured model responses", () => {
-    expect(z.toJSONSchema(LessonGeneratedSchema).type).toBe("object");
+    const lesson = z.toJSONSchema(LessonGeneratedSchema);
+    expect(lesson.type).toBe("object");
+    const controlMin = (
+      lesson.properties as {
+        board: {
+          properties: { controls: { items: { properties: { min: object } } } };
+        };
+      }
+    ).board.properties.controls.items.properties.min;
+    expect(controlMin).not.toHaveProperty("minimum");
     expect(z.toJSONSchema(StudentReplySchema).type).toBe("object");
   });
 });

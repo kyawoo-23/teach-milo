@@ -30,7 +30,8 @@ export const gemini: Model = {
     await reserveModelCall(context);
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), pdf ? 90_000 : 60_000);
+    const timeoutMs = pdf ? 240_000 : 120_000;
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await ai.models.generateContent({
         model: process.env.GEMINI_MODEL || "gemini-3.8-flash",
@@ -58,7 +59,7 @@ export const gemini: Model = {
           responseJsonSchema: z.toJSONSchema(schema, { target: "draft-7" }),
           maxOutputTokens: pdf ? 16384 : 10000,
           temperature: 0.35,
-          httpOptions: { timeout: pdf ? 90_000 : 60_000 },
+          httpOptions: { timeout: timeoutMs },
           abortSignal: controller.signal,
           automaticFunctionCalling: { disable: true },
         },
@@ -72,6 +73,12 @@ export const gemini: Model = {
     } catch (e) {
       if (e instanceof AppError) throw e;
       const status = (e as { status?: number }).status;
+      if (status === 400)
+        throw new AppError(
+          "MODEL_CONFIGURATION",
+          "Gemini rejected the structured response schema. Update the app or try a different GEMINI_MODEL.",
+          503,
+        );
       if (status === 401 || status === 403 || status === 404)
         throw new AppError(
           "MODEL_CONFIGURATION",

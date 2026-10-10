@@ -121,7 +121,55 @@ async function fixtures(page: Page) {
         state.transferQuestion =
           "A valid stride-1 convolution has 5×5 kernels, 2 input channels, and 4 output filters, with biases. Compare inputs of 20×20×2 and 40×40×2. How many learned parameters are there in each case, and what changes when the image grows? Explain why.";
       } else if (data.action === "continue") state.phase = "teaching";
-      else state.hintUsed = true;
+      else if (data.action === "end") {
+        state.phase = "report";
+        state.report = {
+          scores: {
+            accuracy: {
+              score: 2,
+              status: "assessed",
+              explanation: "You explained the idea clearly.",
+              citations: [],
+            },
+            mechanism: {
+              score: 2,
+              status: "assessed",
+              explanation: "You explained the mechanism.",
+              citations: [],
+            },
+            evidence: {
+              score: 2,
+              status: "assessed",
+              explanation: "You used an example.",
+              citations: [],
+            },
+            misconception: {
+              score: null,
+              status: "insufficient_evidence",
+              explanation: "No misconception was raised.",
+              citations: [],
+            },
+            transfer: {
+              score: null,
+              status: "insufficient_evidence",
+              explanation: "The independent check was skipped.",
+              citations: [],
+            },
+          },
+          total: 6,
+          earnedPoints: 6,
+          availablePoints: 6,
+          overallLabel: "strong_evidence",
+          criticalMisconception: false,
+          transferCorrect: null,
+          strengths: [{ text: "You taught the core idea.", citations: [] }],
+          nextSteps: [
+            { text: "Try the idea on a new example.", citations: [] },
+          ],
+          expectedTransferExplanation:
+            "A later example would reuse the same idea.",
+        };
+      } else state.hintUsed = true;
       return reply({
         ...state,
         ...(state.phase === "transfer"
@@ -327,6 +375,10 @@ test("materials-to-report golden path — scripted walkthrough", async ({
     })),
   ).toEqual([]);
   await page.getByRole("button", { name: "Send explanation" }).click();
+  const understood = page.getByRole("dialog", { name: "Milo understood." });
+  await expect(understood).toBeVisible();
+  await understood.getByRole("button", { name: "Keep chatting" }).click();
+  await expect(understood).toBeHidden();
   await page
     .getByRole("button", { name: "Take the independent check" })
     .click();
@@ -444,6 +496,42 @@ test("worker sandbox returns calculations and terminates a stuck script", async 
   expect(results.storage.error).toBeTruthy();
 });
 
+test("understood celebration offers a close or a return to the chat", async ({
+  page,
+}) => {
+  const { state } = await fixtures(page);
+  state.phase = "ready_for_check";
+  state.progress = lesson.objectives.map((objective) => ({
+    ...objective,
+    status: "supported",
+  }));
+  await page.goto(`/session/${sessionId}`);
+  const dialog = page.getByRole("dialog", { name: "Milo understood." });
+  await expect(dialog).toBeVisible();
+  await page.waitForTimeout(350);
+  await page.screenshot({ path: "artifacts/understood-desktop.png" });
+  await expect(
+    dialog.getByRole("button", { name: "Close session" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(page.getByLabel("Your explanation to Milo")).toBeEnabled();
+  await page.reload();
+  await expect(dialog).toBeHidden();
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Keep chatting" }).click();
+  await expect(dialog).toBeHidden();
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload();
+  await dialog.getByRole("button", { name: "Close session" }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Here’s what your explanations showed.",
+    }),
+  ).toBeVisible();
+});
 test("failed turn survives refresh and retries the same operation", async ({
   page,
 }) => {
