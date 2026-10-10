@@ -9,14 +9,17 @@ import {
   ChevronDown,
   Circle,
   Flag,
+  History,
   Layers3,
   Lightbulb,
+  LogIn,
   MessageCircle,
   Paperclip,
   ShieldCheck,
   X,
 } from "lucide-react";
 import { BoardSubmission, Message, SessionPublic } from "@/lib/contracts";
+import { useAuth } from "./auth-context";
 import { Brand } from "./brand";
 import { Milo } from "./milo";
 import { TeachingBoard } from "./teaching-board";
@@ -34,6 +37,7 @@ import {
 export function SessionExperience({ id }: { id: string }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { user, openAuthModal, openSessionModal } = useAuth();
   const getOperation = useOperationId(id);
   const busyRef = useRef(false);
   const [session, setSession] = useState<SessionPublic | null>(null);
@@ -246,15 +250,52 @@ export function SessionExperience({ id }: { id: string }) {
                 : "Learning by teaching"}
           </span>
         </div>
-        {isTeaching && (
+        <div className="session-header-actions">
+          {isTeaching && (
+            <button
+              className="quiet-button"
+              disabled={unavailable}
+              onClick={() => setEndOpen(true)}
+            >
+              <Flag size={15} /> End session
+            </button>
+          )}
           <button
+            type="button"
             className="quiet-button"
-            disabled={unavailable}
-            onClick={() => setEndOpen(true)}
+            onClick={openSessionModal}
+            title="My Sessions"
           >
-            <Flag size={15} /> End session
+            <History size={15} />
+            <span className="button-text">My Sessions</span>
           </button>
-        )}
+          {user ? (
+            <div className="user-profile-badge-small" title={user.email}>
+              {user.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={user.avatarUrl}
+                  alt={user.name}
+                  className="user-avatar-image-small"
+                />
+              ) : (
+                <span className="user-avatar-fallback-small">
+                  {user.name.charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className="user-name-small">{user.name}</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="quiet-button signin-button-small"
+              onClick={() => openAuthModal("login")}
+            >
+              <LogIn size={14} />
+              <span>Sign In</span>
+            </button>
+          )}
+        </div>
       </header>
       {!session ? (
         <main id="main" className="loading-page">
@@ -782,8 +823,8 @@ function UnderstoodCelebration({
         <Milo size={88} />
         <h2 id="understood-title">Milo understood.</h2>
         <p>
-          Your explanation landed. Close this session for feedback, or stay
-          and keep talking with Milo.
+          Your explanation landed. Close this session for feedback, or stay and
+          keep talking with Milo.
         </p>
         {error && <ErrorNotice message={error} />}
         <div className="modal-actions">

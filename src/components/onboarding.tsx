@@ -17,6 +17,7 @@ import {
 import { LessonPublic, SessionPublic, Source } from "@/lib/contracts";
 import { Brand } from "./brand";
 import { Milo } from "./milo";
+import { NavHeader } from "./nav-header";
 import { api, ErrorNotice, Modal, Spinner, useOperationId } from "./ui";
 
 type MaterialResult = { id: string; name: string; sources: Source[] };
@@ -130,12 +131,13 @@ export function Onboarding() {
   }
   return (
     <div className="home-shell">
-      <header className="site-header">
-        <Brand />
-        <button className="quiet-button" onClick={() => setHelp(true)}>
-          How it works <MessageCircle size={16} />
-        </button>
-      </header>
+      <NavHeader
+        extraActions={
+          <button className="quiet-button" onClick={() => setHelp(true)}>
+            How it works <MessageCircle size={16} />
+          </button>
+        }
+      />
       <main
         id="main"
         className={`home-main ${step !== "material" ? "flow-main" : ""}`}

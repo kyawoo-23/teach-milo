@@ -336,3 +336,45 @@ export const publicLesson = (lesson: Lesson): LessonPublic => ({
   concerns: lesson.concerns,
   objectives: lesson.objectives.map(({ id, label }) => ({ id, label })),
 });
+
+export const UserPublicSchema = z.object({
+  id: z.string(),
+  email: z.string().email(),
+  name: z.string(),
+  avatarUrl: z.string().optional(),
+});
+export type UserPublic = z.infer<typeof UserPublicSchema>;
+
+export const SessionSummarySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  scope: z.string(),
+  level: Level,
+  phase: Phase,
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  expiresAt: z.string(),
+  progress: z.array(
+    z.object({
+      id: z.string(),
+      label: z.string(),
+      status: z.enum(["missing", "partial", "supported"]),
+    }),
+  ),
+});
+export type SessionSummary = z.infer<typeof SessionSummarySchema>;
+
+export const SignupSchema = z
+  .object({
+    email: z.string().trim().email("Please enter a valid email address."),
+    password: z.string().min(8, "Password must be at least 8 characters."),
+    name: z.string().trim().min(1, "Name is required.").max(80),
+  })
+  .strict();
+
+export const LoginSchema = z
+  .object({
+    email: z.string().trim().email("Please enter a valid email address."),
+    password: z.string().min(1, "Password is required."),
+  })
+  .strict();

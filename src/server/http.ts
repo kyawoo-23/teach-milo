@@ -5,6 +5,8 @@ import { z } from "zod";
 import { AppError } from "@/lib/errors";
 import { database, decode, encode, expiresAt } from "./db";
 
+import { getAuthenticatedUser, User } from "./auth";
+
 export const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 export function assertOrigin(request: Request) {
   const origin = request.headers.get("origin");
@@ -20,7 +22,33 @@ export function assertOrigin(request: Request) {
       403,
     );
 }
+
+export async function currentGuestId(): Promise<string | null> {
+  const jar = await cookies();
+  const token = jar.get("teachback_guest")?.value;
+  if (token && /^[A-Za-z0-9_-]{43}$/.test(token)) {
+    return hash(token);
+  }
+  return null;
+}
+
+export async function resolveOwner(create = false): Promise<{
+  ownerId: string;
+  user: User | null;
+  isGuest: boolean;
+}> {
+  const user = await getAuthenticatedUser();
+  if (user) {
+    return { ownerId: user.id, user, isGuest: false };
+  }
+  const guestId = await guest(create);
+  return { ownerId: guestId, user: null, isGuest: true };
+}
+
 export async function guest(create = false) {
+  const user = await getAuthenticatedUser();
+  if (user) return user.id;
+
   const jar = await cookies();
   const token = jar.get("teachback_guest")?.value;
   if (token && /^[A-Za-z0-9_-]{43}$/.test(token)) {
