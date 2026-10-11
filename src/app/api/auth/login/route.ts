@@ -3,17 +3,10 @@ import { AppError } from "@/lib/errors";
 import {
   createUserSession,
   findUserByEmail,
-  migrateGuestData,
   toPublicUser,
   verifyPassword,
 } from "@/server/auth";
-import {
-  assertOrigin,
-  currentGuestId,
-  json,
-  respond,
-  route,
-} from "@/server/http";
+import { assertOrigin, json, respond, route } from "@/server/http";
 
 export const runtime = "nodejs";
 
@@ -34,11 +27,7 @@ export async function POST(request: Request) {
         401,
       );
     }
-    const guestId = await currentGuestId();
     await createUserSession(user.id);
-    if (guestId) {
-      await migrateGuestData(guestId, user.id);
-    }
     return respond({ user: toPublicUser(user) });
   });
 }

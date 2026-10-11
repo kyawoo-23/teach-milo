@@ -17,13 +17,13 @@ initializeApp({
 const db = getFirestore();
 const operationId = randomUUID();
 const preparationId = randomUUID();
-const owners = new Set();
+const users = [];
 const data = {
   operationId,
   text: "Filters reuse learned weights across spatial locations. Image size changes computation, not the learned filter parameters.",
 };
-const post = async (path, body, cookie, requestOrigin = origin) => {
-  const response = await fetch(origin + path, {
+const post = async (path, body, cookie, requestOrigin = origin) =>
+  fetch(origin + path, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -32,11 +32,22 @@ const post = async (path, body, cookie, requestOrigin = origin) => {
     },
     body: JSON.stringify(body),
   });
-  const token = response.headers
-    .get("set-cookie")
-    ?.match(/teachback_guest=([^;]+)/)?.[1];
-  if (token) owners.add(createHash("sha256").update(token).digest("hex"));
-  return response;
+const signup = async () => {
+  const response = await post("/api/auth/signup", {
+    email: `smoke-${randomUUID()}@example.test`,
+    password: randomUUID(),
+    name: "Smoke Test",
+  });
+  assert.equal(response.status, 201);
+  const header = response.headers.get("set-cookie");
+  assert.match(header, /httponly/i);
+  const token = header.match(/teachback_auth=([^;]+)/)[1];
+  const { user } = await response.json();
+  users.push({
+    id: user.id,
+    session: createHash("sha256").update(token).digest("hex"),
+  });
+  return `teachback_auth=${token}`;
 };
 try {
   assert.equal(
@@ -44,17 +55,21 @@ try {
       .status,
     403,
   );
-  const created = await post("/api/materials", data);
+  const anonymous = await post("/api/materials", data);
+  assert.equal(anonymous.status, 401);
+  assert.equal((await anonymous.json()).error.code, "AUTH_REQUIRED");
+  const cookie = await signup();
+  const created = await post("/api/materials", data, cookie);
   assert.equal(created.status, 201);
-  const cookie = created.headers.get("set-cookie").split(";")[0];
-  assert.match(created.headers.get("set-cookie"), /httponly/i);
-  assert.match(created.headers.get("set-cookie"), /samesite=strict/i);
   const material = await created.json();
   assert.equal(
     (await (await post("/api/materials", data, cookie)).json()).id,
     material.id,
   );
-  assert.equal((await post("/api/materials", data)).status, 404);
+  assert.equal(
+    (await post("/api/materials", data, await signup())).status,
+    404,
+  );
   const status = await (await fetch(origin + "/api/status")).json();
   if (!status.configured) {
     const lesson = await post(
@@ -72,14 +87,15 @@ try {
     assert.equal((await lesson.json()).error.code, "SETUP_REQUIRED");
   }
   console.log(
-    "HTTP smoke passed: origin protection, HttpOnly cookie, persistence, idempotency, guest ownership, and configuration response. No model calls made.",
+    "HTTP smoke passed: origin protection, sign-in requirement, HttpOnly auth cookie, persistence, idempotency, account ownership, and configuration response. No model calls made.",
   );
 } finally {
   await db.collection("materials").doc(operationId).delete();
-  for (const owner of owners) {
-    await db.collection("guests").doc(owner).delete();
+  for (const user of users) {
+    await db.collection("users").doc(user.id).delete();
+    await db.collection("user_sessions").doc(user.session).delete();
     for (const id of [operationId, preparationId])
-      await db.collection("operations").doc(`${owner}-${id}`).delete();
+      await db.collection("operations").doc(`${user.id}-${id}`).delete();
   }
   await db.terminate();
 }

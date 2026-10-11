@@ -56,10 +56,10 @@ export function SessionHistoryModal() {
   }
 
   useEffect(() => {
-    if (sessionModalOpen) {
+    if (sessionModalOpen && user) {
       loadSessions();
     }
-  }, [sessionModalOpen]);
+  }, [sessionModalOpen, user]);
 
   async function handleDelete(id: string, e: React.MouseEvent) {
     e.stopPropagation();
@@ -78,25 +78,25 @@ export function SessionHistoryModal() {
     }
   }
 
-  function handleResume(id: string) {
+  function handleResume(id: string, completed = false) {
     closeSessionModal();
-    router.push(`/session/${id}`);
+    router.push(`/session/${id}${completed ? "/report" : ""}`);
   }
 
   return (
     <Modal
       open={sessionModalOpen}
       onClose={closeSessionModal}
-      title={user ? "My Learning Sessions" : "Current Sessions"}
+      title="My Learning Sessions"
     >
       <div className="session-history-content">
-        {!user && (
-          <div className="guest-history-banner">
+        {!user ? (
+          <div className="signin-history-banner">
             <div>
-              <strong>You are in guest mode.</strong>
+              <strong>Sign in to see your sessions.</strong>
               <p>
-                Sign in to save and sync your learning sessions across all your
-                devices.
+                Your learning sessions are saved to your account and sync across
+                all your devices.
               </p>
             </div>
             <button
@@ -110,111 +110,117 @@ export function SessionHistoryModal() {
               Sign In / Sign Up
             </button>
           </div>
-        )}
-
-        {error && <ErrorNotice message={error} onRetry={loadSessions} />}
-
-        {loading ? (
-          <div className="history-loading">
-            <Spinner label="Loading your sessions…" />
-          </div>
-        ) : sessions.length === 0 ? (
-          <div className="history-empty">
-            <div className="history-empty-icon">
-              <BookOpen size={36} />
-            </div>
-            <h3>No sessions found</h3>
-            <p>
-              Bring a document or paste your notes to start teaching Milo and
-              test your understanding.
-            </p>
-            <button
-              type="button"
-              className="action-button primary-action"
-              onClick={() => {
-                closeSessionModal();
-                router.push("/");
-              }}
-            >
-              Start a New Lesson
-            </button>
-          </div>
         ) : (
-          <div className="sessions-list">
-            {sessions.map((item) => {
-              const phaseInfo = PHASE_LABELS[item.phase] || {
-                label: item.phase,
-                badgeClass: "phase-badge-neutral",
-              };
-              const supportedCount = item.progress.filter(
-                (p) => p.status === "supported",
-              ).length;
-              const dateStr = new Date(
-                item.updatedAt || item.createdAt,
-              ).toLocaleDateString(undefined, {
-                month: "short",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              });
+          <>
+            {error && <ErrorNotice message={error} onRetry={loadSessions} />}
 
-              return (
-                <div
-                  key={item.id}
-                  className="session-card"
-                  onClick={() => handleResume(item.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      handleResume(item.id);
-                    }
+            {loading ? (
+              <div className="history-loading">
+                <Spinner label="Loading your sessions…" />
+              </div>
+            ) : sessions.length === 0 ? (
+              <div className="history-empty">
+                <div className="history-empty-icon">
+                  <BookOpen size={36} />
+                </div>
+                <h3>No sessions found</h3>
+                <p>
+                  Bring a document or paste your notes to start teaching Milo
+                  and test your understanding.
+                </p>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => {
+                    closeSessionModal();
+                    router.push("/");
                   }}
                 >
-                  <div className="session-card-header">
-                    <div className="session-card-title-wrap">
-                      <span className={`phase-badge ${phaseInfo.badgeClass}`}>
-                        {phaseInfo.label}
-                      </span>
-                      <span className="level-badge">{item.level}</span>
-                    </div>
-                    <button
-                      type="button"
-                      className="icon-button delete-session-button"
-                      aria-label="Delete session"
-                      onClick={(e) => handleDelete(item.id, e)}
-                      disabled={deletingId === item.id}
+                  Start a New Lesson <ArrowRight size={17} />
+                </button>
+              </div>
+            ) : (
+              <div className="sessions-list">
+                {sessions.map((item) => {
+                  const phaseInfo = PHASE_LABELS[item.phase] || {
+                    label: item.phase,
+                    badgeClass: "phase-badge-neutral",
+                  };
+                  const supportedCount = item.progress.filter(
+                    (p) => p.status === "supported",
+                  ).length;
+                  const dateStr = new Date(
+                    item.updatedAt || item.createdAt,
+                  ).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  });
+
+                  const completed = item.phase === "report";
+                  return (
+                    <div
+                      key={item.id}
+                      className="session-card"
+                      onClick={() => handleResume(item.id, completed)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          handleResume(item.id, completed);
+                        }
+                      }}
                     >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
+                      <div className="session-card-header">
+                        <div className="session-card-title-wrap">
+                          <span
+                            className={`phase-badge ${phaseInfo.badgeClass}`}
+                          >
+                            {phaseInfo.label}
+                          </span>
+                          <span className="level-badge">{item.level}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="icon-button delete-session-button"
+                          aria-label="Delete session"
+                          onClick={(e) => handleDelete(item.id, e)}
+                          disabled={deletingId === item.id}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
 
-                  <h3 className="session-card-title">{item.title}</h3>
-                  {item.scope && (
-                    <p className="session-card-scope">{item.scope}</p>
-                  )}
-
-                  <div className="session-card-footer">
-                    <div className="session-meta">
-                      <span className="session-date">
-                        <Clock size={13} />
-                        {dateStr}
-                      </span>
-                      {item.progress.length > 0 && (
-                        <span className="session-progress-pill">
-                          <CheckCircle2 size={13} />
-                          {supportedCount}/{item.progress.length} objectives
-                        </span>
+                      <h3 className="session-card-title">{item.title}</h3>
+                      {item.scope && (
+                        <p className="session-card-scope">{item.scope}</p>
                       )}
+
+                      <div className="session-card-footer">
+                        <div className="session-meta">
+                          <span className="session-date">
+                            <Clock size={13} />
+                            {dateStr}
+                          </span>
+                          {item.progress.length > 0 && (
+                            <span className="session-progress-pill">
+                              <CheckCircle2 size={13} />
+                              {supportedCount}/{item.progress.length} objectives
+                            </span>
+                          )}
+                        </div>
+                        <span className="resume-indicator">
+                          {completed ? "View report" : "Resume"}{" "}
+                          <ArrowRight size={14} />
+                        </span>
+                      </div>
                     </div>
-                    <span className="resume-indicator">
-                      Resume <ArrowRight size={14} />
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
     </Modal>

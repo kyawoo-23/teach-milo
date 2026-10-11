@@ -70,6 +70,10 @@ async function fixtures(page: Page) {
         body: JSON.stringify(body),
       });
     if (path === "/api/status") return reply({ configured: true, missing: [] });
+    if (path === "/api/auth/me")
+      return reply({
+        user: { id: "learner-1", email: "learner@example.test", name: "Ada" },
+      });
     if (path === "/api/materials")
       return reply({
         id: materialId,

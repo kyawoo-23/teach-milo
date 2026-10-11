@@ -15,10 +15,19 @@ import {
   X,
 } from "lucide-react";
 import { LessonPublic, SessionPublic, Source } from "@/lib/contracts";
-import { Brand } from "./brand";
+import { useAuth } from "./auth-context";
+import { MarkdownEditor } from "./markdown-editor";
+import { clearDraft, saveDraft, takeDraft } from "./material-draft";
 import { Milo } from "./milo";
 import { NavHeader } from "./nav-header";
-import { api, ErrorNotice, Modal, Spinner, useOperationId } from "./ui";
+import {
+  api,
+  ApiError,
+  ErrorNotice,
+  Modal,
+  Spinner,
+  useOperationId,
+} from "./ui";
 
 type MaterialResult = { id: string; name: string; sources: Source[] };
 export function Onboarding() {
@@ -42,6 +51,34 @@ export function Onboarding() {
   const [help, setHelp] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [missing, setMissing] = useState<string[]>([]);
+  const { user, loading, authModalOpen, openAuthModal } = useAuth();
+  // Set when the learner submitted material while signed out; the submission resumes after sign-in.
+  const [resume, setResume] = useState(false);
+  useEffect(() => {
+    takeDraft().then((saved) => {
+      if (!saved) return;
+      setMode(saved.draft.mode);
+      setNotes(saved.draft.notes);
+      setTopic(saved.draft.topic);
+      setLevel(saved.draft.level);
+      setFile(saved.file);
+      if (saved.draft.mode === "upload" && !saved.file)
+        setError("Choose your file again to continue.");
+      else setResume(true);
+    });
+  }, []);
+  useEffect(() => {
+    if (!resume || loading) return;
+    if (user) {
+      setResume(false);
+      void clearDraft();
+      void readMaterial();
+    } else if (!authModalOpen) {
+      setResume(false);
+      void clearDraft();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resume, user, loading, authModalOpen]);
   useEffect(() => {
     api<{ missing: string[] }>("/api/status")
       .then((r) => setMissing(r.missing))
@@ -59,6 +96,8 @@ export function Onboarding() {
     try {
       await action();
     } catch (e) {
+      if (e instanceof ApiError && e.code === "AUTH_REQUIRED")
+        openAuthModal("login");
       setError(e instanceof Error ? e.message : "Please try again.");
     } finally {
       setBusy("");
@@ -78,8 +117,23 @@ export function Onboarding() {
     setFile(chosen);
     setError("");
   }
-  async function readMaterial(event: React.FormEvent) {
+  async function submitMaterial(event: React.FormEvent) {
     event.preventDefault();
+    if (busyRef.current || loading) return;
+    if (!user) {
+      if (mode === "upload" && !file) {
+        setError("Choose a learning document first.");
+        return;
+      }
+      setError("");
+      await saveDraft({ mode, notes, topic, level }, file);
+      setResume(true);
+      openAuthModal("login");
+      return;
+    }
+    await readMaterial();
+  }
+  async function readMaterial() {
     await run(
       mode === "upload" && file?.name.toLowerCase().endsWith(".pdf")
         ? "Reading your pages, including scanned content…"
@@ -201,7 +255,7 @@ export function Onboarding() {
                   <p>Start with something you want to understand.</p>
                 </div>
               </div>
-              <form onSubmit={readMaterial}>
+              <form onSubmit={submitMaterial}>
                 <div
                   className="segmented"
                   role="group"
@@ -355,7 +409,7 @@ export function Onboarding() {
                   </p>
                 )}
                 <p className="privacy-note">
-                  <LockKeyhole size={13} /> Private guest session. Material is
+                  <LockKeyhole size={13} /> Private to your account. Material is
                   processed with Gemini.
                 </p>
               </form>
@@ -408,18 +462,16 @@ export function Onboarding() {
                           {w}
                         </p>
                       ))}
-                      <textarea
+                      <MarkdownEditor
                         id={`source-${i}`}
                         value={source.text}
                         rows={Math.min(
                           12,
                           Math.max(4, source.text.split("\n").length),
                         )}
-                        onChange={(e) =>
+                        onChange={(text) =>
                           setSources((prev) =>
-                            prev.map((s, n) =>
-                              n === i ? { ...s, text: e.target.value } : s,
-                            ),
+                            prev.map((s, n) => (n === i ? { ...s, text } : s)),
                           )
                         }
                       />
@@ -520,7 +572,7 @@ export function Onboarding() {
       </main>
       <footer className="site-footer">
         <span>Understanding grows when you explain.</span>
-        <span>Formative feedback · No account needed</span>
+        <span>Formative feedback · Sign in to save your sessions</span>
       </footer>
       {missing.length > 0 && (
         <div className="setup-note">

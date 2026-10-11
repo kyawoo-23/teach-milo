@@ -27,7 +27,7 @@ pnpm emulators
 pnpm dev
 ```
 
-Open **http://127.0.0.1:3000**. Use this hostname consistently: guest cookies and request-origin checks are scoped to it. Firestore's local UI is **http://127.0.0.1:4000**. `pnpm doctor` checks prerequisites without printing credentials.
+Open **http://127.0.0.1:3000**. Use this hostname consistently: sign-in cookies and request-origin checks are scoped to it. Firestore's local UI is **http://127.0.0.1:4000**. `pnpm doctor` checks prerequisites without printing credentials.
 
 The working app always calls real Gemini. Missing keys, exhausted quota, and model failures produce actionable errors; they never switch to simulated answers. The local emulator persists data in `.emulator-data` on clean shutdown. Use `pnpm cleanup` to remove expired records locally.
 
@@ -59,7 +59,7 @@ Browser tests use intercepted API responses to exercise the complete UI. Integra
 - `src/app`: Next.js routes and server API handlers.
 - `src/components`: material preparation, chat, boards, transfer, and report interfaces.
 - `src/lib`: shared Zod contracts and pure controller, arithmetic, grading, and board validation.
-- `src/server`: guest ownership, Firestore, operations, extraction, lesson preparation, Gemini calls, and session orchestration. Imports are protected by `server-only`.
+- `src/server`: account ownership, Firestore, operations, extraction, lesson preparation, Gemini calls, and session orchestration. Imports are protected by `server-only`.
 - `src/content`: private prompts and the vetted CNN reference.
 - `scripts/extract-worker.mjs`: memory/time-bounded document parsing worker.
 
@@ -83,11 +83,11 @@ The CNN specialization uses deterministic server-recomputed snapshots (224 param
 
 ### Access, retries, and expiry
 
-An opaque HttpOnly, SameSite=Strict guest cookie maps to a server-side token hash. IDs alone grant no access. Mutation endpoints check Origin; Firestore rules deny all direct browser access. Production requires HTTPS and a strong `RATE_LIMIT_SECRET`.
+Learners must sign in (email/password or Google) before material is processed. An opaque HttpOnly, SameSite=Lax `teachback_auth` cookie maps to a server-side session token hash. IDs alone grant no access. Mutation endpoints check Origin; Firestore rules deny all direct browser access. Production requires HTTPS and a strong `RATE_LIMIT_SECRET`.
 
 Durable operation IDs, payload fingerprints, revisions, and transactional leases prevent duplicate stored turns and overlapping calls. Pending teaching/transfer input is stored with the operation before generation/evaluation. Failed calls leave the phase unchanged. Retries reuse the operation ID; expired leases can be recovered. An external provider request whose result is lost during a server crash can still incur a second charge on retry—Firestore cannot make the external API exactly-once.
 
-Daily guest, network, and global call budgets are transactional and configurable. They pause requests rather than end lessons. The default network bucket is shared, which is conservative. Only enable `TRUST_PROXY=true` behind a proxy whose forwarded-address behavior you control; otherwise leave the shared bucket enabled. Telemetry stores event names and session IDs, not source or conversation text.
+Daily per-user, network, and global call budgets are transactional and configurable. They pause requests rather than end lessons. The default network bucket is shared, which is conservative. Only enable `TRUST_PROXY=true` behind a proxy whose forwarded-address behavior you control; otherwise leave the shared bucket enabled. Telemetry stores event names and session IDs, not source or conversation text.
 
 Seven-day expiry is checked on every access. TTL policies cover parent records and message/operation subcollections because deleting a Firestore parent does not delete descendants. The cleanup script also recursively deletes expired parents and should run daily in production. Resetting or creating another lesson does not immediately delete prior materials; use session deletion for conversation removal and expiry for retained extracted sources.
 
@@ -105,4 +105,4 @@ Deploy `firestore.rules` and `firestore.indexes.json`, including TTL fields. Sch
 
 ## Current boundaries
 
-English interface; no accounts, voice, web search, standalone images, slides, or recordings as inputs. Custom material checks use model knowledge and source evidence, not independently verified external facts. Ambiguous material can yield unscored criteria. A generated simulation can be mathematically bounded without being a scientifically valid model; source assumptions and learner interpretation remain essential.
+English interface; no voice, web search, standalone images, slides, or recordings as inputs. Custom material checks use model knowledge and source evidence, not independently verified external facts. Ambiguous material can yield unscored criteria. A generated simulation can be mathematically bounded without being a scientifically valid model; source assumptions and learner interpretation remain essential.
