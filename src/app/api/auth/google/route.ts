@@ -21,7 +21,9 @@ export async function GET(request: Request) {
       e instanceof AppError
         ? e.message
         : "Google authentication configuration error.";
-    const target = new URL("/", request.url);
+    const url = new URL(request.url);
+    const origin = process.env.APP_ORIGIN || url.origin;
+    const target = new URL("/", origin);
     target.searchParams.set("authError", message);
     return Response.redirect(target.toString(), 302);
   }

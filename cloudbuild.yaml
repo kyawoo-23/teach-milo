@@ -46,7 +46,7 @@ steps:
       - --port=8080
       - --startup-probe=httpGet.path=/api/status,httpGet.port=8080
       - --set-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID,APP_ORIGIN=${_APP_ORIGIN},GEMINI_MODEL=${_GEMINI_MODEL},MODEL_CALLS_PER_GLOBAL_DAY=1000
-      - --set-secrets=GEMINI_API_KEY=teachback-gemini-key:latest,RATE_LIMIT_SECRET=teachback-rate-limit-secret:latest
+      - --set-secrets=GEMINI_API_KEY=teachback-gemini-key:latest,RATE_LIMIT_SECRET=teachback-rate-limit-secret:latest,GOOGLE_CLIENT_ID=teachback-google-client-id:latest,GOOGLE_CLIENT_SECRET=teachback-google-client-secret:latest
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/app:$SHORT_SHA
