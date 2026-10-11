@@ -4,8 +4,7 @@ substitutions:
   _REPOSITORY: teachback
   _RUNTIME_SA: teachback-runtime@teachback-ai-511214.iam.gserviceaccount.com
   _GEMINI_MODEL: gemini-3.5-flash-lite
-  # Replace with the Cloud Run HTTPS URL before origin checks or OAuth matter.
-  _APP_ORIGIN: https://pending.invalid
+  _APP_ORIGIN: https://teachback-ai-609216296403.asia-southeast1.run.app
 
 steps:
   - id: build
