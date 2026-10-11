@@ -1,6 +1,12 @@
-import { randomUUID } from "node:crypto";
+import { FieldPath, Timestamp } from "firebase-admin/firestore";
 import { z } from "zod";
-import { Lesson, Session, SessionSummary } from "@/lib/contracts";
+import {
+  Lesson,
+  Session,
+  SessionHistoryPage,
+  SessionSummary,
+} from "@/lib/contracts";
+import { AppError } from "@/lib/errors";
 import { database, decode } from "@/server/db";
 import {
   assertOrigin,
@@ -14,33 +20,92 @@ import { createSession, publicSession } from "@/server/sessions";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+type HistorySession = Pick<
+  Session,
+  "id" | "lessonId" | "phase" | "createdAt" | "updatedAt" | "expiresAt"
+> & { ledger: Pick<Session["ledger"], "evidence"> };
+type HistoryLesson = Pick<Lesson, "title" | "scope" | "level" | "objectives">;
+
+const PAGE_SIZE = 20;
+const CursorSchema = z
+  .object({
+    updatedAt: z.string().datetime(),
+    expiresAt: z
+      .object({
+        seconds: z.number().int().min(-62135596800).max(253402300799),
+        nanoseconds: z.number().int().min(0).max(999999999),
+      })
+      .strict(),
+    id: z.string().uuid(),
+  })
+  .strict();
+
+function readCursor(value: string | null) {
+  if (value === null) return undefined;
+  try {
+    if (value.length > 1024 || !/^[A-Za-z0-9_-]+$/.test(value))
+      throw new Error();
+    return CursorSchema.parse(
+      JSON.parse(Buffer.from(value, "base64url").toString("utf8")),
+    );
+  } catch {
+    throw new AppError(
+      "INVALID_CURSOR",
+      "This history page is invalid. Reopen your sessions to start again.",
+      400,
+    );
+  }
+}
+
+export async function GET(request: Request) {
   return route(async () => {
     const ownerId = await requireUserId();
-    const snap = await database()
+    const cursor = readCursor(new URL(request.url).searchParams.get("cursor"));
+    const now = Timestamp.now();
+    let query = database()
       .collection("sessions")
       .where("ownerId", "==", ownerId)
-      .get();
+      .where("expiresAt", ">", now)
+      .orderBy("updatedAt", "desc")
+      .orderBy("expiresAt", "asc")
+      .orderBy(FieldPath.documentId(), "asc")
+      .select(
+        "id",
+        "lessonId",
+        "phase",
+        "createdAt",
+        "updatedAt",
+        "expiresAt",
+        "ledger.evidence",
+      )
+      .limit(PAGE_SIZE + 1);
+    if (cursor) {
+      query = query.startAfter(
+        cursor.updatedAt,
+        new Timestamp(cursor.expiresAt.seconds, cursor.expiresAt.nanoseconds),
+        cursor.id,
+      );
+    }
+    const snap = await query.get();
+    const pageDocs = snap.docs.slice(0, PAGE_SIZE);
 
-    const sessionDocs = snap.docs.map((d) => decode<Session>(d.data()));
-    const now = Date.now();
-    const activeSessions = sessionDocs.filter(
-      (s) => new Date(s.expiresAt).getTime() > now,
-    );
-    activeSessions.sort(
-      (a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    const activeSessions = pageDocs.map((d) =>
+      decode<HistorySession>(d.data()),
     );
 
-    const lessonRefs = activeSessions.map((s) =>
-      database().collection("lessons").doc(s.lessonId),
+    const lessonRefs = [...new Set(activeSessions.map((s) => s.lessonId))].map(
+      (id) => database().collection("lessons").doc(id),
     );
     const lessonDocs =
-      lessonRefs.length > 0 ? await database().getAll(...lessonRefs) : [];
-    const lessonMap = new Map<string, Lesson>();
+      lessonRefs.length > 0
+        ? await database().getAll(...lessonRefs, {
+            fieldMask: ["title", "scope", "level", "objectives"],
+          })
+        : [];
+    const lessonMap = new Map<string, HistoryLesson>();
     for (const doc of lessonDocs) {
       if (doc.exists) {
-        lessonMap.set(doc.id, decode<Lesson>(doc.data()));
+        lessonMap.set(doc.id, decode<HistoryLesson>(doc.data()));
       }
     }
 
@@ -65,7 +130,22 @@ export async function GET() {
       };
     });
 
-    return respond({ sessions: summaries });
+    const result: SessionHistoryPage = { sessions: summaries };
+    if (snap.size > PAGE_SIZE) {
+      const last = pageDocs.at(-1)!;
+      const expiry = last.get("expiresAt") as Timestamp;
+      result.nextCursor = Buffer.from(
+        JSON.stringify({
+          updatedAt: last.get("updatedAt"),
+          expiresAt: {
+            seconds: expiry.seconds,
+            nanoseconds: expiry.nanoseconds,
+          },
+          id: last.id,
+        }),
+      ).toString("base64url");
+    }
+    return respond(result);
   });
 }
 

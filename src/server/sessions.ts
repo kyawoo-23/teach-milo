@@ -26,7 +26,14 @@ import { validateBoardInputs } from "@/lib/boards";
 import { finalizeReport } from "@/lib/assessment";
 import { AppError } from "@/lib/errors";
 import { EVALUATE_PROMPT, STUDENT_PROMPT } from "@/content/prompts";
-import { database, decode, encode, expiresAt, readOwned } from "./db";
+import {
+  assertOwned,
+  database,
+  decode,
+  encode,
+  expiresAt,
+  readOwned,
+} from "./db";
 import { gemini, Model } from "./model";
 import { sessionOperation } from "./operations";
 import { CallContext, event } from "./usage";
@@ -38,7 +45,8 @@ export async function createSession(
 ) {
   const existing = await database().collection("sessions").doc(id).get();
   if (existing.exists) {
-    const old = await readOwned<Session>("sessions", id, ownerId);
+    const old = decode<Session>(existing.data());
+    assertOwned(old, ownerId);
     if (old.lessonId !== lessonId)
       throw new AppError(
         "OPERATION_CONFLICT",
@@ -161,13 +169,16 @@ export async function publicSession(
   ownerId: string,
 ): Promise<SessionPublic> {
   const initial = await readOwned<Session>("sessions", id, ownerId);
-  const lesson = await readOwned<Lesson>("lessons", initial.lessonId, ownerId);
+  // Session ownership is checked before starting either independent read.
+  const [lesson, messages] = await Promise.all([
+    readOwned<Lesson>("lessons", initial.lessonId, ownerId),
+    initial.phase === "transfer" ? Promise.resolve([]) : readMessages(id),
+  ]);
   const session = await maybePromoteReady(id, initial, lesson);
   // Once assessment begins, normal session retrieval cannot reopen practice aids.
   const teaching = ["baseline", "teaching", "ready_for_check"].includes(
     session.phase,
   );
-  const messages = session.phase === "transfer" ? [] : await readMessages(id);
   return {
     id,
     phase: session.phase,

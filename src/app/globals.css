@@ -3382,6 +3382,13 @@ input[type="range"] {
   flex-direction: column;
   gap: 12px;
 }
+
+.history-pagination {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding-top: 16px;
+}
 .session-card {
   position: relative;
   padding: 16px 20px;

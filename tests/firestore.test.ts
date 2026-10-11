@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, describe, expect, it } from "vitest";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { deleteApp, initializeApp } from "firebase-admin/app";
+import { getFirestore, Query, Timestamp } from "firebase-admin/firestore";
+import { afterAll, describe, expect, it, vi } from "vitest";
+import { GET as sessionHistory } from "@/app/api/sessions/route";
+import { getAuthenticatedUser } from "@/server/auth";
 import { database, encode, readOwned } from "@/server/db";
 import {
   createSession,
@@ -13,9 +19,18 @@ import { sessionOperation } from "@/server/operations";
 import { saveMaterial } from "@/server/materials";
 import { reserveModelCall } from "@/server/usage";
 import type { Model } from "@/server/model";
-import type { Message, Session } from "@/lib/contracts";
+import type { Message, Session, SessionHistoryPage } from "@/lib/contracts";
 import { AppError } from "@/lib/errors";
-import { ctx, lessonFixture, replyFixture, reportFixture } from "./fixtures";
+import {
+  ctx,
+  lessonFixture,
+  messageFixture,
+  replyFixture,
+  reportFixture,
+  sessionFixture,
+} from "./fixtures";
+
+vi.mock("@/server/auth", () => ({ getAuthenticatedUser: vi.fn() }));
 
 const enabled = !!process.env.FIRESTORE_EMULATOR_HOST;
 describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
@@ -293,6 +308,476 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
       ).toBe("Original");
     } finally {
       await database().collection("materials").doc(id).delete();
+    }
+  });
+  it("returns only active owned history in newest-first order with existing summaries", async () => {
+    const ownerId = randomUUID();
+    const lesson = { ...lessonFixture(), ownerId };
+    lesson.sources[0].text = "s".repeat(50_000);
+    lesson.knowledge = "k".repeat(7_000);
+    lesson.board.code = "// unused history payload\n".repeat(400);
+    const now = Timestamp.now();
+    const older = {
+      ...sessionFixture(lesson),
+      updatedAt: new Date(now.toMillis() - 60_000).toISOString(),
+    };
+    older.ledger.evidence = [
+      { objectiveId: "o1", understanding: "supported", citations: [] },
+    ];
+    older.ledger.summary = "summary ".repeat(250);
+    older.report = {
+      ...reportFixture(messageFixture()),
+      total: null,
+      availablePoints: 0,
+      earnedPoints: 0,
+      overallLabel: "incomplete",
+      expectedTransferExplanation: "e".repeat(2_000),
+      transferCorrect: null,
+    };
+    const newer = {
+      ...sessionFixture(lesson),
+      updatedAt: now.toDate().toISOString(),
+    };
+    // Expiry order deliberately differs from history's updatedAt order.
+    older.expiresAt = new Date(now.toMillis() + 120_000).toISOString();
+    newer.expiresAt = new Date(now.toMillis() + 60_000).toISOString();
+    const expired = {
+      ...sessionFixture(lesson),
+      expiresAt: new Date(0).toISOString(),
+    };
+    const expiresNow = {
+      ...sessionFixture(lesson),
+      expiresAt: now.toDate().toISOString(),
+    };
+    const otherOwner = { ...sessionFixture(lesson), ownerId: randomUUID() };
+    const missingLesson = {
+      ...sessionFixture(lesson),
+      lessonId: randomUUID(),
+      updatedAt: new Date(now.toMillis() - 120_000).toISOString(),
+    };
+    const sessions = [
+      older,
+      newer,
+      expired,
+      expiresNow,
+      otherOwner,
+      missingLesson,
+    ];
+    const f = database();
+    const lessonRef = f.collection("lessons").doc(lesson.id);
+    const refs = sessions.map((s) => f.collection("sessions").doc(s.id));
+    const batch = f.batch();
+    batch.create(lessonRef, encode(lesson));
+    sessions.forEach((s, i) => batch.create(refs[i], encode(s)));
+    vi.mocked(getAuthenticatedUser).mockResolvedValue({
+      id: ownerId,
+      email: "history@example.test",
+      name: "History Learner",
+      createdAt: now.toDate().toISOString(),
+      updatedAt: now.toDate().toISOString(),
+    });
+    const clock = vi.spyOn(Timestamp, "now").mockReturnValue(now);
+    let queryRead: ReturnType<typeof vi.spyOn> | undefined;
+    let lessonRead: ReturnType<typeof vi.spyOn> | undefined;
+    try {
+      await batch.commit();
+      const fullSessions = await f.getAll(refs[0], refs[1], refs[5]);
+      const fullLessons = await f.getAll(
+        lessonRef,
+        lessonRef,
+        f.collection("lessons").doc(missingLesson.lessonId),
+      );
+      const snapshotBytes = (rows: unknown[]) =>
+        Buffer.byteLength(JSON.stringify(rows));
+      const fullBytes = snapshotBytes([
+        ...fullSessions.map((d) => d.data()),
+        ...fullLessons.map((d) => d.data()),
+      ]);
+      let projectedSessions: Record<string, unknown>[] = [];
+      let projectedLessons: (Record<string, unknown> | undefined)[] = [];
+      const originalQueryGet = Query.prototype.get;
+      queryRead = vi
+        .spyOn(Query.prototype, "get")
+        .mockImplementation(async function (this: Query) {
+          const docs = await originalQueryGet.call(this);
+          projectedSessions = docs.docs.map((d) => d.data());
+          return docs;
+        });
+      const originalGetAll = f.getAll.bind(f);
+      const lessonSpy = vi
+        .spyOn(f, "getAll")
+        .mockImplementation(async (...args) => {
+          const docs = await originalGetAll(...args);
+          projectedLessons = docs.map((d) => d.data());
+          return docs;
+        });
+      lessonRead = lessonSpy;
+      const response = await sessionHistory(
+        new Request("http://localhost/api/sessions"),
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      const body = await response.json();
+      expect(body.sessions.map((s: { id: string }) => s.id)).toEqual([
+        newer.id,
+        older.id,
+        missingLesson.id,
+      ]);
+      expect(body.sessions[1]).toEqual({
+        id: older.id,
+        title: lesson.title,
+        scope: lesson.scope,
+        level: lesson.level,
+        phase: older.phase,
+        createdAt: older.createdAt,
+        updatedAt: older.updatedAt,
+        expiresAt: older.expiresAt,
+        progress: lesson.objectives.map((o, i) => ({
+          id: o.id,
+          label: o.label,
+          status: i === 0 ? "supported" : "missing",
+        })),
+      });
+      expect(body.sessions[2]).toMatchObject({
+        title: "Untitled Lesson",
+        scope: "",
+        level: "introductory",
+        progress: [],
+      });
+      expect(lessonSpy).toHaveBeenCalledTimes(1);
+      const lessonArgs = lessonSpy.mock.calls[0];
+      expect(lessonArgs.slice(0, -1)).toEqual([
+        lessonRef,
+        f.collection("lessons").doc(missingLesson.lessonId),
+      ]);
+      for (const row of projectedSessions) {
+        expect(Object.keys(row).sort()).toEqual(
+          [
+            "id",
+            "lessonId",
+            "phase",
+            "createdAt",
+            "updatedAt",
+            "expiresAt",
+            "ledger",
+          ].sort(),
+        );
+        expect(Object.keys(row.ledger as object)).toEqual(["evidence"]);
+      }
+      const projectedLesson = projectedLessons.find(
+        (row) => row !== undefined,
+      )!;
+      expect(Object.keys(projectedLesson).sort()).toEqual([
+        "level",
+        "objectives",
+        "scope",
+        "title",
+      ]);
+      const projectedBytes = snapshotBytes([
+        ...projectedSessions,
+        ...projectedLessons,
+      ]);
+      expect(projectedBytes).toBeLessThan(fullBytes / 10);
+      console.info("History serialized snapshot payload (large fixture)", {
+        fullBytes,
+        projectedBytes,
+        lessonReadsBefore: fullLessons.length,
+        lessonReadsAfter: projectedLessons.length,
+      });
+    } finally {
+      queryRead?.mockRestore();
+      lessonRead?.mockRestore();
+      clock.mockRestore();
+      vi.mocked(getAuthenticatedUser).mockReset();
+      await Promise.all([lessonRef, ...refs].map((ref) => ref.delete()));
+    }
+  });
+  it("returns empty history when an owner has no active sessions", async () => {
+    const lessonRead = vi.spyOn(database(), "getAll");
+    vi.mocked(getAuthenticatedUser).mockResolvedValue({
+      id: randomUUID(),
+      email: "empty@example.test",
+      name: "New Learner",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    try {
+      const response = await sessionHistory(
+        new Request("http://localhost/api/sessions"),
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ sessions: [] });
+      expect(lessonRead).not.toHaveBeenCalled();
+    } finally {
+      lessonRead.mockRestore();
+      vi.mocked(getAuthenticatedUser).mockReset();
+    }
+  });
+  it("bounds history pages, resolves timestamp ties, and continues after a deleted cursor document", async () => {
+    const ownerId = randomUUID();
+    const lesson = { ...lessonFixture(), ownerId };
+    const now = Timestamp.now();
+    const sessions = Array.from({ length: 45 }, (_, i) => ({
+      ...sessionFixture(lesson),
+      updatedAt: new Date(
+        now.toMillis() - Math.floor(i / 15) * 60_000,
+      ).toISOString(),
+      expiresAt: new Date(
+        now.toMillis() + 120_000 + (i % 2) * 1000,
+      ).toISOString(),
+    }));
+    const expected = [...sessions].sort(
+      (a, b) =>
+        b.updatedAt.localeCompare(a.updatedAt) ||
+        a.expiresAt.localeCompare(b.expiresAt) ||
+        a.id.localeCompare(b.id),
+    );
+    const otherOwner = {
+      ...sessionFixture(lesson),
+      ownerId: randomUUID(),
+      updatedAt: new Date(0).toISOString(),
+    };
+    const expired = {
+      ...sessionFixture(lesson),
+      expiresAt: now.toDate().toISOString(),
+    };
+    const f = database();
+    const lessonRef = f.collection("lessons").doc(lesson.id);
+    const refs = [...sessions, otherOwner, expired].map((s) =>
+      f.collection("sessions").doc(s.id),
+    );
+    const batch = f.batch();
+    batch.create(lessonRef, encode(lesson));
+    [...sessions, otherOwner, expired].forEach((s, i) =>
+      batch.create(refs[i], encode(s)),
+    );
+    const user = {
+      id: ownerId,
+      email: "pages@example.test",
+      name: "Pages",
+      createdAt: now.toDate().toISOString(),
+      updatedAt: now.toDate().toISOString(),
+    };
+    vi.mocked(getAuthenticatedUser).mockResolvedValue(user);
+    const clock = vi.spyOn(Timestamp, "now").mockReturnValue(now);
+    const originalGet = Query.prototype.get;
+    const sizes: number[] = [];
+    const queryRead = vi
+      .spyOn(Query.prototype, "get")
+      .mockImplementation(async function (this: Query) {
+        const snapshot = await originalGet.call(this);
+        sizes.push(snapshot.size);
+        return snapshot;
+      });
+    const lessonRead = vi.spyOn(f, "getAll");
+    async function page(cursor?: string): Promise<SessionHistoryPage> {
+      const response = await sessionHistory(
+        new Request(
+          `http://localhost/api/sessions${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+        ),
+      );
+      expect(response.status).toBe(200);
+      return response.json();
+    }
+    try {
+      await batch.commit();
+      const first = await page();
+      expect(first.sessions.map((s) => s.id)).toEqual(
+        expected.slice(0, 20).map((s) => s.id),
+      );
+      expect(first.nextCursor).toEqual(expect.any(String));
+      expect(lessonRead.mock.calls[0].slice(0, -1)).toEqual([lessonRef]);
+      await f.collection("sessions").doc(first.sessions.at(-1)!.id).delete();
+      const second = await page(first.nextCursor);
+      const third = await page(second.nextCursor);
+      expect(second.sessions).toHaveLength(20);
+      expect(third.sessions).toHaveLength(5);
+      expect(third.nextCursor).toBeUndefined();
+      const all = [...first.sessions, ...second.sessions, ...third.sessions];
+      expect(all.map((s) => s.id)).toEqual(expected.map((s) => s.id));
+      expect(new Set(all.map((s) => s.id)).size).toBe(45);
+      expect(sizes).toEqual([21, 21, 5]);
+      expect(lessonRead).toHaveBeenCalledTimes(3);
+
+      // A cursor is a position, never authorization for its original owner.
+      vi.mocked(getAuthenticatedUser).mockResolvedValue({
+        ...user,
+        id: otherOwner.ownerId,
+      });
+      const foreignCursorPage = await page(first.nextCursor);
+      expect(foreignCursorPage.sessions.map((s) => s.id)).toEqual([
+        otherOwner.id,
+      ]);
+      vi.mocked(getAuthenticatedUser).mockResolvedValue(user);
+      await Promise.all(
+        expected
+          .slice(20)
+          .map((s) => f.collection("sessions").doc(s.id).delete()),
+      );
+      const last = await page();
+      expect(last.sessions).toHaveLength(19);
+      expect(last.nextCursor).toBeUndefined();
+    } finally {
+      queryRead.mockRestore();
+      lessonRead.mockRestore();
+      clock.mockRestore();
+      vi.mocked(getAuthenticatedUser).mockReset();
+      await Promise.all([lessonRef, ...refs].map((ref) => ref.delete()));
+    }
+  });
+  it("rechecks expiry between history pages and omits cursors at the exact page boundary", async () => {
+    const ownerId = randomUUID();
+    const lesson = { ...lessonFixture(), ownerId };
+    const now = Timestamp.now();
+    const sessions = Array.from({ length: 21 }, (_, i) => ({
+      ...sessionFixture(lesson),
+      lessonId: randomUUID(),
+      updatedAt: new Date(now.toMillis() - i * 1000).toISOString(),
+      expiresAt: new Date(
+        now.toMillis() + (i === 20 ? 1000 : 120_000),
+      ).toISOString(),
+    }));
+    const f = database();
+    const refs = sessions.map((s) => f.collection("sessions").doc(s.id));
+    const batch = f.batch();
+    sessions.forEach((s, i) => batch.create(refs[i], encode(s)));
+    vi.mocked(getAuthenticatedUser).mockResolvedValue({
+      id: ownerId,
+      email: "expiry@example.test",
+      name: "Expiry",
+      createdAt: now.toDate().toISOString(),
+      updatedAt: now.toDate().toISOString(),
+    });
+    const clock = vi.spyOn(Timestamp, "now").mockReturnValue(now);
+    const lessonRead = vi.spyOn(f, "getAll");
+    try {
+      await batch.commit();
+      const first = await sessionHistory(
+        new Request("http://localhost/api/sessions"),
+      );
+      expect(first.status).toBe(200);
+      const firstPage: SessionHistoryPage = await first.json();
+      expect(firstPage.sessions).toHaveLength(20);
+      expect(firstPage.nextCursor).toEqual(expect.any(String));
+      expect(lessonRead.mock.calls[0].slice(0, -1)).toEqual(
+        sessions
+          .slice(0, 20)
+          .map((s) => f.collection("lessons").doc(s.lessonId)),
+      );
+      expect(
+        firstPage.sessions.every(
+          (s) => s.title === "Untitled Lesson" && s.progress.length === 0,
+        ),
+      ).toBe(true);
+      clock.mockReturnValue(Timestamp.fromMillis(now.toMillis() + 1000));
+      const next = await sessionHistory(
+        new Request(
+          `http://localhost/api/sessions?cursor=${firstPage.nextCursor}`,
+        ),
+      );
+      expect(next.status).toBe(200);
+      expect(await next.json()).toEqual({ sessions: [] });
+      expect(lessonRead).toHaveBeenCalledTimes(1);
+      const refreshed = await sessionHistory(
+        new Request("http://localhost/api/sessions"),
+      );
+      expect(refreshed.status).toBe(200);
+      const last: SessionHistoryPage = await refreshed.json();
+      expect(last.sessions).toHaveLength(20);
+      expect(last.nextCursor).toBeUndefined();
+    } finally {
+      lessonRead.mockRestore();
+      clock.mockRestore();
+      vi.mocked(getAuthenticatedUser).mockReset();
+      await Promise.all(refs.map((ref) => ref.delete()));
+    }
+  });
+  it("paginates messages by sequence without duplicates or skipped messages", async () => {
+    const { id } = await setup();
+    const ref = database().collection("sessions").doc(id);
+    const session = await readOwned<Session>("sessions", id, ctx.ownerId);
+    const batch = database().batch();
+    for (let sequence = 1; sequence <= 5; sequence++) {
+      const message: Message = {
+        id: randomUUID(),
+        role: "learner",
+        text: `Message ${sequence}`,
+        sequence,
+        createdAt: new Date().toISOString(),
+      };
+      batch.create(
+        ref.collection("messages").doc(message.id),
+        encode({ ...message, expiresAt: session.expiresAt }),
+      );
+    }
+    await batch.commit();
+    const newest = await readMessages(id, 2);
+    expect(newest.map((m) => m.sequence)).toEqual([4, 5]);
+    const middle = await readMessages(id, 2, newest[0].sequence);
+    expect(middle.map((m) => m.sequence)).toEqual([2, 3]);
+    const oldest = await readMessages(id, 2, middle[0].sequence);
+    expect(oldest.map((m) => m.sequence)).toEqual([0, 1]);
+    expect(await readMessages(id, 2, oldest[0].sequence)).toEqual([]);
+  });
+  it("cleans expired authentication records across batches and recursively deletes expired sessions", async () => {
+    // Run the real CLI against an isolated emulator project, never dev records.
+    const projectId = "demo-teachback-cleanup";
+    const app = initializeApp({ projectId }, `cleanup-${randomUUID()}`);
+    const f = getFirestore(app);
+    const user = f.collection("users").doc(randomUUID());
+    const active = f.collection("user_sessions").doc(randomUUID());
+    const expired = Array.from({ length: 101 }, () =>
+      f.collection("user_sessions").doc(randomUUID()),
+    );
+    const session = f.collection("sessions").doc(randomUUID());
+    const message = session.collection("messages").doc(randomUUID());
+    const operation = session.collection("operations").doc(randomUUID());
+    const future = Timestamp.fromMillis(Date.now() + 30 * 86_400_000);
+    const batch = f.batch();
+    batch.create(user, { id: user.id, email: "cleanup@example.test" });
+    batch.create(active, { userId: user.id, expiresAt: future });
+    expired.forEach((ref) =>
+      batch.create(ref, {
+        userId: user.id,
+        expiresAt: Timestamp.fromMillis(0),
+      }),
+    );
+    batch.create(session, { expiresAt: Timestamp.fromMillis(0) });
+    batch.create(message, { text: "Expired parent", expiresAt: future });
+    batch.create(operation, { status: "complete", expiresAt: future });
+    try {
+      await batch.commit();
+      const { stdout } = await promisify(execFile)(
+        process.execPath,
+        ["scripts/cleanup.mjs"],
+        {
+          env: {
+            ...process.env,
+            GOOGLE_CLOUD_PROJECT: projectId,
+            FIRESTORE_EMULATOR_HOST: process.env.FIRESTORE_EMULATOR_HOST!,
+          },
+          timeout: 25_000,
+        },
+      );
+      expect(stdout).toContain("user_sessions: removed 101 expired records");
+      expect(stdout).toContain("sessions: removed 1 expired records");
+      expect((await f.getAll(...expired)).every((doc) => !doc.exists)).toBe(
+        true,
+      );
+      expect(
+        (await f.getAll(session, message, operation)).every(
+          (doc) => !doc.exists,
+        ),
+      ).toBe(true);
+      expect((await active.get()).get("expiresAt").toMillis()).toBe(
+        future.toMillis(),
+      );
+      expect((await user.get()).exists).toBe(true);
+    } finally {
+      await Promise.all([user, active, ...expired].map((ref) => ref.delete()));
+      await f.recursiveDelete(session);
+      await f.terminate();
+      await deleteApp(app);
     }
   });
 });

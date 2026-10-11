@@ -89,7 +89,11 @@ Durable operation IDs, payload fingerprints, revisions, and transactional leases
 
 Daily per-user, network, and global call budgets are transactional and configurable. They pause requests rather than end lessons. The default network bucket is shared, which is conservative. Only enable `TRUST_PROXY=true` behind a proxy whose forwarded-address behavior you control; otherwise leave the shared bucket enabled. Telemetry stores event names and session IDs, not source or conversation text.
 
-Seven-day expiry is checked on every access. TTL policies cover parent records and message/operation subcollections because deleting a Firestore parent does not delete descendants. The cleanup script also recursively deletes expired parents and should run daily in production. Resetting or creating another lesson does not immediately delete prior materials; use session deletion for conversation removal and expiry for retained extracted sources.
+Seven-day expiry is checked on every access. Session history filters ownership and expiry in Firestore and orders active sessions newest first. `GET /api/sessions` returns up to 20 summaries and an optional `nextCursor`; pass it as `?cursor=...` to load the next page. Each request reads at most 21 session documents (one lookahead) and 20 distinct lesson documents, with summary-only projections. The modal appends pages with “Load more” and resets when reopened. Cursors use ordered field values, so deleting a boundary session does not break continuation. History is live: updates can move sessions between pages; reopen to refresh the newest entries. The document limit does not bound index entries scanned for expiry filtering.
+
+TTL policies cover parent records and message/operation subcollections because deleting a Firestore parent does not delete descendants. Authentication sessions in `user_sessions` have their own 30-day expiry, TTL policy, and cleanup coverage; user accounts remain persistent. The cleanup script also recursively deletes expired parents and should run daily in production. Resetting or creating another lesson does not immediately delete prior materials; use session deletion for conversation removal and expiry for retained extracted sources.
+
+Large source, lesson, evidence, report, board, and pending-operation payloads are exempt from indexing because the app does not query those fields. Ownership, email, message-sequence, and cleanup expiry indexes remain available.
 
 ## Cloud Run preparation
 
@@ -101,7 +105,7 @@ docker build --platform linux/amd64 -t teachback-ai .
 
 Before deployment, create a Firestore database, an Artifact Registry image repository, and a dedicated runtime service account. Give the runtime `roles/datastore.user` and Secret Manager accessor on two secrets: `teachback-gemini-key` (the Gemini API key) and `teachback-rate-limit-secret` (a random 32+ character rate-limit secret). Deploy with Cloud Build (`gcloud builds submit` or a trigger using `cloudbuild.yaml`). Set the `_APP_ORIGIN` substitution to the service HTTPS URL. Do not set `FIRESTORE_EMULATOR_HOST` in production.
 
-Deploy `firestore.rules` and `firestore.indexes.json`, including TTL fields. Schedule a Cloud Run Job using the same image and `node scripts/cleanup.mjs` daily, with Firestore access. Public IAM access should be enabled only for the app service when you are ready to launch. No cloud deployment is performed by this repository's local commands.
+Deploy `firestore.rules` and `firestore.indexes.json`, including TTL fields. Before releasing the session-history query, confirm the target database edition and deploy indexes with `pnpm exec firebase deploy --only firestore:indexes --project YOUR_PROJECT_ID`; wait until the `sessions` composite indexes are ready, including the pagination index on `ownerId ASC`, `updatedAt DESC`, `expiresAt ASC`, and `__name__ ASC`. Emulator tests do not verify production index readiness. TTL deletion is asynchronous, so application expiry checks and scheduled cleanup remain necessary. Schedule a Cloud Run Job using the same image and `node scripts/cleanup.mjs` daily, with Firestore access. Public IAM access should be enabled only for the app service when you are ready to launch. No cloud deployment is performed by this repository's local commands.
 
 ## Current boundaries
 
