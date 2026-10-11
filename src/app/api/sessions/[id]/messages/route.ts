@@ -1,14 +1,14 @@
 import { Id, Message, Session } from "@/lib/contracts";
 import { AppError } from "@/lib/errors";
 import { database, decode, readOwned } from "@/server/db";
-import { guest, respond, route } from "@/server/http";
+import { requireUserId, respond, route } from "@/server/http";
 import { readMessages } from "@/server/sessions";
 export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   return route(async () => {
-    const owner = await guest();
+    const owner = await requireUserId();
     const id = Id.parse((await context.params).id);
     const session = await readOwned<Session>("sessions", id, owner);
     if (session.phase === "transfer")

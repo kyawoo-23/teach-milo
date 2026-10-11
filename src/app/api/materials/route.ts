@@ -1,7 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { CreateMaterialSchema, Id } from "@/lib/contracts";
-import { assertOrigin, guest, hash, json, respond, route } from "@/server/http";
+import {
+  assertOrigin,
+  requireUserId,
+  hash,
+  json,
+  respond,
+  route,
+} from "@/server/http";
 import { readOwned } from "@/server/db";
 import { extractUpload, readUpload, saveMaterial } from "@/server/materials";
 import { ownerOperation } from "@/server/operations";
@@ -12,7 +19,7 @@ export const maxDuration = 300;
 export async function POST(request: Request) {
   return route(async () => {
     assertOrigin(request);
-    const ownerId = await guest(true);
+    const ownerId = await requireUserId();
     let id: string;
     if (
       request.headers.get("content-type")?.startsWith("multipart/form-data")

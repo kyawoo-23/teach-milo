@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { Lesson, PrepareSchema, publicLesson } from "@/lib/contracts";
-import { assertOrigin, guest, json, respond, route } from "@/server/http";
+import {
+  assertOrigin,
+  requireUserId,
+  json,
+  respond,
+  route,
+} from "@/server/http";
 import { readOwned } from "@/server/db";
 import { prepareLesson } from "@/server/lessons";
 import { ownerOperation } from "@/server/operations";
@@ -10,7 +16,7 @@ export const maxDuration = 180;
 export async function POST(request: Request) {
   return route(async () => {
     assertOrigin(request);
-    const ownerId = await guest();
+    const ownerId = await requireUserId();
     const input = await json(request, PrepareSchema);
     const id = await ownerOperation(
       ownerId,
