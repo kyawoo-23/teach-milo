@@ -3,6 +3,7 @@ import { convolution } from "@/lib/cnn";
 import { finalizeReport } from "@/lib/assessment";
 import {
   allowedMoves,
+  greetLearner,
   normalizeStudentReply,
   readyForCheck,
   validateStudent,
@@ -136,6 +137,27 @@ describe("server-owned readiness", () => {
     expect(readyForCheck(s, l)).toBe(true);
   });
 });
+describe("Milo's opening greeting", () => {
+  it("replaces a greeting addressed to Milo with Hi!", () => {
+    expect(
+      greetLearner(
+        "Hi Milo! I've been reading about DNS attacks. Could you teach me?",
+      ),
+    ).toBe("Hi! I've been reading about DNS attacks. Could you teach me?");
+    expect(greetLearner("Hello there, can you teach me about RAAS?")).toBe(
+      "Hi! Can you teach me about RAAS?",
+    );
+  });
+  it("adds Hi! to an opening without a greeting", () => {
+    expect(greetLearner("Can you teach me about weight sharing?")).toBe(
+      "Hi! Can you teach me about weight sharing?",
+    );
+    expect(greetLearner("Highways fascinate me. How do they drain?")).toBe(
+      "Hi! Highways fascinate me. How do they drain?",
+    );
+  });
+});
+
 describe("evidence-based assessment", () => {
   it("only gives a full total for fully evidenced dimensions", () => {
     const l = lessonFixture();

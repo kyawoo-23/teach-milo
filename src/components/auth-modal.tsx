@@ -213,8 +213,8 @@ function AuthModalContent() {
 
           <button
             type="submit"
-            className="action-button primary-action"
-            style={{ width: "100%", marginTop: "1rem" }}
+            className="primary-button full-width"
+            style={{ marginTop: "1rem" }}
             disabled={busy}
           >
             {busy ? (

@@ -3,24 +3,154 @@ import Link from "next/link";
 import { useState } from "react";
 import {
   ArrowRight,
-  BookOpen,
   CheckCircle2,
+  ChevronDown,
+  CircleDashed,
+  HelpCircle,
   Lightbulb,
   Quote,
   ShieldCheck,
   Trash2,
+  TrendingUp,
+  XCircle,
 } from "lucide-react";
-import { Citation, dimensions, Message, SessionPublic } from "@/lib/contracts";
+import {
+  Citation,
+  Dimension,
+  dimensions,
+  Message,
+  SessionPublic,
+  SessionReport,
+} from "@/lib/contracts";
 import { api, ErrorNotice, Modal } from "./ui";
 import { Milo } from "./milo";
 
-const labels = {
-  accuracy: "Concept accuracy",
-  mechanism: "Explaining the mechanism",
-  evidence: "Examples & demonstrations",
-  misconception: "Misconception handling",
-  transfer: "Independent transfer",
+const skills: Record<Dimension, { label: string; hint: string }> = {
+  accuracy: { label: "Getting the facts right", hint: "Concept accuracy" },
+  mechanism: { label: "Explaining how it works", hint: "The mechanism" },
+  evidence: { label: "Using examples", hint: "Examples & demonstrations" },
+  misconception: {
+    label: "Fixing a common mistake",
+    hint: "Misconception handling",
+  },
+  transfer: { label: "Applying it on your own", hint: "Independent check" },
 };
+
+type Status = "strong" | "partial" | "notyet" | "missing" | "uncertain";
+const statuses: Record<
+  Status,
+  { word: string; icon: typeof CheckCircle2; legend: string }
+> = {
+  strong: { word: "Strong", icon: CheckCircle2, legend: "2 of 2 points" },
+  partial: { word: "Getting there", icon: TrendingUp, legend: "1 of 2 points" },
+  notyet: { word: "Not yet", icon: XCircle, legend: "0 of 2 points" },
+  missing: {
+    word: "Not shown yet",
+    icon: CircleDashed,
+    legend: "Not enough evidence to score",
+  },
+  uncertain: {
+    word: "Couldn’t judge",
+    icon: HelpCircle,
+    legend: "Unclear source, so not scored",
+  },
+};
+const legendOrder: Status[] = [
+  "strong",
+  "partial",
+  "notyet",
+  "missing",
+  "uncertain",
+];
+
+function statusOf(d: SessionReport["scores"][Dimension]): Status {
+  if (d.score === 2) return "strong";
+  if (d.score === 1) return "partial";
+  if (d.score === 0) return "notyet";
+  return d.status === "uncertain" ? "uncertain" : "missing";
+}
+
+const verdicts = {
+  strong_evidence: {
+    tone: "strong",
+    title: "Great teaching — your explanations showed clear understanding.",
+  },
+  developing: {
+    tone: "partial",
+    title: "You’re on your way — a few ideas need more work.",
+  },
+  incomplete: {
+    tone: "missing",
+    title: "Good start — Milo needs more evidence to judge everything.",
+  },
+} as const;
+
+// One donut slice per skill, coloured by its status.
+function SkillRing({
+  items,
+  center,
+  caption,
+}: {
+  items: { name: Dimension; status: Status }[];
+  center: string;
+  caption: string;
+}) {
+  const r = 52;
+  const c = 2 * Math.PI * r;
+  const gap = 6;
+  const slice = c / items.length;
+  return (
+    <figure className="rp-ring" aria-hidden="true">
+      <svg viewBox="0 0 132 132">
+        {items.map((item, i) => (
+          <circle
+            key={item.name}
+            className={`rp-slice rp-fill-${item.status}`}
+            cx="66"
+            cy="66"
+            r={r}
+            strokeDasharray={`${slice - gap} ${c - slice + gap}`}
+            strokeDashoffset={-i * slice}
+            transform="rotate(-90 66 66)"
+          />
+        ))}
+      </svg>
+      <figcaption>
+        <strong>{center}</strong>
+        <span>{caption}</span>
+      </figcaption>
+    </figure>
+  );
+}
+
+function PointMeter({
+  status,
+  score,
+}: {
+  status: Status;
+  score: number | null;
+}) {
+  return (
+    <span
+      className={`rp-meter rp-meter-${status}`}
+      role="img"
+      aria-label={score === null ? "Not scored" : `${score} of 2 points`}
+    >
+      <i className={score !== null && score >= 1 ? "on" : ""} />
+      <i className={score === 2 ? "on" : ""} />
+    </span>
+  );
+}
+
+function StatusBadge({ status }: { status: Status }) {
+  const { word, icon: Icon } = statuses[status];
+  return (
+    <span className={`rp-badge rp-tone-${status}`}>
+      <Icon size={14} aria-hidden="true" /> {word}
+    </span>
+  );
+}
+
 export function ReportView({ session }: { session: SessionPublic }) {
   const report = session.report!;
   const [evidence, setEvidence] = useState<Message | null>(null);
@@ -49,6 +179,45 @@ export function ReportView({ session }: { session: SessionPublic }) {
         <ArrowRight size={13} />
       </button>
     ));
+  const yourWords = (items: Citation[]) =>
+    items.length > 0 && (
+      <details className="rp-words">
+        <summary>
+          See your words ({items.length})
+          <ChevronDown size={14} aria-hidden="true" />
+        </summary>
+        {citations(items)}
+      </details>
+    );
+
+  const items = dimensions.map((name) => ({
+    name,
+    status: statusOf(report.scores[name]),
+    dimension: report.scores[name],
+  }));
+  const count = (s: Status) => items.filter((i) => i.status === s).length;
+  const scored = items.filter((i) => i.dimension.score !== null).length;
+  const verdict = verdicts[report.overallLabel];
+  const VerdictIcon = statuses[verdict.tone].icon;
+  const center =
+    report.total !== null
+      ? `${report.total}/10`
+      : report.availablePoints
+        ? `${report.earnedPoints}/${report.availablePoints}`
+        : "—";
+  const summary =
+    report.total !== null
+      ? `You scored ${report.total} out of 10 across all five skills.`
+      : scored === 0
+        ? "Milo didn’t see enough evidence to score any skill yet."
+        : `You earned ${report.earnedPoints} of ${report.availablePoints} points on the ${scored} skill${scored === 1 ? "" : "s"} Milo could check. ${5 - scored} skill${5 - scored === 1 ? "" : "s"} still need${5 - scored === 1 ? "s" : ""} evidence.`;
+  const transferStatus: Status =
+    report.transferCorrect === null
+      ? "missing"
+      : report.transferCorrect
+        ? "strong"
+        : "notyet";
+
   return (
     <main id="main" className="report-main">
       <header className="report-intro">
@@ -56,147 +225,149 @@ export function ReportView({ session }: { session: SessionPublic }) {
           <Milo size={86} />
           <span>Thanks for teaching me.</span>
         </div>
-        <span className="small-label">Your learning reflection</span>
-        <h1>
-          Here’s what your
-          <br />
-          explanations showed.
-        </h1>
+        <span className="small-label">Your learning report</span>
+        <h1>How did your teaching go?</h1>
         <p>{session.lesson.title}</p>
       </header>
-      <div className="report-summary">
-        <div>
-          <span className="report-label">
-            {report.overallLabel === "strong_evidence"
-              ? "Strong evidence of understanding"
-              : report.overallLabel === "developing"
-                ? "Understanding is developing"
-                : "More evidence to explore"}
-          </span>
-          <p>
-            This is indicative feedback on this session, not a mastery
-            certification.
-          </p>
+
+      <section className="rp-overview" aria-labelledby="rp-verdict">
+        <SkillRing
+          items={items}
+          center={center}
+          caption={report.total !== null ? "overall" : "points"}
+        />
+        <div className="rp-overview-text">
+          <h2 id="rp-verdict" className={`rp-verdict rp-tone-${verdict.tone}`}>
+            <VerdictIcon size={20} aria-hidden="true" />
+            {verdict.title}
+          </h2>
+          <p>{summary}</p>
+          <ul className="rp-counts" aria-label="Skills by result">
+            {legendOrder
+              .filter((s) => count(s) > 0)
+              .map((s) => (
+                <li key={s} className={`rp-tone-${s}`}>
+                  <i className={`rp-dot rp-fill-${s}`} aria-hidden="true" />
+                  <strong>{count(s)}</strong> {statuses[s].word}
+                </li>
+              ))}
+          </ul>
         </div>
-        <div className="score-display">
-          {report.total !== null ? (
-            <>
-              <strong>{report.total}</strong>
-              <span>/ 10</span>
-            </>
-          ) : (
-            <>
-              <strong>{report.earnedPoints}</strong>
-              <span>
-                / {report.availablePoints || "—"}
-                <small>assessed points</small>
-              </span>
-            </>
-          )}
-        </div>
-      </div>
+      </section>
+
       {report.criticalMisconception && (
         <div className="source-concerns">
           <strong>One important idea still needs attention.</strong>
           <p>
             An unresolved misconception appeared in your reasoning. Review the
-            relevant next step below before moving on.
+            next steps below before moving on.
           </p>
         </div>
       )}
       {error && <ErrorNotice message={error} />}
-      <div className="report-columns">
-        <section className="rubric-panel">
-          <h2>The evidence, idea by idea</h2>
-          <p className="muted">Each dimension is assessed independently.</p>
-          <div className="rubric-rows">
-            {dimensions.map((name) => {
-              const dimension = report.scores[name];
-              return (
-                <article className="rubric-row" key={name}>
-                  <div className="rubric-title">
-                    <h3>{labels[name]}</h3>
-                    <span>
-                      {dimension.score === null
-                        ? "Unscored"
-                        : `${dimension.score} / 2`}
+
+      <section className="rp-panel" aria-labelledby="rp-skills-title">
+        <div className="rp-panel-head">
+          <h2 id="rp-skills-title">Skill by skill</h2>
+          <p className="muted">Tap a skill to see why.</p>
+        </div>
+        <ul className="rp-skills">
+          {items.map(({ name, status, dimension }) => {
+            const Icon = statuses[status].icon;
+            return (
+              <li key={name}>
+                <details>
+                  <summary>
+                    <span className={`rp-skill-icon rp-tone-${status}`}>
+                      <Icon size={20} aria-hidden="true" />
                     </span>
-                  </div>
-                  <div className="rubric-bar" aria-hidden="true">
-                    <i
-                      style={{
-                        width: `${dimension.score === null ? 0 : dimension.score * 50}%`,
-                      }}
+                    <span className="rp-skill-name">
+                      <strong>{skills[name].label}</strong>
+                      <small>{skills[name].hint}</small>
+                    </span>
+                    <PointMeter status={status} score={dimension.score} />
+                    <StatusBadge status={status} />
+                    <ChevronDown
+                      className="rp-chevron"
+                      size={16}
+                      aria-hidden="true"
                     />
+                  </summary>
+                  <div className="rp-skill-body">
+                    <p>{dimension.explanation}</p>
+                    {citations(dimension.citations)}
                   </div>
-                  <p>{dimension.explanation}</p>
-                  {dimension.score === null && (
-                    <span className="evidence-status">
-                      {dimension.status === "uncertain"
-                        ? "Source or judgment uncertainty"
-                        : "Insufficient evidence"}
-                    </span>
-                  )}
-                  {citations(dimension.citations)}
-                </article>
-              );
-            })}
-          </div>
-        </section>
-        <aside className="reflection-panel">
-          <section className="reflection-card">
-            <span className="reflection-icon">
-              <CheckCircle2 size={22} />
-            </span>
-            <h2>What came through clearly</h2>
-            {report.strengths.length ? (
-              report.strengths.map((s, i) => (
-                <div className="feedback-item" key={i}>
+                </details>
+              </li>
+            );
+          })}
+        </ul>
+        <ul className="rp-legend" aria-label="Legend">
+          {legendOrder.map((s) => (
+            <li key={s}>
+              <i className={`rp-dot rp-fill-${s}`} aria-hidden="true" />
+              <strong>{statuses[s].word}</strong> {statuses[s].legend}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <div className="rp-columns">
+        <section className="rp-panel rp-list rp-strengths">
+          <h2>
+            <CheckCircle2 size={20} aria-hidden="true" /> What went well
+          </h2>
+          {report.strengths.length ? (
+            <ul>
+              {report.strengths.map((s, i) => (
+                <li key={i}>
                   <p>{s.text}</p>
-                  {citations(s.citations)}
-                </div>
-              ))
-            ) : (
-              <p>
-                There isn’t enough evidence yet to identify a specific strength.
-                A worked example is a good place to begin next time.
-              </p>
-            )}
-          </section>
-          <section className="reflection-card next-steps">
-            <span className="reflection-icon">
-              <Lightbulb size={22} />
-            </span>
-            <h2>Your next steps</h2>
+                  {yourWords(s.citations)}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="muted">
+              Nothing stood out clearly yet. Next time, try walking Milo through
+              a worked example.
+            </p>
+          )}
+        </section>
+        <section className="rp-panel rp-list rp-next">
+          <h2>
+            <Lightbulb size={20} aria-hidden="true" /> Try this next
+          </h2>
+          <ol>
             {report.nextSteps.map((s, i) => (
-              <div className="feedback-item" key={i}>
+              <li key={i}>
                 <p>{s.text}</p>
-                {citations(s.citations)}
-              </div>
+                {yourWords(s.citations)}
+              </li>
             ))}
-          </section>
-        </aside>
+          </ol>
+        </section>
       </div>
-      <section className="transfer-review">
-        <div>
-          <ShieldCheck size={23} />
-          <h2>The independent check</h2>
-          <span className="result-chip">
-            {report.transferCorrect === null
-              ? "Unscored"
-              : report.transferCorrect
-                ? "Supported"
-                : "Keep exploring"}
+
+      <section className="rp-panel rp-check">
+        <div className="rp-check-head">
+          <span className={`rp-skill-icon rp-tone-${transferStatus}`}>
+            <ShieldCheck size={20} aria-hidden="true" />
           </span>
+          <h2>Independent check</h2>
+          <StatusBadge status={transferStatus} />
         </div>
         <p>{report.scores.transfer.explanation}</p>
-        <details>
-          <summary>See the expected reasoning</summary>
+        <details className="rp-words">
+          <summary>
+            See the expected reasoning
+            <ChevronDown size={14} aria-hidden="true" />
+          </summary>
           <p className="expected-explanation">
             {report.expectedTransferExplanation}
           </p>
         </details>
       </section>
+
       <div className="report-actions">
         <Link className="primary-button" href="/">
           Teach something new <ArrowRight size={18} />
@@ -206,8 +377,8 @@ export function ReportView({ session }: { session: SessionPublic }) {
         </button>
       </div>
       <p className="report-disclaimer">
-        One session shows today’s explanations. Returning to the idea later
-        helps reveal what stays with you.
+        This is feedback on one session, not a final grade. Coming back to the
+        idea later shows what really sticks.
       </p>
       <Modal
         open={!!evidence}

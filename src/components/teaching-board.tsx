@@ -108,6 +108,9 @@ export function TeachingBoard({
   const output =
     board.kind === "causal" ? calculateTemplate(board, inputs) : customOutput;
   const unavailable = board.kind === "text" || failed || !validCode;
+  const changed =
+    attached ||
+    JSON.stringify(inputs) !== JSON.stringify(initialBoardInputs(board));
   function reorder(index: number, offset: number) {
     const order = [...(inputs.order as string[])];
     [order[index], order[index + offset]] = [
@@ -123,18 +126,26 @@ export function TeachingBoard({
           <Layers3 size={18} />
         </span>
         <h2>Teaching board</h2>
-        <button
-          className="icon-button"
-          title="Reset board"
-          aria-label="Reset board"
-          onClick={() => {
-            setInputs(initialBoardInputs(board));
-            setAttached(false);
-          }}
-          disabled={disabled}
-        >
-          <RotateCcw size={16} />
-        </button>
+        {/* Text boards have no controls, so there is nothing to reset. */}
+        {board.kind !== "text" && (
+          <button
+            className="icon-button"
+            title={changed || failed ? "Reset board" : "Nothing to reset yet"}
+            aria-label="Reset board"
+            onClick={() => {
+              setInputs(initialBoardInputs(board));
+              setAttached(false);
+              if (failed) {
+                retryCount.current = 0;
+                setFailed(false);
+                setRepairNonce((n) => n + 1);
+              }
+            }}
+            disabled={disabled || (!changed && !failed)}
+          >
+            <RotateCcw size={16} />
+          </button>
+        )}
       </div>
       <div className="board-content">
         <span className="small-label">
