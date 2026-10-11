@@ -5,8 +5,7 @@ RUN corepack enable && corepack prepare pnpm@11.21.0 --activate
 
 FROM base AS dependencies
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN --mount=type=cache,id=teachback-pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --store-dir=/pnpm/store --network-concurrency=6 --fetch-timeout=300000
+RUN pnpm install --frozen-lockfile --network-concurrency=6 --fetch-timeout=300000
 
 FROM base AS build
 COPY --from=dependencies /app/node_modules ./node_modules
