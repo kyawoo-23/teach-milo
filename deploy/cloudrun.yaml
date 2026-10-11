@@ -23,9 +23,9 @@ spec:
             - name: GOOGLE_CLOUD_PROJECT
               value: YOUR_PROJECT
             - name: APP_ORIGIN
-              value: https://YOUR_SERVICE_URL
+              value: https://teachback-ai-609216296403.asia-southeast1.run.app
             - name: GEMINI_MODEL
-              value: gemini-3.8-flash
+              value: gemini-3.5-flash-lite
             - name: GEMINI_API_KEY
               valueFrom:
                 secretKeyRef:
