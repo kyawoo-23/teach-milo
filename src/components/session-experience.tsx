@@ -19,7 +19,12 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import { BoardSubmission, Message, SessionPublic } from "@/lib/contracts";
+import {
+  BoardSubmission,
+  Message,
+  SessionPublic,
+  UserPublic,
+} from "@/lib/contracts";
 import { useAuth } from "./auth-context";
 import { Brand } from "./brand";
 import { Milo } from "./milo";
@@ -526,7 +531,7 @@ export function SessionExperience({ id }: { id: string }) {
                     {message.role === "student" ? (
                       <Milo size={34} />
                     ) : (
-                      <span>You</span>
+                      <LearnerMessageAvatar user={user} />
                     )}
                   </div>
                   <div className="message-body">
@@ -538,10 +543,10 @@ export function SessionExperience({ id }: { id: string }) {
                     </span>
                     <div className="message-bubble">
                       <div className="message-text">{message.text}</div>
-                      {message.role === "student" && (
-                        <CopyButton text={message.text} />
-                      )}
                     </div>
+                    {message.role === "student" && (
+                      <CopyButton text={message.text} />
+                    )}
                     {message.board && (
                       <div className="shared-board">
                         <Layers3 size={15} />
@@ -907,6 +912,31 @@ function CheckCircleIcon() {
     </span>
   );
 }
+function LearnerMessageAvatar({ user }: { user: UserPublic | null }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const avatarUrl = user?.avatarUrl;
+  if (avatarUrl && !imageFailed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={avatarUrl}
+        alt=""
+        className="message-avatar-image"
+        width={29}
+        height={29}
+        onError={() => setImageFailed(true)}
+      />
+    );
+  }
+  const fallbackLabel = user?.name
+    ? user.name.charAt(0).toUpperCase()
+    : "You";
+  return (
+    <span className="message-avatar-fallback" aria-hidden="true">
+      {fallbackLabel}
+    </span>
+  );
+}
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   useEffect(() => {
@@ -938,8 +968,8 @@ function CopyButton({ text }: { text: string }) {
         }
       }}
     >
-      {copied ? <Check size={13} /> : <Copy size={13} />}
-      <span>{copied ? "Copied" : "Copy"}</span>
+      {copied ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={2} />}
+      <span className="visually-hidden">{copied ? "Copied" : "Copy"}</span>
     </button>
   );
 }
