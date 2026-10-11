@@ -8,6 +8,7 @@ import {
   Check,
   ChevronDown,
   Circle,
+  Copy,
   Flag,
   History,
   Layers3,
@@ -74,12 +75,16 @@ export function SessionExperience({ id }: { id: string }) {
         draftStorage.removeItem(`pending-turn:${id}`);
       }
     } catch (e) {
+      if (e instanceof ApiError && e.code === "AUTH_REQUIRED")
+        openAuthModal("login");
       setError(e instanceof Error ? e.message : "Couldn't open this session.");
     }
-  }, [id]);
+  }, [id, openAuthModal]);
+  // Reload once the learner signs in (or switches account).
+  const userId = user?.id;
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, userId]);
   useEffect(() => {
     if (!session) return;
     const path = `/session/${id}${session.phase === "transfer" ? "/transfer" : session.phase === "report" ? "/report" : ""}`;
@@ -521,7 +526,12 @@ export function SessionExperience({ id }: { id: string }) {
                         <small> A little nudge</small>
                       )}
                     </span>
-                    <div className="message-bubble">{message.text}</div>
+                    <div className="message-bubble">
+                      <div className="message-text">{message.text}</div>
+                      {message.role === "student" && (
+                        <CopyButton text={message.text} />
+                      )}
+                    </div>
                     {message.board && (
                       <div className="shared-board">
                         <Layers3 size={15} />
@@ -854,5 +864,41 @@ function CheckCircleIcon() {
     <span className="ready-check">
       <Check size={14} />
     </span>
+  );
+}
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  return (
+    <button
+      type="button"
+      className="message-copy"
+      aria-label={copied ? "Copied" : "Copy Milo’s message"}
+      title={copied ? "Copied" : "Copy"}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+        } catch {
+          // Clipboard API blocked (e.g. embedded frames): fall back to a hidden textarea.
+          const area = document.createElement("textarea");
+          area.value = text;
+          area.setAttribute("readonly", "");
+          area.style.position = "fixed";
+          area.style.opacity = "0";
+          document.body.appendChild(area);
+          area.select();
+          if (document.execCommand("copy")) setCopied(true);
+          area.remove();
+        }
+      }}
+    >
+      {copied ? <Check size={13} /> : <Copy size={13} />}
+      <span>{copied ? "Copied" : "Copy"}</span>
+    </button>
   );
 }

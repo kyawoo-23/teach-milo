@@ -41,6 +41,13 @@ export function allowedMoves(session: Session) {
     moves.push("surface_misconception");
   return moves;
 }
+// Milo's first message: drop any greeting the model wrote (e.g. "Hi Milo!") and open with "Hi!".
+export function greetLearner(opening: string) {
+  const body = opening
+    .replace(/^\s*(?:hi|hello|hey|greetings)\b[^.!?,\n]{0,40}[.!?,]\s*/i, "")
+    .trim();
+  return `Hi! ${body.charAt(0).toUpperCase()}${body.slice(1)}`;
+}
 export function normalizeStudentReply(
   reply: StudentReply,
   session: Session,

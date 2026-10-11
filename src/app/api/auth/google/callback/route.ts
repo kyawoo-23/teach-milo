@@ -3,11 +3,9 @@ import {
   createUserSession,
   exchangeGoogleOAuthCode,
   findUserByEmail,
-  migrateGuestData,
   User,
 } from "@/server/auth";
 import { database, decode, encode } from "@/server/db";
-import { currentGuestId } from "@/server/http";
 
 export const runtime = "nodejs";
 
@@ -77,11 +75,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const guestId = await currentGuestId();
     await createUserSession(user.id);
-    if (guestId) {
-      await migrateGuestData(guestId, user.id);
-    }
 
     const successTarget = new URL(returnTo, origin);
     return Response.redirect(successTarget.toString(), 302);

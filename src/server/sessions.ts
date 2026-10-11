@@ -16,6 +16,7 @@ import {
 } from "@/lib/contracts";
 import {
   allowedMoves,
+  greetLearner,
   inferLedgerGaps,
   normalizeStudentReply,
   readyForCheck,
@@ -73,7 +74,7 @@ export async function createSession(
   const greeting: Message = {
     id: randomUUID(),
     role: "student",
-    text: lesson.opening,
+    text: greetLearner(lesson.opening),
     createdAt: now,
     sequence: 0,
     kind: "teaching",

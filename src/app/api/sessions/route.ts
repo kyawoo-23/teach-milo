@@ -2,7 +2,13 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { Lesson, Session, SessionSummary } from "@/lib/contracts";
 import { database, decode } from "@/server/db";
-import { assertOrigin, guest, json, respond, route } from "@/server/http";
+import {
+  assertOrigin,
+  requireUserId,
+  json,
+  respond,
+  route,
+} from "@/server/http";
 import { ownerOperation } from "@/server/operations";
 import { createSession, publicSession } from "@/server/sessions";
 
@@ -10,7 +16,7 @@ export const runtime = "nodejs";
 
 export async function GET() {
   return route(async () => {
-    const ownerId = await guest();
+    const ownerId = await requireUserId();
     const snap = await database()
       .collection("sessions")
       .where("ownerId", "==", ownerId)
@@ -66,7 +72,7 @@ export async function GET() {
 export async function POST(request: Request) {
   return route(async () => {
     assertOrigin(request);
-    const ownerId = await guest();
+    const ownerId = await requireUserId();
     const input = await json(
       request,
       z

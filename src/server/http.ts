@@ -1,11 +1,8 @@
 import "server-only";
-import { cookies } from "next/headers";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { AppError } from "@/lib/errors";
-import { database, decode, encode, expiresAt } from "./db";
-
-import { getAuthenticatedUser, User } from "./auth";
+import { getAuthenticatedUser } from "./auth";
 
 export const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 export function assertOrigin(request: Request) {
@@ -23,65 +20,15 @@ export function assertOrigin(request: Request) {
     );
 }
 
-export async function currentGuestId(): Promise<string | null> {
-  const jar = await cookies();
-  const token = jar.get("teachback_guest")?.value;
-  if (token && /^[A-Za-z0-9_-]{43}$/.test(token)) {
-    return hash(token);
-  }
-  return null;
-}
-
-export async function resolveOwner(create = false): Promise<{
-  ownerId: string;
-  user: User | null;
-  isGuest: boolean;
-}> {
+export async function requireUserId() {
   const user = await getAuthenticatedUser();
-  if (user) {
-    return { ownerId: user.id, user, isGuest: false };
-  }
-  const guestId = await guest(create);
-  return { ownerId: guestId, user: null, isGuest: true };
-}
-
-export async function guest(create = false) {
-  const user = await getAuthenticatedUser();
-  if (user) return user.id;
-
-  const jar = await cookies();
-  const token = jar.get("teachback_guest")?.value;
-  if (token && /^[A-Za-z0-9_-]{43}$/.test(token)) {
-    const id = hash(token);
-    const doc = await database().collection("guests").doc(id).get();
-    if (
-      doc.exists &&
-      new Date(decode<{ expiresAt: string }>(doc.data()).expiresAt).getTime() >
-        Date.now()
-    )
-      return id;
-  }
-  if (!create)
+  if (!user)
     throw new AppError(
-      "SESSION_REQUIRED",
-      "Your guest session has expired. Start again with your learning material.",
+      "AUTH_REQUIRED",
+      "Sign in or create an account to continue.",
       401,
     );
-  const secret = randomBytes(32).toString("base64url");
-  const id = hash(secret);
-  const expiry = expiresAt();
-  await database()
-    .collection("guests")
-    .doc(id)
-    .set(encode({ createdAt: new Date().toISOString(), expiresAt: expiry }));
-  jar.set("teachback_guest", secret, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    path: "/",
-    expires: new Date(expiry),
-  });
-  return id;
+  return user.id;
 }
 export async function json<T>(
   request: Request,

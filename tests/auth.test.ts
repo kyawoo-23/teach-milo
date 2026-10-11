@@ -123,143 +123,34 @@ describe("Authentication utilities and contracts", () => {
 });
 
 const emulatorEnabled = !!process.env.FIRESTORE_EMULATOR_HOST;
-describe.skipIf(!emulatorEnabled)(
-  "Auth Firestore persistence and guest migration",
-  () => {
-    it("creates user, finds user by email, and prevents duplicate registration", async () => {
-      const { createUser, findUserByEmail, findUserById } =
-        await import("@/server/auth");
-      const testEmail = `test-${Date.now()}@teachback.ai`;
+describe.skipIf(!emulatorEnabled)("Auth Firestore persistence", () => {
+  it("creates user, finds user by email, and prevents duplicate registration", async () => {
+    const { createUser, findUserByEmail, findUserById } =
+      await import("@/server/auth");
+    const testEmail = `test-${Date.now()}@teachback.ai`;
 
-      const user = await createUser({
+    const user = await createUser({
+      email: testEmail,
+      name: "Test User",
+      password: "securePassword123",
+    });
+
+    expect(user.id).toBeDefined();
+    expect(user.email).toBe(testEmail);
+    expect(user.passwordHash).toBeDefined();
+
+    const foundByEmail = await findUserByEmail(testEmail);
+    expect(foundByEmail?.id).toBe(user.id);
+
+    const foundById = await findUserById(user.id);
+    expect(foundById?.email).toBe(testEmail);
+
+    await expect(
+      createUser({
         email: testEmail,
-        name: "Test User",
-        password: "securePassword123",
-      });
-
-      expect(user.id).toBeDefined();
-      expect(user.email).toBe(testEmail);
-      expect(user.passwordHash).toBeDefined();
-
-      const foundByEmail = await findUserByEmail(testEmail);
-      expect(foundByEmail?.id).toBe(user.id);
-
-      const foundById = await findUserById(user.id);
-      expect(foundById?.email).toBe(testEmail);
-
-      await expect(
-        createUser({
-          email: testEmail,
-          name: "Duplicate User",
-          password: "anotherPassword",
-        }),
-      ).rejects.toThrow("already exists");
-    });
-
-    it("migrates guest materials, lessons, and sessions to the authenticated user", async () => {
-      const { createUser, migrateGuestData } = await import("@/server/auth");
-      const { database, encode } = await import("@/server/db");
-      const guestId = `guest-${Date.now()}`;
-      const user = await createUser({
-        email: `migrate-${Date.now()}@teachback.ai`,
-        name: "Migrated User",
-        password: "securePassword123",
-      });
-
-      const sessionId = `sess-${Date.now()}`;
-      const lessonId = `less-${Date.now()}`;
-      const materialId = `mat-${Date.now()}`;
-
-      const now = new Date().toISOString();
-      const expiry = new Date(Date.now() + 86400000).toISOString();
-
-      await database()
-        .collection("materials")
-        .doc(materialId)
-        .set(
-          encode({
-            id: materialId,
-            ownerId: guestId,
-            name: "Notes",
-            sources: [],
-            text: "",
-            createdAt: now,
-            expiresAt: expiry,
-          }),
-        );
-
-      await database()
-        .collection("lessons")
-        .doc(lessonId)
-        .set(
-          encode({
-            id: lessonId,
-            ownerId: guestId,
-            materialId,
-            title: "Quantum",
-            scope: "",
-            level: "introductory",
-            objectives: [],
-            knowledge: "",
-            concerns: [],
-            misconception: "",
-            misconceptionCorrection: "",
-            opening: "",
-            transfer: {},
-            board: { kind: "text" },
-            sources: [],
-            confirmed: true,
-            createdAt: now,
-            expiresAt: expiry,
-          }),
-        );
-
-      await database()
-        .collection("sessions")
-        .doc(sessionId)
-        .set(
-          encode({
-            id: sessionId,
-            ownerId: guestId,
-            lessonId,
-            phase: "teaching",
-            revision: 0,
-            nextSequence: 1,
-            challengeUsed: false,
-            hintUsed: false,
-            ledger: {
-              evidence: [],
-              mechanism: [],
-              demonstration: [],
-              misconceptionCorrection: [],
-              unresolvedError: false,
-              unresolvedErrorDetail: "",
-              summary: "",
-            },
-            createdAt: now,
-            updatedAt: now,
-            expiresAt: expiry,
-          }),
-        );
-
-      await migrateGuestData(guestId, user.id);
-
-      const updatedMaterial = await database()
-        .collection("materials")
-        .doc(materialId)
-        .get();
-      const updatedLesson = await database()
-        .collection("lessons")
-        .doc(lessonId)
-        .get();
-      const updatedSession = await database()
-        .collection("sessions")
-        .doc(sessionId)
-        .get();
-
-      expect(updatedMaterial.data()?.ownerId).toBe(user.id);
-      expect(updatedLesson.data()?.ownerId).toBe(user.id);
-      expect(updatedSession.data()?.ownerId).toBe(user.id);
-    });
-  },
-);
+        name: "Duplicate User",
+        password: "anotherPassword",
+      }),
+    ).rejects.toThrow("already exists");
+  });
+});

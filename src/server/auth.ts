@@ -177,29 +177,6 @@ export async function clearUserSession(): Promise<void> {
   jar.delete(AUTH_COOKIE_NAME);
 }
 
-export async function migrateGuestData(
-  guestId: string,
-  userId: string,
-): Promise<void> {
-  if (!guestId || guestId === userId) return;
-  const db = database();
-  const collections = ["materials", "lessons", "sessions"];
-
-  for (const col of collections) {
-    const snap = await db.collection(col).where("ownerId", "==", guestId).get();
-    if (!snap.empty) {
-      const batch = db.batch();
-      for (const d of snap.docs) {
-        batch.update(d.ref, {
-          ownerId: userId,
-          updatedAt: new Date().toISOString(),
-        });
-      }
-      await batch.commit();
-    }
-  }
-}
-
 export function getGoogleOAuthUrl(origin: string, state: string): string {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) {
