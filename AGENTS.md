@@ -15,7 +15,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Learned Workspace Facts
 
-- TeachBack AI is a guest-only Next.js MVP: Firestore persistence, Gemini for OCR/lessons/chat, session phases through report; intended production is Cloud Run + Firestore + Secret Manager (`deploy/cloudrun.yaml`, README).
+- TeachBack AI is a guest-only Next.js MVP: Firestore persistence, Gemini for OCR/lessons/chat, session phases through report; intended production is Cloud Run + Firestore + Secret Manager (`cloudbuild.yaml`, README).
 - Workspace path includes a trailing space (`TeachBack AI `); quote paths in shell commands.
 - Local dev expects JDK 21+, Firestore emulator (`pnpm emulators` on 127.0.0.1:8080), and `pnpm dev` in a second terminal; `node scripts/doctor.mjs` checks setup.
 - Match browser origin to `APP_ORIGIN` in `.env.local` (typically `http://127.0.0.1:3000`, not `localhost`); Google OAuth redirect URI is `{APP_ORIGIN}/api/auth/google/callback` with the same origin authorized on the Web client.

@@ -146,7 +146,27 @@ export function MarkdownEditor({
               role="tab"
               id={`${id}-${t}-tab`}
               aria-selected={tab === t}
-              aria-controls={t === "write" ? id : `${id}-preview`}
+              aria-controls={`${id}-${t}-panel`}
+              tabIndex={tab === t ? 0 : -1}
+              onKeyDown={(event) => {
+                if (
+                  !["ArrowLeft", "ArrowRight", "Home", "End"].includes(
+                    event.key,
+                  )
+                )
+                  return;
+                event.preventDefault();
+                const next =
+                  event.key === "Home"
+                    ? "write"
+                    : event.key === "End"
+                      ? "preview"
+                      : t === "write"
+                        ? "preview"
+                        : "write";
+                setTab(next);
+                document.getElementById(`${id}-${next}-tab`)?.focus();
+              }}
               onClick={() => setTab(t)}
             >
               {t === "write" ? "Write" : "Preview"}
@@ -156,7 +176,7 @@ export function MarkdownEditor({
         {tab === "write" && (
           <div
             className="md-toolbar"
-            role="toolbar"
+            role="group"
             aria-label="Markdown formatting"
           >
             {TOOLS.map(({ kind, label, icon: Icon }) => (
@@ -175,21 +195,26 @@ export function MarkdownEditor({
         )}
       </div>
       {tab === "write" ? (
-        <textarea
-          ref={ref}
-          id={id}
+        <div
+          id={`${id}-write-panel`}
           role="tabpanel"
           aria-labelledby={`${id}-write-tab`}
-          value={value}
-          rows={rows}
-          onChange={(e) => onChange(e.target.value)}
-        />
+        >
+          <textarea
+            ref={ref}
+            id={id}
+            value={value}
+            rows={rows}
+            onChange={(e) => onChange(e.target.value)}
+          />
+        </div>
       ) : (
         <div
-          id={`${id}-preview`}
+          id={`${id}-preview-panel`}
           role="tabpanel"
           aria-labelledby={`${id}-preview-tab`}
           className="md-preview"
+          tabIndex={0}
           style={{ minHeight: `${rows * 1.65 + 2}em` }}
         >
           {value.trim() ? (

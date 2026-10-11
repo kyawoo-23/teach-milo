@@ -219,7 +219,7 @@ export function ReportView({ session }: { session: SessionPublic }) {
         : "notyet";
 
   return (
-    <main id="main" className="report-main">
+    <main tabIndex={-1} id="main" className="report-main">
       <header className="report-intro">
         <div className="report-milo">
           <Milo size={86} />

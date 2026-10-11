@@ -183,7 +183,12 @@ export function SessionExperience({ id }: { id: string }) {
     if (ok) {
       setOutgoing(null);
       pendingSend.current = null;
+      setText((current) => (current === payload.text ? "" : current));
+      setBoard((current) => (current === payload.board ? undefined : current));
       composer.current?.focus();
+    } else {
+      setText(payload.text);
+      setBoard(payload.board);
     }
     return ok;
   }
@@ -255,7 +260,7 @@ export function SessionExperience({ id }: { id: string }) {
                 : "Learning by teaching"}
           </span>
         </div>
-        <div className="session-header-actions">
+        <nav className="session-header-actions" aria-label="Session">
           {isTeaching && (
             <button
               className="quiet-button"
@@ -270,6 +275,7 @@ export function SessionExperience({ id }: { id: string }) {
             className="quiet-button"
             onClick={openSessionModal}
             title="My Sessions"
+            aria-label="My Sessions"
           >
             <History size={15} />
             <span className="button-text">My Sessions</span>
@@ -282,6 +288,8 @@ export function SessionExperience({ id }: { id: string }) {
                   src={user.avatarUrl}
                   alt={user.name}
                   className="user-avatar-image-small"
+                  width={22}
+                  height={22}
                 />
               ) : (
                 <span className="user-avatar-fallback-small">
@@ -300,10 +308,10 @@ export function SessionExperience({ id }: { id: string }) {
               <span>Sign In</span>
             </button>
           )}
-        </div>
+        </nav>
       </header>
       {!session ? (
-        <main id="main" className="loading-page">
+        <main tabIndex={-1} id="main" className="loading-page">
           {error ? (
             <>
               <ErrorNotice message={error} onRetry={load} />
@@ -321,7 +329,7 @@ export function SessionExperience({ id }: { id: string }) {
       ) : session.phase === "report" && session.report ? (
         <ReportView session={session} />
       ) : session.phase === "transfer" ? (
-        <main id="main" className="transfer-main">
+        <main tabIndex={-1} id="main" className="transfer-main">
           <section className="transfer-card">
             <span className="transfer-icon">
               <ShieldCheck size={30} />
@@ -363,6 +371,7 @@ export function SessionExperience({ id }: { id: string }) {
                     <input
                       className="text-input"
                       type="number"
+                      inputMode="numeric"
                       min="0"
                       step="1"
                       required
@@ -375,6 +384,7 @@ export function SessionExperience({ id }: { id: string }) {
                     <input
                       className="text-input"
                       type="number"
+                      inputMode="numeric"
                       min="0"
                       step="1"
                       required
@@ -429,7 +439,7 @@ export function SessionExperience({ id }: { id: string }) {
           </section>
         </main>
       ) : (
-        <main id="main" className="classroom">
+        <main tabIndex={-1} id="main" className="classroom">
           <section
             className="conversation-panel"
             aria-label="Conversation with Milo"
@@ -708,6 +718,7 @@ export function SessionExperience({ id }: { id: string }) {
             busy={unavailable}
             error={error}
             onDismiss={dismissCelebration}
+            onStartTransfer={() => void action("start_transfer")}
             onCloseSession={() => void action("end")}
           />
           <Modal
@@ -752,16 +763,19 @@ function UnderstoodCelebration({
   busy,
   error,
   onDismiss,
+  onStartTransfer,
   onCloseSession,
 }: {
   open: boolean;
   busy: boolean;
   error: string;
   onDismiss: () => void;
+  onStartTransfer: () => void;
   onCloseSession: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const programmaticClose = useRef(false);
+  const [pending, setPending] = useState<"transfer" | "end" | null>(null);
   const pieces = useMemo(
     () =>
       Array.from({ length: 42 }, (_, i) => {
@@ -791,6 +805,9 @@ function UnderstoodCelebration({
       programmaticClose.current = false;
     }
   }, [open]);
+  useEffect(() => {
+    if (!busy) setPending(null);
+  }, [busy]);
   function requestDismiss() {
     if (!programmaticClose.current) onDismiss();
   }
@@ -833,8 +850,8 @@ function UnderstoodCelebration({
         <Milo size={88} />
         <h2 id="understood-title">Milo understood.</h2>
         <p>
-          Your explanation landed. Close this session for feedback, or stay and
-          keep talking with Milo.
+          Your explanation landed. Take the independent check, close this
+          session for feedback, or stay and keep talking with Milo.
         </p>
         {error && <ErrorNotice message={error} />}
         <div className="modal-actions">
@@ -842,9 +859,33 @@ function UnderstoodCelebration({
             type="button"
             className="primary-button full-width"
             disabled={busy}
-            onClick={onCloseSession}
+            onClick={() => {
+              setPending("transfer");
+              onStartTransfer();
+            }}
           >
-            {busy ? <Spinner label="Closing session" /> : "Close session"}
+            {pending === "transfer" ? (
+              <Spinner label="Starting the independent check" />
+            ) : (
+              <>
+                Take the independent check <ArrowRight size={15} />
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            className="secondary-button full-width"
+            disabled={busy}
+            onClick={() => {
+              setPending("end");
+              onCloseSession();
+            }}
+          >
+            {pending === "end" ? (
+              <Spinner label="Closing session" />
+            ) : (
+              "Close session"
+            )}
           </button>
           <button
             type="button"

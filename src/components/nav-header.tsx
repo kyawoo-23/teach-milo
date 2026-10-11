@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  BookOpen,
-  History,
-  LogIn,
-  LogOut,
-  Sparkles,
-  User as UserIcon,
-} from "lucide-react";
+import { History, LogIn, LogOut } from "lucide-react";
 import { Brand } from "./brand";
 import { useAuth } from "./auth-context";
 
@@ -23,13 +16,14 @@ export function NavHeader({
       <div className="header-inner">
         <Brand />
 
-        <div className="header-actions">
+        <nav className="header-actions" aria-label="Main">
           {extraActions}
           <button
             type="button"
             className="header-nav-button"
             onClick={openSessionModal}
             title="View saved learning sessions"
+            aria-label="My Sessions"
           >
             <History size={16} />
             <span className="button-text">My Sessions</span>
@@ -46,6 +40,8 @@ export function NavHeader({
                         src={user.avatarUrl}
                         alt={user.name}
                         className="user-avatar-image"
+                        width={26}
+                        height={26}
                       />
                     ) : (
                       <span className="user-avatar-fallback">
@@ -78,7 +74,7 @@ export function NavHeader({
               )}
             </>
           )}
-        </div>
+        </nav>
       </div>
     </header>
   );
