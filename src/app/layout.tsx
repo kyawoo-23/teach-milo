@@ -1,8 +1,16 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth-context";
 import { AuthModal } from "@/components/auth-modal";
 import { SessionHistoryModal } from "@/components/session-history-modal";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
+  themeColor: "#f8f9fc",
+};
 
 export const metadata: Metadata = {
   title: {

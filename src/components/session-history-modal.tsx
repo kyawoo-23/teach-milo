@@ -2,14 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ArrowRight,
   BookOpen,
-  Calendar,
   CheckCircle2,
   Clock,
-  GraduationCap,
-  Sparkles,
   Trash2,
 } from "lucide-react";
 import { SessionSummary } from "@/lib/contracts";
@@ -76,11 +74,6 @@ export function SessionHistoryModal() {
     } finally {
       setDeletingId(null);
     }
-  }
-
-  function handleResume(id: string, completed = false) {
-    closeSessionModal();
-    router.push(`/session/${id}${completed ? "/report" : ""}`);
   }
 
   return (
@@ -160,18 +153,7 @@ export function SessionHistoryModal() {
 
                   const completed = item.phase === "report";
                   return (
-                    <div
-                      key={item.id}
-                      className="session-card"
-                      onClick={() => handleResume(item.id, completed)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          handleResume(item.id, completed);
-                        }
-                      }}
-                    >
+                    <article key={item.id} className="session-card">
                       <div className="session-card-header">
                         <div className="session-card-title-wrap">
                           <span
@@ -184,7 +166,7 @@ export function SessionHistoryModal() {
                         <button
                           type="button"
                           className="icon-button delete-session-button"
-                          aria-label="Delete session"
+                          aria-label={`Delete session: ${item.title}`}
                           onClick={(e) => handleDelete(item.id, e)}
                           disabled={deletingId === item.id}
                         >
@@ -192,7 +174,15 @@ export function SessionHistoryModal() {
                         </button>
                       </div>
 
-                      <h3 className="session-card-title">{item.title}</h3>
+                      <h3 className="session-card-title">
+                        <Link
+                          className="session-card-link"
+                          href={`/session/${item.id}${completed ? "/report" : ""}`}
+                          onClick={closeSessionModal}
+                        >
+                          {item.title}
+                        </Link>
+                      </h3>
                       {item.scope && (
                         <p className="session-card-scope">{item.scope}</p>
                       )}
@@ -215,7 +205,7 @@ export function SessionHistoryModal() {
                           <ArrowRight size={14} />
                         </span>
                       </div>
-                    </div>
+                    </article>
                   );
                 })}
               </div>

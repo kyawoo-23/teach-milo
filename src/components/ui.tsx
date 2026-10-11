@@ -117,12 +117,21 @@ export function Modal({
     <dialog
       ref={ref}
       className="modal"
+      onPointerDown={(event) => {
+        // A backdrop targets the dialog too; padding inside it should not dismiss.
+        if (event.target !== event.currentTarget) return;
+        const bounds = event.currentTarget.getBoundingClientRect();
+        if (
+          event.clientX < bounds.left ||
+          event.clientX > bounds.right ||
+          event.clientY < bounds.top ||
+          event.clientY > bounds.bottom
+        )
+          onClose();
+      }}
       onCancel={onClose}
       onClose={onClose}
       aria-label={title}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
     >
       <div className="modal-heading">
         <h2>{title}</h2>

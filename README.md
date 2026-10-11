@@ -99,7 +99,7 @@ The Dockerfile builds Next's standalone server and includes the extraction worke
 docker build --platform linux/amd64 -t teachback-ai .
 ```
 
-Before deployment, create a Firestore database, an Artifact Registry image repository, and a dedicated runtime service account. Give the runtime `roles/datastore.user` and access only to the two configured Secret Manager secrets. Store the Gemini key and a random 32+ character rate-limit secret in Secret Manager. Replace placeholders in `deploy/cloudrun.yaml`, deploy the image, and set `APP_ORIGIN` to the final HTTPS URL. Do not set `FIRESTORE_EMULATOR_HOST` in production.
+Before deployment, create a Firestore database, an Artifact Registry image repository, and a dedicated runtime service account. Give the runtime `roles/datastore.user` and Secret Manager accessor on two secrets: `teachback-gemini-key` (the Gemini API key) and `teachback-rate-limit-secret` (a random 32+ character rate-limit secret). Deploy with Cloud Build (`gcloud builds submit` or a trigger using `cloudbuild.yaml`). Set the `_APP_ORIGIN` substitution to the service HTTPS URL. Do not set `FIRESTORE_EMULATOR_HOST` in production.
 
 Deploy `firestore.rules` and `firestore.indexes.json`, including TTL fields. Schedule a Cloud Run Job using the same image and `node scripts/cleanup.mjs` daily, with Firestore access. Public IAM access should be enabled only for the app service when you are ready to launch. No cloud deployment is performed by this repository's local commands.
 

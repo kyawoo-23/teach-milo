@@ -194,6 +194,7 @@ export function Onboarding() {
       />
       <main
         id="main"
+        tabIndex={-1}
         className={`home-main ${step !== "material" ? "flow-main" : ""}`}
       >
         {step === "material" ? (
@@ -340,6 +341,8 @@ export function Onboarding() {
                     </label>
                     <textarea
                       id="notes"
+                      name="notes"
+                      autoComplete="off"
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       minLength={30}
@@ -358,6 +361,8 @@ export function Onboarding() {
                 </label>
                 <input
                   id="topic"
+                  name="topic"
+                  autoComplete="off"
                   className="text-input"
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}

@@ -403,7 +403,7 @@ test("materials-to-report golden path — scripted walkthrough", async ({
   await page.getByRole("button", { name: "See my learning report" }).click();
   await expect(
     page.getByRole("heading", {
-      name: "Here’s what your explanations showed.",
+      name: "How did your teaching go?",
     }),
   ).toBeVisible();
   await checkpoint();
@@ -500,7 +500,7 @@ test("worker sandbox returns calculations and terminates a stuck script", async 
   expect(results.storage.error).toBeTruthy();
 });
 
-test("understood celebration offers a close or a return to the chat", async ({
+test("understood celebration offers the independent check, a close, or a return to the chat", async ({
   page,
 }) => {
   const { state } = await fixtures(page);
@@ -514,6 +514,9 @@ test("understood celebration offers a close or a return to the chat", async ({
   await expect(dialog).toBeVisible();
   await page.waitForTimeout(350);
   await page.screenshot({ path: "artifacts/understood-desktop.png" });
+  await expect(
+    dialog.getByRole("button", { name: "Take the independent check" }),
+  ).toBeVisible();
   await expect(
     dialog.getByRole("button", { name: "Close session" }),
   ).toBeVisible();
@@ -532,7 +535,7 @@ test("understood celebration offers a close or a return to the chat", async ({
   await dialog.getByRole("button", { name: "Close session" }).click();
   await expect(
     page.getByRole("heading", {
-      name: "Here’s what your explanations showed.",
+      name: "How did your teaching go?",
     }),
   ).toBeVisible();
 });
@@ -605,4 +608,271 @@ test("independent-check draft survives refresh without reopening aids", async ({
         .analyze()
     ).violations,
   ).toEqual([]);
+});
+
+test("retrying a failed explanation clears the recovered draft", async ({
+  page,
+}) => {
+  await fixtures(page);
+  let failed = false;
+  await page.route("**/api/sessions/*/turns", async (route) => {
+    if (failed) return route.fallback();
+    failed = true;
+    return route.fulfill({
+      status: 502,
+      json: {
+        error: {
+          code: "MODEL_FAILURE",
+          message: "Please retry your explanation.",
+        },
+      },
+    });
+  });
+  await page.goto(`/session/${sessionId}`);
+  await page
+    .getByLabel("Your explanation to Milo")
+    .fill("Filters reuse weights.");
+  await page.getByRole("button", { name: "Send explanation" }).click();
+  await expect(
+    page
+      .getByRole("alert")
+      .filter({ hasText: "Please retry your explanation." }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Your explanation to Milo")).toHaveValue(
+    "Filters reuse weights.",
+  );
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByLabel("Your explanation to Milo")).toHaveValue("");
+  await expect(
+    page
+      .getByLabel("Teaching messages")
+      .getByText("Filters reuse weights.", { exact: true }),
+  ).toHaveCount(1);
+});
+
+for (const viewport of [
+  { width: 320, height: 780 },
+  { width: 390, height: 844 },
+  { width: 768, height: 1024 },
+  { width: 1024, height: 768 },
+  { width: 1440, height: 1000 },
+  { width: 844, height: 390 },
+]) {
+  test(`responsive learning flow at ${viewport.width} × ${viewport.height}`, async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "desktop",
+      "Explicit viewport coverage runs once.",
+    );
+    await page.setViewportSize(viewport);
+    const { state } = await fixtures(page);
+    const assertFits = async () => {
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+        "Page should not scroll horizontally",
+      ).toBe(true);
+      for (const selector of ["header", "main", "dialog[open]"]) {
+        const element = page.locator(selector).first();
+        if (!(await element.isVisible())) continue;
+        const box = await element.boundingBox();
+        expect(box!.x).toBeGreaterThanOrEqual(0);
+        expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width + 1);
+      }
+    };
+    const assertAccessible = async () => {
+      const result = await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+        .analyze();
+      expect(
+        result.violations.map((v) => ({
+          id: v.id,
+          targets: v.nodes.map((n) => n.target),
+        })),
+      ).toEqual([]);
+    };
+    await page.goto("/");
+    await expect(
+      page.getByRole("heading", { name: "You know it. Can you teach it?" }),
+    ).toBeVisible();
+    await assertFits();
+    await page.getByRole("button", { name: "Paste notes" }).click();
+    await page.getByLabel("Your learning notes").fill(notes);
+    await page
+      .getByLabel("What would you like to focus on?")
+      .fill("CNN weight sharing");
+    await page.getByRole("button", { name: "Prepare my lesson" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Does this look right?" }),
+    ).toBeVisible();
+    await assertFits();
+    await page.getByRole("tab", { name: "Write", exact: true }).focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(
+      page.getByRole("tab", { name: "Preview", exact: true }),
+    ).toBeFocused();
+    await assertFits();
+    await assertAccessible();
+    await page
+      .getByRole("button", { name: "Looks right. Find my lesson" })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "CNN weight sharing", exact: true }),
+    ).toBeVisible();
+    await assertFits();
+    state.lesson = {
+      ...lesson,
+      title:
+        "A very long lesson title about convolution weight sharing and computational work",
+    };
+    state.messages[0].text += " https://example.test/" + "a".repeat(200);
+    await page.getByRole("button", { name: "Let’s teach Milo" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Milo’s classroom" }),
+    ).toBeVisible();
+    await assertFits();
+    if (viewport.width <= 960)
+      await expect(page.getByLabel("Your explanation to Milo")).toHaveCSS(
+        "font-size",
+        "16px",
+      );
+    const end = await page
+      .getByRole("button", { name: "End session" })
+      .boundingBox();
+    const brand = await page.locator(".session-header .brand").boundingBox();
+    expect(end!.x).toBeGreaterThanOrEqual(brand!.x + brand!.width);
+    if (viewport.width <= 960) {
+      await expect(page.locator(".board-sidebar")).toBeHidden();
+      await page.getByRole("button", { name: "Open teaching board" }).click();
+    }
+    const teachingBoard = page.locator(".teaching-board:visible");
+    await teachingBoard.getByRole("button", { name: "64 × 64" }).click();
+    await assertFits();
+    await teachingBoard
+      .getByRole("button", { name: "Use this to explain it" })
+      .click();
+    await page
+      .getByLabel("Your explanation to Milo")
+      .fill("The same learned weights get reused at more positions.");
+    await page.getByRole("button", { name: "Send explanation" }).click();
+    await expect(
+      page
+        .getByLabel("Teaching messages")
+        .getByText(
+          "What actually gets reused when the filter moves across the image?",
+        ),
+    ).toBeVisible();
+    await assertAccessible();
+    await page.screenshot({
+      path: testInfo.outputPath(`classroom-${viewport.width}.png`),
+      fullPage: true,
+    });
+    await page.getByRole("button", { name: "End session" }).click();
+    await page
+      .getByRole("button", { name: "Try the independent check" })
+      .click();
+    await expect(page.getByLabel("Explain your thinking")).toBeVisible();
+    await assertFits();
+    await page.getByLabel("Parameters at 20 × 20").fill("204");
+    await page.getByLabel("Parameters at 40 × 40").fill("204");
+    await page
+      .getByLabel("Explain your thinking")
+      .fill("The same weights are reused at more spatial positions.");
+    await page.getByRole("button", { name: "See my learning report" }).click();
+    await expect(
+      page.getByRole("heading", {
+        name: "How did your teaching go?",
+      }),
+    ).toBeVisible();
+    await page.locator(".rp-skills summary").first().click();
+    await assertFits();
+    await assertAccessible();
+    await page.screenshot({
+      path: testInfo.outputPath(`report-${viewport.width}.png`),
+      fullPage: true,
+    });
+  });
+}
+
+test("small-screen account and history dialogs remain accessible", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  const { state } = await fixtures(page);
+  let signedIn = false;
+  await page.route("**/api/auth/me", (route) =>
+    route.fulfill({
+      json: {
+        user: signedIn
+          ? {
+              id: "learner-1",
+              name: "Ada with a very long display name",
+              email: "ada@example.test",
+            }
+          : null,
+      },
+    }),
+  );
+  await page.route("**/api/sessions", (route) =>
+    route.fulfill({
+      json: {
+        sessions: [
+          {
+            ...state,
+            title: "LongSessionTitle".repeat(15),
+            scope: "LongSource".repeat(20),
+            level: "introductory",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await page
+    .getByRole("button", { name: "Create Account", exact: true })
+    .first()
+    .click();
+  await expect(page.getByLabel("Your Name")).toBeVisible();
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await expect(page.getByLabel("Email Address")).toHaveCSS("font-size", "16px");
+  const bounds = (await dialog.boundingBox())!;
+  await page.mouse.click(bounds.x + 3, bounds.y + 3);
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Sign In", exact: true }),
+  ).toBeFocused();
+  await page.getByRole("button", { name: "My Sessions", exact: true }).click();
+  await expect(dialog.getByText("Sign in to see your sessions.")).toBeVisible();
+  await page.keyboard.press("Escape");
+  signedIn = true;
+  await page.reload();
+  await page.getByRole("button", { name: "My Sessions", exact: true }).click();
+  await expect(dialog.locator(".session-card-link")).toBeVisible();
+  expect(await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
+    true,
+  );
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await dialog.getByRole("button", { name: "Close dialog" }).click();
+  await expect(
+    page.getByRole("button", { name: "My Sessions", exact: true }),
+  ).toBeFocused();
 });

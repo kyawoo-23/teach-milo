@@ -79,11 +79,10 @@ function AuthModalContent() {
       }
     >
       <div className="auth-modal-content">
-        <div className="auth-tabs" role="tablist">
+        <div className="auth-tabs" role="group" aria-label="Account access">
           <button
             type="button"
-            role="tab"
-            aria-selected={authMode === "login"}
+            aria-pressed={authMode === "login"}
             className={`auth-tab ${authMode === "login" ? "auth-tab-active" : ""}`}
             onClick={() => {
               setAuthMode("login");
@@ -94,8 +93,7 @@ function AuthModalContent() {
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={authMode === "signup"}
+            aria-pressed={authMode === "signup"}
             className={`auth-tab ${authMode === "signup" ? "auth-tab-active" : ""}`}
             onClick={() => {
               setAuthMode("signup");
@@ -161,6 +159,8 @@ function AuthModalContent() {
                 <UserIcon size={16} className="input-icon" />
                 <input
                   id="auth-name"
+                  name="name"
+                  autoComplete="name"
                   type="text"
                   required
                   placeholder="e.g. Marie Curie"
@@ -178,6 +178,8 @@ function AuthModalContent() {
               <Mail size={16} className="input-icon" />
               <input
                 id="auth-email"
+                name="email"
+                spellCheck={false}
                 type="email"
                 required
                 autoComplete="email"
@@ -195,6 +197,7 @@ function AuthModalContent() {
               <Lock size={16} className="input-icon" />
               <input
                 id="auth-password"
+                name="password"
                 type="password"
                 required
                 autoComplete={
