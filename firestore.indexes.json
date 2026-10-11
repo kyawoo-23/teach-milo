@@ -1,5 +1,24 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "sessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ownerId", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" },
+        { "fieldPath": "expiresAt", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "sessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ownerId", "order": "ASCENDING" },
+        { "fieldPath": "expiresAt", "order": "ASCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": [
     {
       "collectionGroup": "sessions",
@@ -48,6 +67,77 @@
       "fieldPath": "expiresAt",
       "ttl": true,
       "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }]
+    },
+    {
+      "collectionGroup": "user_sessions",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }]
+    },
+    {
+      "collectionGroup": "materials",
+      "fieldPath": "text",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "materials",
+      "fieldPath": "sources",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "lessons",
+      "fieldPath": "sources",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "lessons",
+      "fieldPath": "knowledge",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "lessons",
+      "fieldPath": "objectives",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "lessons",
+      "fieldPath": "board",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "lessons",
+      "fieldPath": "transfer",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "sessions",
+      "fieldPath": "ledger",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "sessions",
+      "fieldPath": "report",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "messages",
+      "fieldPath": "text",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "messages",
+      "fieldPath": "board",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "operations",
+      "fieldPath": "pendingTurn",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "operations",
+      "fieldPath": "pendingAnswer",
+      "indexes": []
     }
   ]
 }

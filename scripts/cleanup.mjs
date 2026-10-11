@@ -20,6 +20,7 @@ for (const collection of [
   "operations",
   "usage",
   "events",
+  "user_sessions",
 ]) {
   let deleted = 0;
   while (true) {

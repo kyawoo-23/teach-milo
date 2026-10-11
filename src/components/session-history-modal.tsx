@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -10,7 +10,7 @@ import {
   Clock,
   Trash2,
 } from "lucide-react";
-import { SessionSummary } from "@/lib/contracts";
+import { SessionHistoryPage, SessionSummary } from "@/lib/contracts";
 import { useAuth } from "./auth-context";
 import { api, ErrorNotice, Modal, Spinner } from "./ui";
 
@@ -33,46 +33,96 @@ export function SessionHistoryModal() {
 
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string>();
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const requests = useRef({ generation: 0, pending: false });
+  const deletedIds = useRef(new Set<string>());
+  const retryCursor = useRef<string | undefined>(undefined);
 
-  async function loadSessions() {
-    setLoading(true);
+  const loadSessions = useCallback(async (cursor?: string) => {
+    if (requests.current.pending) return;
+    const generation = requests.current.generation;
+    requests.current.pending = true;
+    retryCursor.current = cursor;
+    setLoading(!cursor);
+    setLoadingMore(!!cursor);
     setError("");
     try {
-      const res = await api<{ sessions: SessionSummary[] }>(
-        "/api/sessions",
+      const res = await api<SessionHistoryPage>(
+        cursor
+          ? `/api/sessions?cursor=${encodeURIComponent(cursor)}`
+          : "/api/sessions",
         undefined,
         "GET",
       );
-      setSessions(res.sessions);
+      if (requests.current.generation !== generation) return;
+      setSessions((previous) =>
+        cursor
+          ? [
+              ...new Map(
+                [...previous, ...res.sessions]
+                  .filter((session) => !deletedIds.current.has(session.id))
+                  .map((session) => [session.id, session]),
+              ).values(),
+            ]
+          : res.sessions,
+      );
+      setNextCursor(res.nextCursor);
     } catch (err) {
+      if (requests.current.generation !== generation) return;
       setError(err instanceof Error ? err.message : "Failed to load sessions.");
     } finally {
-      setLoading(false);
+      if (requests.current.generation === generation) {
+        requests.current.pending = false;
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
-  }
+  }, []);
 
+  const userId = user?.id;
   useEffect(() => {
-    if (sessionModalOpen && user) {
-      loadSessions();
-    }
-  }, [sessionModalOpen, user]);
+    requests.current = {
+      generation: requests.current.generation + 1,
+      pending: false,
+    };
+    setSessions([]);
+    setNextCursor(undefined);
+    setError("");
+    setLoading(false);
+    setLoadingMore(false);
+    setDeletingId(null);
+    retryCursor.current = undefined;
+    deletedIds.current.clear();
+    if (sessionModalOpen && userId) void loadSessions();
+    return () => {
+      requests.current = {
+        generation: requests.current.generation + 1,
+        pending: false,
+      };
+    };
+  }, [sessionModalOpen, userId, loadSessions]);
 
   async function handleDelete(id: string, e: React.MouseEvent) {
     e.stopPropagation();
     if (!window.confirm("Are you sure you want to delete this session?"))
       return;
+    const generation = requests.current.generation;
     setDeletingId(id);
     try {
       await api(`/api/sessions/${id}`, {}, "DELETE");
+      if (requests.current.generation !== generation) return;
+      deletedIds.current.add(id);
       setSessions((prev) => prev.filter((s) => s.id !== id));
     } catch (err) {
+      if (requests.current.generation !== generation) return;
       setError(
         err instanceof Error ? err.message : "Failed to delete session.",
       );
     } finally {
-      setDeletingId(null);
+      if (requests.current.generation === generation) setDeletingId(null);
     }
   }
 
@@ -105,13 +155,18 @@ export function SessionHistoryModal() {
           </div>
         ) : (
           <>
-            {error && <ErrorNotice message={error} onRetry={loadSessions} />}
+            {error && (
+              <ErrorNotice
+                message={error}
+                onRetry={() => loadSessions(retryCursor.current)}
+              />
+            )}
 
             {loading ? (
               <div className="history-loading">
                 <Spinner label="Loading your sessions…" />
               </div>
-            ) : sessions.length === 0 ? (
+            ) : sessions.length === 0 && !nextCursor && !error ? (
               <div className="history-empty">
                 <div className="history-empty-icon">
                   <BookOpen size={36} />
@@ -208,6 +263,25 @@ export function SessionHistoryModal() {
                     </article>
                   );
                 })}
+              </div>
+            )}
+            {!loading && (sessions.length > 0 || nextCursor) && (
+              <div className="history-pagination">
+                <p role="status">{sessions.length} sessions shown</p>
+                {nextCursor && (
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={loadingMore}
+                    onClick={() => loadSessions(nextCursor)}
+                  >
+                    {loadingMore ? (
+                      <Spinner label="Loading more sessions…" />
+                    ) : (
+                      "Load more"
+                    )}
+                  </button>
+                )}
               </div>
             )}
           </>

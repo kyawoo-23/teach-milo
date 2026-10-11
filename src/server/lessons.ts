@@ -12,7 +12,14 @@ import { validateCalculation } from "@/lib/custom-code";
 import { AppError } from "@/lib/errors";
 import { CNN_BOARD, CNN_CARD, CNN_TRANSFER } from "@/content/cnn";
 import { PREPARE_PROMPT } from "@/content/prompts";
-import { database, encode, expiresAt, readOwned } from "./db";
+import {
+  assertOwned,
+  database,
+  decode,
+  encode,
+  expiresAt,
+  readOwned,
+} from "./db";
 import { gemini, Model } from "./model";
 import { CallContext } from "./usage";
 
@@ -22,8 +29,9 @@ export async function prepareLesson(
   ctx: CallContext,
   model: Model = gemini,
 ) {
-  if ((await database().collection("lessons").doc(id).get()).exists) {
-    await readOwned<Lesson>("lessons", id, ctx.ownerId);
+  const existing = await database().collection("lessons").doc(id).get();
+  if (existing.exists) {
+    assertOwned(decode<Lesson>(existing.data()), ctx.ownerId);
     return id;
   }
   const material = await readOwned<Material>(

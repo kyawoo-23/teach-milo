@@ -876,3 +876,156 @@ test("small-screen account and history dialogs remain accessible", async ({
     page.getByRole("button", { name: "My Sessions", exact: true }),
   ).toBeFocused();
 });
+
+test("session history appends pages, retries in place, and preserves deletion", async ({
+  page,
+}, testInfo) => {
+  const { state } = await fixtures(page);
+  const summary = (id: string) => ({
+    ...state,
+    id,
+    title: `Lesson ${id}`,
+    scope: lesson.scope,
+    level: lesson.level,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+  let attempts = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/sessions*", async (route) => {
+    const cursor = new URL(route.request().url()).searchParams.get("cursor");
+    if (!cursor)
+      return route.fulfill({
+        json: { sessions: [summary("A"), summary("B")], nextCursor: "page2" },
+      });
+    expect(cursor).toBe("page2");
+    attempts++;
+    if (attempts === 1)
+      return route.fulfill({
+        status: 503,
+        json: { error: { message: "History temporarily unavailable" } },
+      });
+    await gate;
+    return route.fulfill({
+      json: { sessions: [summary("A"), summary("B"), summary("C")] },
+    });
+  });
+  await page.route("**/api/sessions/B", (route) =>
+    route.fulfill({ json: { ok: true } }),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "My Sessions", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.locator(".session-card")).toHaveCount(2);
+  page.once("dialog", (confirmation) => confirmation.accept());
+  await dialog
+    .getByRole("button", { name: "Delete session: Lesson B" })
+    .click();
+  await expect(dialog.locator(".session-card")).toHaveCount(1);
+  await dialog.getByRole("button", { name: "Load more", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "History temporarily unavailable",
+  );
+  await expect(dialog.locator(".session-card")).toHaveCount(1);
+  await dialog.getByRole("button", { name: "Try again" }).click();
+  try {
+    await expect(
+      dialog.getByRole("button", { name: "Loading more sessions…" }),
+    ).toBeDisabled();
+    await expect(dialog.getByRole("link", { name: "Lesson A" })).toBeVisible();
+    expect(attempts).toBe(2);
+  } finally {
+    release();
+  }
+  await expect(dialog.locator(".session-card")).toHaveCount(2);
+  await expect(dialog.getByRole("status")).toHaveText("2 sessions shown");
+  await expect(
+    dialog.getByRole("button", { name: "Load more", exact: true }),
+  ).toHaveCount(0);
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath("history-pages.png") });
+  await dialog.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("button", { name: "My Sessions", exact: true }).click();
+  await expect(dialog.getByRole("link", { name: "Lesson B" })).toBeVisible();
+  await expect(dialog.getByRole("link", { name: "Lesson C" })).toHaveCount(0);
+});
+
+test("session history ignores stale pages after reopening and handles empty history", async ({
+  page,
+}) => {
+  const { state } = await fixtures(page);
+  let firstLoads = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/sessions*", async (route) => {
+    if (new URL(route.request().url()).searchParams.has("cursor")) {
+      await gate;
+      return route.fulfill({
+        json: {
+          sessions: [
+            {
+              ...state,
+              id: "stale",
+              title: "Stale lesson",
+              level: lesson.level,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          ],
+        },
+      });
+    }
+    firstLoads++;
+    return route.fulfill({
+      json:
+        firstLoads === 1
+          ? {
+              sessions: [
+                {
+                  ...state,
+                  title: lesson.title,
+                  level: lesson.level,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                },
+              ],
+              nextCursor: "page2",
+            }
+          : { sessions: [] },
+    });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "My Sessions", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Load more", exact: true }).click();
+  await expect(
+    dialog.getByRole("button", { name: "Loading more sessions…" }),
+  ).toBeDisabled();
+  await dialog.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("button", { name: "My Sessions", exact: true }).click();
+  await expect(
+    dialog.getByRole("heading", { name: "No sessions found" }),
+  ).toBeVisible();
+  const staleResponse = page.waitForResponse((response) =>
+    response.url().includes("cursor=page2"),
+  );
+  release();
+  await staleResponse;
+  await expect(dialog.getByRole("link", { name: "Stale lesson" })).toHaveCount(
+    0,
+  );
+  await expect(
+    dialog.getByRole("heading", { name: "No sessions found" }),
+  ).toBeVisible();
+});

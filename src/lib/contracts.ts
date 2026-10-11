@@ -364,6 +364,12 @@ export const SessionSummarySchema = z.object({
 });
 export type SessionSummary = z.infer<typeof SessionSummarySchema>;
 
+export const SessionHistoryPageSchema = z.object({
+  sessions: z.array(SessionSummarySchema),
+  nextCursor: z.string().optional(),
+});
+export type SessionHistoryPage = z.infer<typeof SessionHistoryPageSchema>;
+
 export const SignupSchema = z
   .object({
     email: z.string().trim().email("Please enter a valid email address."),
