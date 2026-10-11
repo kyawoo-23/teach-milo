@@ -14,8 +14,8 @@ COPY . .
 RUN pnpm build
 
 FROM dependencies AS production-dependencies
-RUN --mount=type=cache,id=teachback-pnpm,target=/pnpm/store \
-    pnpm prune --prod --store-dir=/pnpm/store --offline
+ENV CI=true
+RUN pnpm prune --prod
 
 FROM node:24.15-bookworm-slim AS runner
 WORKDIR /app

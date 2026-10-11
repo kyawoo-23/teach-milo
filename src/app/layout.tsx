@@ -11,6 +11,22 @@ export const metadata: Metadata = {
   },
   description:
     "Bring your learning material. Teach Milo, a curious AI student. Find out what your explanations really show.",
+  icons: {
+    icon: [
+      {
+        url: "/brand/teachback-icon-64.png",
+        sizes: "64x64",
+        type: "image/png",
+      },
+    ],
+    apple: [
+      {
+        url: "/brand/teachback-icon-master.png",
+        sizes: "1254x1254",
+        type: "image/png",
+      },
+    ],
+  },
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {
