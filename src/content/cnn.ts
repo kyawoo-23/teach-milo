@@ -1,4 +1,6 @@
 import "server-only";
+import { lessonLanguage } from "@/lib/i18n/locales";
+import { localize } from "@/lib/i18n/messages";
 import type { Board } from "@/lib/contracts";
 
 export const CNN_CARD = `For a fixed standard convolution layer, weights = kernelHeight × kernelWidth × inputChannels × outputChannels; with bias, parameters = weights + outputChannels. Spatial input dimensions do not affect these parameters. The same learned filter coefficients are reused at every spatial position. For valid stride one, output spatial dimensions are (H-K+1) × (W-K+1). Multiplications = outputHeight × outputWidth × weights. Fixed 3×3, 3 input channels, 8 filters: 216 weights, 224 parameters. Input32: output30×30×8, 194400 multiplications. Input64: output62×62×8, 830304 multiplications. This claim is for the fixed convolution layer, not an entire network with flatten+dense layers.`;
@@ -28,3 +30,26 @@ export const CNN_BOARD: Board = {
   groups: [],
   code: "",
 };
+
+export function localizedCnnBoard(
+  language?: import("@/lib/i18n/locales").Locale,
+): Board {
+  const locale = lessonLanguage(language);
+  return {
+    ...structuredClone(CNN_BOARD),
+    title: localize(locale, CNN_BOARD.title),
+    instruction: localize(locale, CNN_BOARD.instruction),
+    assumptions: localize(locale, CNN_BOARD.assumptions),
+  };
+}
+export function localizedCnnTransfer(
+  language?: import("@/lib/i18n/locales").Locale,
+) {
+  const locale = lessonLanguage(language);
+  return {
+    ...CNN_TRANSFER,
+    question: localize(locale, CNN_TRANSFER.question),
+    expected: localize(locale, CNN_TRANSFER.expected),
+    criteria: CNN_TRANSFER.criteria.map((c) => localize(locale, c)),
+  };
+}

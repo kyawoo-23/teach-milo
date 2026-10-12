@@ -11,11 +11,13 @@ export function MiloArtwork({
   state = "idle",
   decorative = false,
   svgRef,
+  label = "Milo, your AI student",
 }: {
   size?: number;
   state?: MiloState;
   decorative?: boolean;
   svgRef?: Ref<SVGSVGElement>;
+  label?: string;
 }) {
   const gradientId = `milo-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const part = (name: MiloPart) => ({
@@ -34,7 +36,7 @@ export function MiloArtwork({
       viewBox="0 0 120 120"
       role={decorative ? undefined : "img"}
       aria-hidden={decorative || undefined}
-      aria-label={decorative ? undefined : "Milo, your AI student"}
+      aria-label={decorative ? undefined : label}
       className="milo"
       data-milo-state={state}
     >

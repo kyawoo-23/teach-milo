@@ -27,3 +27,4 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Student turns run `normalizeStudentReply` before `validateStudent` so minor model formatting issues do not fail the whole turn.
 - Session chat UI optimistically shows the learner message via `outgoing` in `session-experience.tsx`; scroll effect deps use `messageCount`, `outgoingId`, and `busy`.
 - Docker production stage: set `ENV CI=true` then `pnpm prune --prod` only (pnpm 11 rejects `--store-dir` / `--offline` on `prune`).
+- Teaching sessions get `expiresAt` on create (`SESSION_RETENTION_DAYS`, default 7); after expiry the API returns 410 and history hides them. Physical removal uses Firestore TTL on `expiresAt` (async) plus `pnpm cleanup` / `scripts/cleanup.mjs` (daily in prod per README). Auth cookies in `user_sessions` use a separate 30-day expiry; users can delete a session anytime via `DELETE /api/sessions/:id`.

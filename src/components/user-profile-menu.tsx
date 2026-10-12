@@ -1,5 +1,6 @@
 "use client";
 
+import { useI18n } from "@/components/locale-context";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, LogOut } from "lucide-react";
 import { UserPublic } from "@/lib/contracts";
@@ -13,6 +14,8 @@ export function UserProfileMenu({
   user: UserPublic;
   variant?: "header" | "session";
 }) {
+  const { t } = useI18n();
+
   const confirm = useConfirmation();
   const { logout } = useAuth();
   const [profileOpen, setProfileOpen] = useState(false);
@@ -22,6 +25,8 @@ export function UserProfileMenu({
   useEffect(() => {
     if (!profileOpen) return;
     const onPointerDown = (event: PointerEvent) => {
+      // Keep the menu trigger mounted while a native modal owns focus.
+      if (document.querySelector("dialog[open]")) return;
       if (
         profileRef.current &&
         !profileRef.current.contains(event.target as Node)
@@ -30,7 +35,8 @@ export function UserProfileMenu({
       }
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setProfileOpen(false);
+      if (event.key === "Escape" && !document.querySelector("dialog[open]"))
+        setProfileOpen(false);
     };
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -60,7 +66,7 @@ export function UserProfileMenu({
         title={user.email}
         aria-expanded={profileOpen}
         aria-haspopup="menu"
-        aria-label="Open account menu"
+        aria-label={t("Open account menu")}
         onClick={() => setProfileOpen((open) => !open)}
       >
         {user.avatarUrl ? (
@@ -109,11 +115,11 @@ export function UserProfileMenu({
                 void logout();
               }
             }}
-            title="Log out"
-            aria-label="Log out"
+            title={t("Log out")}
+            aria-label={t("Log out")}
           >
             <LogOut size={16} aria-hidden="true" />
-            <span>Sign out</span>
+            <span>{t("Sign out")}</span>
           </button>
         </div>
       )}

@@ -1,4 +1,8 @@
 "use client";
+
+import { lessonLanguage, formatNumber, type Locale } from "@/lib/i18n/locales";
+import { CustomSelect } from "./custom-select";
+import { useI18n } from "@/components/locale-context";
 import { useConfirmation } from "./confirmation";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
@@ -23,15 +27,19 @@ import { calculationSandbox } from "@/lib/sandbox";
 
 export function TeachingBoard({
   board,
+  teachingLanguage,
   onAttach,
   disabled = false,
 }: {
   board: Board;
+  teachingLanguage?: Locale;
   onAttach: (
     snapshot: BoardSubmission,
   ) => void | boolean | Promise<void | boolean>;
   disabled?: boolean;
 }) {
+  const { t, locale } = useI18n();
+
   const confirm = useConfirmation();
   const boardId = useId();
   const [inputs, setInputs] = useState<BoardSubmission["inputs"]>(() =>
@@ -129,13 +137,15 @@ export function TeachingBoard({
         <span className="board-icon">
           <Layers3 size={18} />
         </span>
-        <h2>Teaching board</h2>
+        <h2>{t("Teaching board")}</h2>
         {/* Text boards have no controls, so there is nothing to reset. */}
         {board.kind !== "text" && (
           <button
             className="icon-button"
-            title={changed || failed ? "Reset board" : "Nothing to reset yet"}
-            aria-label="Reset board"
+            title={
+              changed || failed ? t("Reset board") : t("Nothing to reset yet")
+            }
+            aria-label={t("Reset board")}
             onClick={async () => {
               if (
                 !(await confirm({
@@ -163,18 +173,27 @@ export function TeachingBoard({
       </div>
       <div className="board-content">
         <span className="small-label">
-          A space to make your thinking visible
+          {t("A space to make your thinking visible")}
         </span>
-        <h3>{board.title}</h3>
-        <p className="board-instruction">
+        <h3 lang={lessonLanguage(teachingLanguage)}>{board.title}</h3>
+        <p
+          className="board-instruction"
+          lang={
+            unavailable && board.kind !== "text"
+              ? locale
+              : lessonLanguage(teachingLanguage)
+          }
+        >
           {unavailable && board.kind !== "text"
-            ? "This visualization isn't available. You can still teach Milo with a written example in the conversation."
+            ? t(
+                "This visualization isn't available. You can still teach Milo with a written example in the conversation.",
+              )
             : board.instruction}
         </p>
         {board.kind === "custom" && validCode && (
           <iframe
             ref={frame}
-            title="Isolated board calculation engine"
+            title={t("Isolated board calculation engine")}
             sandbox="allow-scripts"
             srcDoc={calculationSandbox}
             className="calculation-sandbox"
@@ -185,7 +204,9 @@ export function TeachingBoard({
           <>
             <div
               className="cnn-scene"
-              aria-label="The same kernel is reused across different image positions"
+              aria-label={t(
+                "The same kernel is reused across different image positions",
+              )}
             >
               <div
                 className="cnn-grid"
@@ -208,14 +229,14 @@ export function TeachingBoard({
                   ))}
                 </div>
                 <span>
-                  Same weights,
+                  {t("Same weights,")}
                   <br />
-                  every position
+                  {t("every position")}
                 </span>
               </div>
             </div>
             <fieldset className="board-sizes">
-              <legend>Input image size</legend>
+              <legend>{t("Input image size")}</legend>
               <div className="segmented">
                 {[32, 64].map((size) => (
                   <button
@@ -231,23 +252,24 @@ export function TeachingBoard({
             </fieldset>
             <dl className="board-metrics">
               <div>
-                <dt>Output shape</dt>
+                <dt>{t("Output shape")}</dt>
                 <dd>
                   {cnn.outputSize} × {cnn.outputSize} × 8
                 </dd>
               </div>
               <div className="metric-feature">
                 <dt>
-                  Learned parameters <span>216 weights + 8 biases</span>
+                  {t("Learned parameters")}{" "}
+                  <span>{t("216 weights + 8 biases")}</span>
                 </dt>
                 <dd>
                   {cnn.parameters}
-                  <span>stays the same</span>
+                  <span>{t("stays the same")}</span>
                 </dd>
               </div>
               <div>
-                <dt>Multiplications</dt>
-                <dd>{cnn.multiplications.toLocaleString()}</dd>
+                <dt>{t("Multiplications")}</dt>
+                <dd>{formatNumber(locale, cnn.multiplications)}</dd>
               </div>
             </dl>
           </>
@@ -287,7 +309,7 @@ export function TeachingBoard({
                   <dt>{m.label}</dt>
                   <dd>
                     {output
-                      ? Number(output.metrics[m.id]).toLocaleString(undefined, {
+                      ? formatNumber(locale, Number(output.metrics[m.id]), {
                           maximumFractionDigits: 3,
                         })
                       : "…"}{" "}
@@ -310,7 +332,9 @@ export function TeachingBoard({
                 <div>
                   <button
                     className="icon-button"
-                    aria-label={`Move ${board.items.find((i) => i.id === id)?.label} up`}
+                    aria-label={t("Move {item} up", {
+                      item: board.items.find((i) => i.id === id)?.label ?? "",
+                    })}
                     disabled={index === 0}
                     onClick={() => reorder(index, -1)}
                   >
@@ -318,7 +342,9 @@ export function TeachingBoard({
                   </button>
                   <button
                     className="icon-button"
-                    aria-label={`Move ${board.items.find((i) => i.id === id)?.label} down`}
+                    aria-label={t("Move {item} down", {
+                      item: board.items.find((i) => i.id === id)?.label ?? "",
+                    })}
                     disabled={index === all.length - 1}
                     onClick={() => reorder(index, 1)}
                   >
@@ -337,18 +363,19 @@ export function TeachingBoard({
                   {item.label}
                 </label>
                 <p>{item.detail}</p>
-                <select
+                <CustomSelect
                   id={`${boardId}-class-${item.id}`}
+                  label={item.label}
+                  disabled={disabled}
                   value={String(inputs[item.id] || "")}
-                  onChange={(e) => update(item.id, e.target.value)}
-                >
-                  <option value="" disabled>
-                    Choose a group
-                  </option>
-                  {board.groups.map((group) => (
-                    <option key={group}>{group}</option>
-                  ))}
-                </select>
+                  placeholder={t("Choose a group")}
+                  options={board.groups.map((group) => ({
+                    value: group,
+                    label: group,
+                    lang: lessonLanguage(teachingLanguage),
+                  }))}
+                  onChange={(value) => update(item.id, value)}
+                />
               </div>
             ))}
           </div>
@@ -383,18 +410,18 @@ export function TeachingBoard({
             >
               {attached ? (
                 <>
-                  <Check size={17} /> Attached to your explanation
+                  <Check size={17} /> {t("Attached to your explanation")}
                 </>
               ) : (
                 <>
-                  Use this to explain it <ArrowUpRight size={17} />
+                  {t("Use this to explain it")} <ArrowUpRight size={17} />
                 </>
               )}
             </button>
             <p className="board-footnote">
-              Add your own explanation when you send.{" "}
+              {t("Add your own explanation when you send.")}{" "}
               {board.kind !== "cnn" &&
-                "This illustration is not an assessment answer key."}
+                t("This illustration is not an assessment answer key.")}
             </p>
           </>
         )}

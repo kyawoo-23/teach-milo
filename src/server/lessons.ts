@@ -10,8 +10,13 @@ import {
 import { validateBoardConfiguration, textBoard } from "@/lib/boards";
 import { validateCalculation } from "@/lib/custom-code";
 import { AppError } from "@/lib/errors";
-import { CNN_BOARD, CNN_CARD, CNN_TRANSFER } from "@/content/cnn";
-import { PREPARE_PROMPT } from "@/content/prompts";
+import {
+  localizedCnnBoard,
+  CNN_CARD,
+  localizedCnnTransfer,
+} from "@/content/cnn";
+import { lessonLanguage } from "@/lib/i18n/locales";
+import { PREPARE_PROMPT, languageInstruction } from "@/content/prompts";
 import {
   assertOwned,
   database,
@@ -23,15 +28,32 @@ import {
 import { gemini, Model } from "./model";
 import { CallContext } from "./usage";
 
+// English keeps the canonical pre-i18n payload so retries from older clients
+// still match saved operations. Non-English choices participate in the hash.
+export function prepareOperationPayload(input: z.infer<typeof PrepareSchema>) {
+  const { teachingLanguage, ...legacy } = input;
+  return teachingLanguage === "en"
+    ? { type: "prepare", ...legacy }
+    : { type: "prepare", ...input };
+}
+
 export async function prepareLesson(
   id: string,
-  input: z.infer<typeof PrepareSchema>,
+  request: z.input<typeof PrepareSchema>,
   ctx: CallContext,
   model: Model = gemini,
 ) {
+  const input = PrepareSchema.parse(request);
   const existing = await database().collection("lessons").doc(id).get();
   if (existing.exists) {
-    assertOwned(decode<Lesson>(existing.data()), ctx.ownerId);
+    const saved = decode<Lesson>(existing.data());
+    assertOwned(saved, ctx.ownerId);
+    if (lessonLanguage(saved.teachingLanguage) !== input.teachingLanguage)
+      throw new AppError(
+        "OPERATION_CONFLICT",
+        "This request ID was used for different content.",
+        409,
+      );
     return id;
   }
   const material = await readOwned<Material>(
@@ -57,8 +79,13 @@ export async function prepareLesson(
     );
   const result = await model.generate(
     LessonGeneratedSchema,
-    PREPARE_PROMPT,
-    { topic: input.topic, level: input.level, sources: input.sources },
+    PREPARE_PROMPT + languageInstruction(input.teachingLanguage),
+    {
+      topic: input.topic,
+      level: input.level,
+      sources: input.sources,
+      teachingLanguage: input.teachingLanguage,
+    },
     ctx,
   );
   if (
@@ -74,15 +101,20 @@ export async function prepareLesson(
       502,
     );
   const cnn =
-    /(?:cnn|convolution)/i.test(input.topic + " " + result.title) &&
-    /weight\s*sharing/i.test(result.title + " " + input.topic);
+    /(?:cnn|convolution|卷积|畳み込み)/i.test(
+      input.topic + " " + result.title,
+    ) &&
+    /(?:weight\s*sharing|权重共享|重み(?:の)?共有)/i.test(
+      result.title + " " + input.topic,
+    );
   if (cnn) {
     result.knowledge += "\nVetted reference: " + CNN_CARD;
-    result.board = CNN_BOARD;
-    result.transfer = CNN_TRANSFER;
+    result.board = localizedCnnBoard(input.teachingLanguage);
+    result.transfer = localizedCnnTransfer(input.teachingLanguage);
   } else {
     result.transfer.arithmetic = "none";
-    if (result.board.kind === "cnn") result.board = textBoard();
+    if (result.board.kind === "cnn")
+      result.board = textBoard(input.teachingLanguage);
   }
   const checkBoard = () => {
     validateBoardConfiguration(result.board);
@@ -100,13 +132,14 @@ export async function prepareLesson(
       result.board = await model.generate(
         BoardSchema,
         PREPARE_PROMPT +
+          languageInstruction(input.teachingLanguage) +
           "\nRepair the supplied board to satisfy the constraints. Return only the board schema.",
         { board: result.board, concept: result.title },
         ctx,
       );
       checkBoard();
     } catch {
-      result.board = textBoard();
+      result.board = textBoard(input.teachingLanguage);
     }
   }
   // OCR warnings are surfaced for learner review; unresolved factual concerns remain private grading constraints.
@@ -116,6 +149,7 @@ export async function prepareLesson(
     ownerId: ctx.ownerId,
     materialId: material.id,
     level: input.level,
+    teachingLanguage: input.teachingLanguage,
     sources: input.sources,
     confirmed: false,
     createdAt: new Date().toISOString(),

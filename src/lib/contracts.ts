@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { locales, lessonLanguage, type Locale } from "./i18n/locales";
+export const TeachingLanguageSchema = z.enum(locales);
 
 export const Id = z.string().uuid();
 export const Level = z.enum(["introductory", "intermediate", "advanced"]);
@@ -147,6 +149,7 @@ export type Lesson = LessonGenerated & {
   ownerId: string;
   materialId: string;
   level: z.infer<typeof Level>;
+  teachingLanguage?: Locale;
   sources: Source[];
   expiresAt: string;
   createdAt: string;
@@ -154,7 +157,7 @@ export type Lesson = LessonGenerated & {
 };
 export type LessonPublic = Pick<
   Lesson,
-  "id" | "title" | "scope" | "level" | "concerns"
+  "id" | "title" | "scope" | "level" | "concerns" | "teachingLanguage"
 > & { objectives: { id: string; label: string }[] };
 export type Message = {
   id: string;
@@ -245,7 +248,7 @@ export type Session = {
   lessonId: string;
   lessonSummary?: Pick<
     LessonPublic,
-    "title" | "scope" | "level" | "objectives"
+    "title" | "scope" | "level" | "objectives" | "teachingLanguage"
   >;
   phase: Phase;
   revision: number;
@@ -296,7 +299,8 @@ export const PrepareSchema = z
   .object({
     operationId: Id,
     materialId: Id,
-    topic: z.string().trim().min(3).max(200),
+    topic: z.string().trim().min(1).max(200),
+    teachingLanguage: TeachingLanguageSchema.default("en"),
     level: Level,
     sources: z.array(SourceSchema).min(1).max(100),
   })
@@ -344,6 +348,7 @@ export const publicLesson = (lesson: Lesson): LessonPublic => ({
   title: lesson.title,
   scope: lesson.scope,
   level: lesson.level,
+  teachingLanguage: lessonLanguage(lesson.teachingLanguage),
   concerns: lesson.concerns,
   objectives: lesson.objectives.map(({ id, label }) => ({ id, label })),
 });
@@ -362,6 +367,7 @@ export const SessionSummarySchema = z.object({
   scope: z.string(),
   level: Level,
   phase: Phase,
+  teachingLanguage: TeachingLanguageSchema.default("en"),
   createdAt: z.string(),
   updatedAt: z.string(),
   expiresAt: z.string(),

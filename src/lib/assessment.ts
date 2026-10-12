@@ -1,3 +1,5 @@
+import { lessonLanguage } from "./i18n/locales";
+import { translate, localize } from "./i18n/messages";
 import {
   dimensions,
   Lesson,
@@ -15,6 +17,7 @@ export function finalizeReport(
   skipped: boolean,
   arithmetic?: { small: number; large: number },
 ): SessionReport {
+  const locale = lessonLanguage(lesson.teachingLanguage);
   const report = structuredClone(raw);
   for (const name of dimensions) {
     const item = report.scores[name];
@@ -28,8 +31,14 @@ export function finalizeReport(
       item.status = "insufficient_evidence";
       item.explanation =
         name === "transfer" && skipped
-          ? "The independent check was skipped, so there is no unaided transfer evidence."
-          : "There is not enough cited learner evidence to assess this dimension.";
+          ? localize(
+              locale,
+              "The independent check was skipped, so there is no unaided transfer evidence.",
+            )
+          : localize(
+              locale,
+              "There is not enough cited learner evidence to assess this dimension.",
+            );
     }
     if (item.status !== "assessed") item.score = null;
     if (item.score === null && item.status === "assessed")
@@ -40,8 +49,10 @@ export function finalizeReport(
       if (report.scores[name].status !== "insufficient_evidence") {
         report.scores[name].score = null;
         report.scores[name].status = "uncertain";
-        report.scores[name].explanation =
-          "The source material has unresolved factual concerns. This judgment is withheld until those concerns are clarified.";
+        report.scores[name].explanation = localize(
+          locale,
+          "The source material has unresolved factual concerns. This judgment is withheld until those concerns are clarified.",
+        );
       }
   if (lesson.transfer.arithmetic === "cnn" && !skipped) {
     const expected = convolution(20, 5, 2, 4).parameters;
@@ -49,12 +60,18 @@ export function finalizeReport(
     if (!arithmetic) {
       dimension.score = null;
       dimension.status = "insufficient_evidence";
-      dimension.explanation =
-        "The numerical fields were not supplied, so arithmetic could not be independently checked.";
+      dimension.explanation = localize(
+        locale,
+        "The numerical fields were not supplied, so arithmetic could not be independently checked.",
+      );
     } else if (arithmetic.small !== expected || arithmetic.large !== expected) {
       if (dimension.score !== null)
         dimension.score = Math.min(dimension.score, 1) as 0 | 1;
-      dimension.explanation += ` The entered parameter counts were ${arithmetic.small} and ${arithmetic.large}; both should be ${expected}.`;
+      dimension.explanation += translate(
+        locale,
+        " The entered parameter counts were {small} and {large}; both should be {expected}.",
+        { small: arithmetic.small, large: arithmetic.large, expected },
+      );
       if (arithmetic.small !== arithmetic.large)
         report.criticalMisconception = true;
     }

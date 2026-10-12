@@ -18,6 +18,11 @@ import {
   submitTurn,
 } from "@/server/sessions";
 import { sessionOperation } from "@/server/operations";
+import { prepareLesson } from "@/server/lessons";
+import { localizedCnnBoard, localizedCnnTransfer } from "@/content/cnn";
+import { translate } from "@/lib/i18n/messages";
+import { textBoard } from "@/lib/boards";
+import type { Lesson } from "@/lib/contracts";
 import { saveMaterial } from "@/server/materials";
 import { reserveModelCall } from "@/server/usage";
 import type { Model } from "@/server/model";
@@ -52,6 +57,218 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
       );
     await database().terminate();
   });
+  it.each(["zh-CN", "ja"] as const)(
+    "persists %s through preparation, hints, chat, transfer, report and history",
+    async (locale) => {
+      const generated = lessonFixture();
+      const materialId = randomUUID();
+      const lessonId = randomUUID();
+      const id = randomUUID();
+      cleanup.push(id);
+      await saveMaterial(materialId, ctx.ownerId, "Notes", generated.sources);
+      const calls: string[] = [];
+      const model: Model = {
+        async generate(schema, system, data) {
+          expect(system).toContain(
+            locale === "ja" ? "Use Japanese" : "Use Simplified Chinese",
+          );
+          const input = data as {
+            teachingLanguage: string;
+            messages?: Message[];
+            skipped?: boolean;
+          };
+          expect(input.teachingLanguage).toBe(locale);
+          if (!input.messages) {
+            calls.push("prepare");
+            return schema.parse(generated);
+          }
+          const teaching = input.messages.find(
+            (m) => m.role === "learner" && m.kind === "teaching",
+          )!;
+          if ("skipped" in input) {
+            calls.push("report");
+            return schema.parse(
+              reportFixture(
+                teaching,
+                input.messages.find((m) => m.kind === "transfer"),
+              ),
+            );
+          }
+          calls.push("student");
+          return schema.parse({
+            ...replyFixture(teaching, true),
+            studentMessage:
+              locale === "ja"
+                ? "仕組みがわかってきたよ。"
+                : "我理解这个机制了。",
+          });
+        },
+      };
+      await prepareLesson(
+        lessonId,
+        {
+          operationId: lessonId,
+          materialId,
+          topic: "CNN weight sharing",
+          level: "introductory",
+          sources: generated.sources,
+          teachingLanguage: locale,
+        },
+        ctx,
+        model,
+      );
+      const saved = await readOwned<Lesson>("lessons", lessonId, ctx.ownerId);
+      expect(saved.teachingLanguage).toBe(locale);
+      expect(saved.board).toEqual(localizedCnnBoard(locale));
+      expect(saved.transfer).toEqual(localizedCnnTransfer(locale));
+      await createSession(id, lessonId, ctx.ownerId);
+      let session = await publicSession(id, ctx.ownerId);
+      expect(session.lesson.teachingLanguage).toBe(locale);
+      expect(
+        session.messages[0].text.startsWith(translate(locale, "Hi!")),
+      ).toBe(true);
+      await sessionAction(
+        id,
+        {
+          operationId: randomUUID(),
+          revision: session.revision,
+          action: "hint",
+        },
+        ctx,
+        model,
+      );
+      session = await publicSession(id, ctx.ownerId);
+      expect(session.messages.at(-1)!.text).toBe(
+        translate(
+          locale,
+          "Could you pick one small example, walk me through what happens, and explain why each step follows? Start with the part you feel most sure about.",
+        ),
+      );
+      const text =
+        locale === "ja"
+          ? "同じ重みを使い回すので、画像が大きくなってもパラメーター数は同じです。"
+          : "相同权重在每个位置重复使用，所以图像变大时参数量不变。";
+      await submitTurn(
+        id,
+        { operationId: randomUUID(), revision: session.revision, text },
+        ctx,
+        model,
+      );
+      session = await publicSession(id, ctx.ownerId);
+      expect(session.phase).toBe("ready_for_check");
+      expect(session.messages.at(-1)!.text).toBe(
+        translate(
+          locale,
+          "Your explanation has helped me connect the key ideas. Would you like to try a new example on your own, or keep teaching me?",
+        ),
+      );
+      await sessionAction(
+        id,
+        {
+          operationId: randomUUID(),
+          revision: session.revision,
+          action: "start_transfer",
+        },
+        ctx,
+        model,
+      );
+      session = await publicSession(id, ctx.ownerId);
+      expect(session.transferQuestion).toBe(saved.transfer.question);
+      await submitTransfer(
+        id,
+        {
+          operationId: randomUUID(),
+          revision: session.revision,
+          answer: text,
+          skip: false,
+          parameters: { small: 204, large: 204 },
+        },
+        ctx,
+        model,
+      );
+      session = await publicSession(id, ctx.ownerId);
+      expect(session.report!.total).toBe(10);
+      expect(session.report!.scores.accuracy.citations[0].quote).toBe(text);
+      expect(session.report!.expectedTransferExplanation).toBe(
+        saved.transfer.expected,
+      );
+      expect(calls).toEqual(["prepare", "student", "report"]);
+      vi.mocked(getAuthenticatedUser).mockResolvedValue({
+        id: ctx.ownerId,
+        email: "locale@example.test",
+        name: "Learner",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      const history = (await (
+        await sessionHistory(new Request("http://127.0.0.1/api/sessions"))
+      ).json()) as SessionHistoryPage;
+      expect(history.sessions.find((s) => s.id === id)?.teachingLanguage).toBe(
+        locale,
+      );
+      await database().collection("lessons").doc(lessonId).delete();
+      await database().collection("materials").doc(materialId).delete();
+    },
+  );
+  it.each(["zh-CN", "ja"] as const)(
+    "keeps %s in board repair and fallback",
+    async (locale) => {
+      const generated = {
+        ...lessonFixture(),
+        title: "A source-grounded concept",
+        board: { ...textBoard(), kind: "custom" as const, code: "invalid" },
+      };
+      const materialId = randomUUID();
+      const id = randomUUID();
+      await saveMaterial(materialId, ctx.ownerId, "Notes", generated.sources);
+      let calls = 0;
+      const model: Model = {
+        async generate(schema, system) {
+          calls++;
+          expect(system).toContain(
+            locale === "ja" ? "Use Japanese" : "Use Simplified Chinese",
+          );
+          if (calls === 1) return schema.parse(generated);
+          expect(system).toContain("Repair the supplied board");
+          throw new Error("Repair unavailable");
+        },
+      };
+      await prepareLesson(
+        id,
+        {
+          operationId: id,
+          materialId,
+          topic: "concept",
+          level: "introductory",
+          sources: generated.sources,
+          teachingLanguage: locale,
+        },
+        ctx,
+        model,
+      );
+      expect(calls).toBe(2);
+      expect(
+        (await readOwned<Lesson>("lessons", id, ctx.ownerId)).board,
+      ).toEqual(textBoard(locale));
+      await expect(
+        prepareLesson(
+          id,
+          {
+            operationId: id,
+            materialId,
+            topic: "concept",
+            level: "introductory",
+            sources: generated.sources,
+            teachingLanguage: "en",
+          },
+          ctx,
+          model,
+        ),
+      ).rejects.toMatchObject({ code: "OPERATION_CONFLICT" });
+      await database().collection("lessons").doc(id).delete();
+      await database().collection("materials").doc(materialId).delete();
+    },
+  );
   it("completes the golden path and protects the unseen task", async () => {
     const { id } = await setup();
     let studentCalls = 0;
@@ -431,6 +648,7 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
         scope: lesson.scope,
         level: lesson.level,
         phase: older.phase,
+        teachingLanguage: "en",
         createdAt: older.createdAt,
         updatedAt: older.updatedAt,
         expiresAt: older.expiresAt,
