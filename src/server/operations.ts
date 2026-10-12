@@ -131,10 +131,10 @@ export async function sessionOperation(
     );
     return { session: session!, cached: false };
   });
-  if (reserved.cached) return;
+  if (reserved.cached) return reserved.session;
   try {
     const result = await work(reserved.session);
-    await f.runTransaction(async (tx) => {
+    return await f.runTransaction(async (tx) => {
       const current = await tx.get(ref);
       if (
         current.data()?.activeOperation?.token !== token ||
@@ -146,20 +146,19 @@ export async function sessionOperation(
           409,
         );
       const { activeOperation: _lock, ...next } = result.session;
-      tx.set(
-        ref,
-        encode({
-          ...next,
-          revision: revision + 1,
-          updatedAt: new Date().toISOString(),
-        }),
-      );
+      const committed: Session = {
+        ...next,
+        revision: revision + 1,
+        updatedAt: new Date().toISOString(),
+      };
+      tx.set(ref, encode(committed));
       for (const message of result.messages || [])
         tx.create(
           ref.collection("messages").doc(message.id),
           encode({ ...message, expiresAt: result.session.expiresAt }),
         );
       tx.update(opRef, { status: "complete" });
+      return committed;
     });
   } catch (e) {
     await f

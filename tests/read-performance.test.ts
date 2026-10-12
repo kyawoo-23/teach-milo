@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { database, encode, readOwned } from "@/server/db";
-import { createSession, publicSession } from "@/server/sessions";
+import {
+  createSession,
+  publicSession,
+  readMessagePage,
+  sessionUpdate,
+} from "@/server/sessions";
 import { prepareLesson } from "@/server/lessons";
 import { AppError } from "@/lib/errors";
 import type { Lesson, Session } from "@/lib/contracts";
@@ -32,6 +37,7 @@ function deferred<T>() {
 function mockDatabase() {
   const query = {
     orderBy: vi.fn().mockReturnThis(),
+    startAfter: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
     get: vi.fn().mockResolvedValue({ docs: [] }),
   };
@@ -41,11 +47,16 @@ function mockDatabase() {
     collection: vi.fn().mockReturnValue(query),
   };
   const collection = { doc: vi.fn().mockReturnValue(document) };
-  const f = { collection: vi.fn().mockReturnValue(collection), batch: vi.fn() };
+  const tx = { get: vi.fn(), update: vi.fn() };
+  const f = {
+    collection: vi.fn().mockReturnValue(collection),
+    batch: vi.fn(),
+    runTransaction: vi.fn(async (work) => work(tx)),
+  };
   vi.mocked(database).mockReturnValue(
     f as unknown as ReturnType<typeof database>,
   );
-  return { f, document, query };
+  return { f, document, query, tx };
 }
 
 beforeEach(() => vi.resetAllMocks());
@@ -106,6 +117,41 @@ describe("Session read scheduling", () => {
     expect(result.transferQuestion).toBe(lesson.transfer.question);
   });
 
+  it("includes a history cursor only when an earlier completed message exists", async () => {
+    const { query } = mockDatabase();
+    const lesson = lessonFixture();
+    const session = { ...sessionFixture(lesson), phase: "report" as const };
+    const messages = Array.from({ length: 31 }, (_, index) => ({
+      ...messageFixture(),
+      id: `message-${index}`,
+      sequence: index + 19,
+    }));
+    query.get.mockResolvedValue({
+      docs: [...messages]
+        .reverse()
+        .map((message) => ({ data: () => encode(message) })),
+    });
+    vi.mocked(readOwned)
+      .mockResolvedValueOnce(session)
+      .mockResolvedValueOnce(lesson);
+    const result = await publicSession(session.id, ctx.ownerId);
+    expect(result.messages).toEqual(messages.slice(1));
+    expect(result.nextCursor).toBe(20);
+    expect(result.board).toBeUndefined();
+  });
+
+  it("omits the history cursor when completed history fits on one page", async () => {
+    mockDatabase();
+    const lesson = lessonFixture();
+    const session = { ...sessionFixture(lesson), phase: "report" as const };
+    vi.mocked(readOwned)
+      .mockResolvedValueOnce(session)
+      .mockResolvedValueOnce(lesson);
+    expect(
+      (await publicSession(session.id, ctx.ownerId)).nextCursor,
+    ).toBeUndefined();
+  });
+
   it("starts no dependent reads when session authorization fails", async () => {
     const { query } = mockDatabase();
     const error = new AppError("NOT_FOUND", "Unavailable", 404);
@@ -135,17 +181,19 @@ describe("Session read scheduling", () => {
   );
 
   it("still promotes supported teaching evidence before returning the session", async () => {
-    const { document } = mockDatabase();
+    const { tx } = mockDatabase();
     const lesson = lessonFixture();
     const session = sessionFixture(lesson);
     session.ledger = replyFixture(messageFixture(), true);
+    tx.get.mockResolvedValue({ exists: true, data: () => encode(session) });
     vi.mocked(readOwned)
       .mockResolvedValueOnce(session)
       .mockResolvedValueOnce(lesson);
     const result = await publicSession(session.id, ctx.ownerId);
     expect(result.phase).toBe("ready_for_check");
     expect(result.revision).toBe(session.revision + 1);
-    expect(document.update).toHaveBeenCalledWith(
+    expect(tx.update).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         phase: "ready_for_check",
         revision: result.revision,
@@ -220,4 +268,116 @@ it("preserves conflicting lesson detection on a session retry", async () => {
   });
   expect(document.get).toHaveBeenCalledTimes(1);
   expect(readOwned).not.toHaveBeenCalled();
+});
+
+describe("Bounded session reads", () => {
+  it("checks an unchanged revision with one owned read and no lesson or message query", async () => {
+    const { query } = mockDatabase();
+    const session = {
+      ...sessionFixture(lessonFixture()),
+      activeOperation: {
+        id: "operation",
+        token: "token",
+        until: Date.now() + 30000,
+      },
+    };
+    vi.mocked(readOwned).mockResolvedValue(session);
+    expect(
+      await sessionUpdate(session.id, ctx.ownerId, session.revision),
+    ).toEqual({ unchanged: true, revision: session.revision, pending: true });
+    expect(readOwned).toHaveBeenCalledTimes(1);
+    expect(readOwned).toHaveBeenCalledWith(
+      "sessions",
+      session.id,
+      ctx.ownerId,
+      ["revision", "activeOperation"],
+    );
+    expect(query.get).not.toHaveBeenCalled();
+  });
+  it("reads a full session only when the revision changes", async () => {
+    const { query } = mockDatabase();
+    const lesson = lessonFixture();
+    const session = { ...sessionFixture(lesson), revision: 2 };
+    vi.mocked(readOwned)
+      .mockResolvedValueOnce(session)
+      .mockResolvedValueOnce(session)
+      .mockResolvedValueOnce(lesson);
+    const result = await sessionUpdate(session.id, ctx.ownerId, 1);
+    expect(result).toMatchObject({ revision: 2, messages: [] });
+    expect(readOwned).toHaveBeenCalledTimes(3);
+    expect(query.get).toHaveBeenCalledTimes(1);
+  });
+  it("returns mutation data without repeating owned session or lesson reads", async () => {
+    const { query } = mockDatabase();
+    const lesson = lessonFixture();
+    const session = sessionFixture(lesson);
+    await publicSession(session.id, ctx.ownerId, { session, lesson });
+    expect(readOwned).not.toHaveBeenCalled();
+    expect(query.get).toHaveBeenCalledTimes(1);
+  });
+  it("does not let a supplied snapshot bypass ownership", async () => {
+    const { query } = mockDatabase();
+    const lesson = lessonFixture();
+    const session = sessionFixture(lesson);
+    await expect(
+      publicSession(session.id, "other-owner", { session, lesson }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(query.get).not.toHaveBeenCalled();
+  });
+  it("uses a cursor and stops exactly at a full last message page", async () => {
+    const { query } = mockDatabase();
+    const messages = Array.from({ length: 30 }, (_, sequence) => ({
+      ...messageFixture(),
+      sequence,
+    }));
+    query.get.mockResolvedValue({
+      docs: [...messages]
+        .reverse()
+        .map((message) => ({ data: () => encode(message) })),
+    });
+    expect(await readMessagePage("session", 30)).toEqual({ messages });
+    expect(query.startAfter).toHaveBeenCalledWith(30);
+    expect(query.limit).toHaveBeenCalledWith(31);
+  });
+  it("does not promote a teaching session while a mutation holds its lock", async () => {
+    const { f } = mockDatabase();
+    const lesson = lessonFixture();
+    const session = sessionFixture(lesson);
+    session.ledger = replyFixture(messageFixture(), true);
+    session.activeOperation = {
+      id: "operation",
+      token: "token",
+      until: Date.now() + 30000,
+    };
+    vi.mocked(readOwned)
+      .mockResolvedValueOnce(session)
+      .mockResolvedValueOnce(lesson);
+    expect((await publicSession(session.id, ctx.ownerId)).phase).toBe(
+      session.phase,
+    );
+    expect(f.runTransaction).not.toHaveBeenCalled();
+  });
+  it("does not overwrite an assessment started concurrently with readiness promotion", async () => {
+    const { tx } = mockDatabase();
+    const lesson = lessonFixture();
+    const session = sessionFixture(lesson);
+    session.ledger = replyFixture(messageFixture(), true);
+    tx.get.mockResolvedValue({
+      exists: true,
+      data: () =>
+        encode({
+          ...session,
+          phase: "transfer",
+          revision: session.revision + 1,
+        }),
+    });
+    vi.mocked(readOwned)
+      .mockResolvedValueOnce(session)
+      .mockResolvedValueOnce(lesson);
+    const result = await publicSession(session.id, ctx.ownerId);
+    expect(result.phase).toBe("transfer");
+    expect(result.messages).toEqual([]);
+    expect(result.board).toBeUndefined();
+    expect(tx.update).not.toHaveBeenCalled();
+  });
 });

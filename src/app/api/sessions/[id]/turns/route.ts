@@ -18,7 +18,7 @@ export async function POST(
     const owner = await requireUserId();
     const id = Id.parse((await context.params).id);
     const input = await json(request, TurnSchema);
-    await submitTurn(id, input, callContext(owner, request));
-    return respond(await publicSession(id, owner));
+    const snapshot = await submitTurn(id, input, callContext(owner, request));
+    return respond(await publicSession(id, owner, snapshot));
   });
 }

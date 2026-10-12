@@ -16,7 +16,12 @@ export async function POST(
   return route(async () => {
     assertOrigin(request);
     const id = Id.parse((await context.params).id);
-    await readOwned<Session>("sessions", id, await requireUserId());
+    await readOwned<Pick<Session, "ownerId" | "expiresAt">>(
+      "sessions",
+      id,
+      await requireUserId(),
+      [],
+    );
     const input = await json(
       request,
       z.object({ name: z.literal("board_opened") }),

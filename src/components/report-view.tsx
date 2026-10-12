@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   CheckCircle2,
@@ -23,7 +23,7 @@ import {
   SessionReport,
 } from "@/lib/contracts";
 import { api, ErrorNotice, Modal } from "./ui";
-import { Milo } from "./milo";
+import { Milo, MiloMotionToggle } from "./milo";
 
 const skills: Record<Dimension, { label: string; hint: string }> = {
   accuracy: { label: "Getting the facts right", hint: "Concept accuracy" },
@@ -151,20 +151,50 @@ function StatusBadge({ status }: { status: Status }) {
   );
 }
 
-export function ReportView({ session }: { session: SessionPublic }) {
+export function ReportView({
+  session,
+  active = true,
+}: {
+  session: SessionPublic;
+  active?: boolean;
+}) {
   const report = session.report!;
   const [evidence, setEvidence] = useState<Message | null>(null);
   const [error, setError] = useState("");
   const [remove, setRemove] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const evidenceRequest = useRef<AbortController | null>(null);
+  const [loadingEvidence, setLoadingEvidence] = useState<string | null>(null);
+  useEffect(() => {
+    if (!active) {
+      setEvidence(null);
+      setLoadingEvidence(null);
+    }
+    return () => {
+      evidenceRequest.current?.abort();
+      evidenceRequest.current = null;
+    };
+  }, [active, session.id]);
   async function showEvidence(citation: Citation) {
+    evidenceRequest.current?.abort();
+    const controller = new AbortController();
+    evidenceRequest.current = controller;
+    setLoadingEvidence(citation.messageId);
     try {
       const result = await api<{ messages: Message[] }>(
         `/api/sessions/${session.id}/messages?messageId=${citation.messageId}`,
+        undefined,
+        "GET",
+        { signal: controller.signal },
       );
-      setEvidence(result.messages[0]);
+      if (!controller.signal.aborted) setEvidence(result.messages[0]);
     } catch (e) {
-      setError((e as Error).message);
+      if (!controller.signal.aborted) setError((e as Error).message);
+    } finally {
+      if (evidenceRequest.current === controller) {
+        evidenceRequest.current = null;
+        setLoadingEvidence(null);
+      }
     }
   }
   const citations = (items: Citation[]) =>
@@ -172,6 +202,8 @@ export function ReportView({ session }: { session: SessionPublic }) {
       <button
         className="evidence-quote"
         key={i}
+        disabled={loadingEvidence === c.messageId}
+        aria-busy={loadingEvidence === c.messageId}
         onClick={() => showEvidence(c)}
       >
         <Quote size={13} />
@@ -219,11 +251,12 @@ export function ReportView({ session }: { session: SessionPublic }) {
         : "notyet";
 
   return (
-    <main tabIndex={-1} id="main" className="report-main">
+    <div className="report-main">
       <header className="report-intro">
         <div className="report-milo">
-          <Milo size={86} />
+          <Milo size={86} state="reply" reactionKey={session.id} interactive />
           <span>Thanks for teaching me.</span>
+          <MiloMotionToggle />
         </div>
         <span className="small-label">Your learning report</span>
         <h1>How did your teaching go?</h1>
@@ -424,6 +457,6 @@ export function ReportView({ session }: { session: SessionPublic }) {
           </button>
         </div>
       </Modal>
-    </main>
+    </div>
   );
 }

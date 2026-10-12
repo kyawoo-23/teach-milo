@@ -1,4 +1,5 @@
 "use client";
+import { useConfirmation } from "./confirmation";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
@@ -26,9 +27,12 @@ export function TeachingBoard({
   disabled = false,
 }: {
   board: Board;
-  onAttach: (snapshot: BoardSubmission) => void;
+  onAttach: (
+    snapshot: BoardSubmission,
+  ) => void | boolean | Promise<void | boolean>;
   disabled?: boolean;
 }) {
+  const confirm = useConfirmation();
   const boardId = useId();
   const [inputs, setInputs] = useState<BoardSubmission["inputs"]>(() =>
     initialBoardInputs(board),
@@ -132,7 +136,17 @@ export function TeachingBoard({
             className="icon-button"
             title={changed || failed ? "Reset board" : "Nothing to reset yet"}
             aria-label="Reset board"
-            onClick={() => {
+            onClick={async () => {
+              if (
+                !(await confirm({
+                  title: "Reset this board?",
+                  description:
+                    "Your current board settings will be lost and the initial settings restored.",
+                  confirmLabel: "Reset board",
+                  destructive: true,
+                }))
+              )
+                return;
               setInputs(initialBoardInputs(board));
               setAttached(false);
               if (failed) {
@@ -362,9 +376,9 @@ export function TeachingBoard({
             <button
               className="secondary-button full-width"
               disabled={disabled || (board.kind === "custom" && !customOutput)}
-              onClick={() => {
-                onAttach({ version: 1, inputs });
-                setAttached(true);
+              onClick={async () => {
+                const accepted = await onAttach({ version: 1, inputs });
+                if (accepted !== false) setAttached(true);
               }}
             >
               {attached ? (

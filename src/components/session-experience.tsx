@@ -1,6 +1,7 @@
 "use client";
+import { useConfirmation } from "./confirmation";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { notFound, usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -8,7 +9,6 @@ import {
   Check,
   ChevronDown,
   Circle,
-  Copy,
   Flag,
   History,
   Layers3,
@@ -23,13 +23,15 @@ import {
   BoardSubmission,
   Message,
   SessionPublic,
-  UserPublic,
+  SessionUpdate,
 } from "@/lib/contracts";
 import { useAuth } from "./auth-context";
 import { Brand } from "./brand";
-import { Milo } from "./milo";
+import { UserProfileMenu } from "./user-profile-menu";
+import { Milo, MiloMotionToggle } from "./milo";
 import { TeachingBoard } from "./teaching-board";
-import { ReportView } from "./report-view";
+import { CompletedSessionView } from "./completed-session-view";
+import { ConversationMessage } from "./conversation-message";
 import {
   api,
   ApiError,
@@ -41,21 +43,46 @@ import {
 } from "./ui";
 
 export function SessionExperience({ id }: { id: string }) {
+  const confirm = useConfirmation();
   const router = useRouter();
   const pathname = usePathname();
-  const { user, openAuthModal, openSessionModal } = useAuth();
+  const {
+    user,
+    loading: authLoading,
+    openAuthModal,
+    openSessionModal,
+  } = useAuth();
+  const userId = user?.id;
   const getOperation = useOperationId(id);
   const busyRef = useRef(false);
   const [session, setSession] = useState<SessionPublic | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [text, setText] = useState("");
+  const [listening, setListening] = useState(false);
+  const listeningTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [replyKey, setReplyKey] = useState<string | undefined>();
+  const lastStudent = useRef<{ sessionKey: string; messageId?: string } | null>(
+    null,
+  );
   const [outgoing, setOutgoing] = useState<Message | null>(null);
   const pendingSend = useRef<{ text: string; board?: BoardSubmission } | null>(
     null,
   );
   const [board, setBoard] = useState<BoardSubmission | undefined>();
   const [boardOpen, setBoardOpen] = useState(false);
+  const [classroomDetailsOpen, setClassroomDetailsOpen] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(
+      "(max-width: 960px), (max-height: 860px)",
+    );
+    const sync = () => {
+      setClassroomDetailsOpen(!mq.matches);
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
   const [endOpen, setEndOpen] = useState(false);
   const [celebrationDismissed, setCelebrationDismissed] = useState(false);
   const [older, setOlder] = useState<Message[]>([]);
@@ -63,33 +90,179 @@ export function SessionExperience({ id }: { id: string }) {
   const [small, setSmall] = useState("");
   const [large, setLarge] = useState("");
   const [answer, setAnswer] = useState("");
-  const endRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
-  const load = useCallback(async () => {
-    try {
-      const s = await api<SessionPublic>(`/api/sessions/${id}`);
-      setSession(s);
-      setError("");
-      if (
-        s.messages.some(
-          (m) => m.id === draftStorage.getItem(`pending-turn:${id}`),
-        )
-      ) {
-        setText("");
-        draftStorage.removeItem(`draft:${id}`);
-        draftStorage.removeItem(`pending-turn:${id}`);
-      }
-    } catch (e) {
-      if (e instanceof ApiError && e.code === "AUTH_REQUIRED")
-        openAuthModal("login");
-      setError(e instanceof Error ? e.message : "Couldn't open this session.");
+  const sessionRef = useRef(session);
+  const generation = useRef(0);
+  const request = useRef<{
+    controller: AbortController;
+    promise: Promise<boolean>;
+  } | null>(null);
+  const earlierRequest = useRef<AbortController | null>(null);
+  const [loadingEarlier, setLoadingEarlier] = useState(false);
+  const acceptSession = useCallback((incoming: SessionPublic) => {
+    const previous = sessionRef.current;
+    if (previous?.id === incoming.id && previous.revision > incoming.revision)
+      return;
+    if (
+      previous?.id === incoming.id &&
+      ["baseline", "teaching", "ready_for_check"].includes(incoming.phase)
+    ) {
+      const first = incoming.messages[0]?.sequence ?? Infinity;
+      setOlder((old) =>
+        Array.from(
+          new Map(
+            [
+              ...old,
+              ...previous.messages.filter((m) => m.sequence < first),
+            ].map((m) => [m.id, m]),
+          ).values(),
+        ).sort((a, b) => a.sequence - b.sequence),
+      );
+      incoming = { ...incoming, nextCursor: previous.nextCursor };
     }
-  }, [id, openAuthModal]);
-  // Reload once the learner signs in (or switches account).
-  const userId = user?.id;
+    sessionRef.current = incoming;
+    setSession(incoming);
+  }, []);
+  const load = useCallback(
+    (incremental = false): Promise<boolean> => {
+      if (!userId) return Promise.resolve(false);
+      if (request.current) return request.current.promise;
+      const currentGeneration = generation.current;
+      const controller = new AbortController();
+      const revision = incremental ? sessionRef.current?.revision : undefined;
+      const promise = (async () => {
+        try {
+          const result = await api<SessionUpdate>(
+            `/api/sessions/${id}${revision === undefined ? "" : `?sinceRevision=${revision}`}`,
+            undefined,
+            "GET",
+            {
+              signal: controller.signal,
+              priority: incremental ? "low" : "auto",
+            },
+          );
+          if (
+            generation.current !== currentGeneration ||
+            controller.signal.aborted
+          )
+            return false;
+          if ("unchanged" in result) {
+            const previous = sessionRef.current;
+            if (
+              previous?.id === id &&
+              previous.revision === result.revision &&
+              previous.pending !== result.pending
+            )
+              acceptSession({ ...previous, pending: result.pending });
+          } else {
+            acceptSession(result);
+            if (
+              result.messages.some(
+                (m) => m.id === draftStorage.getItem(`pending-turn:${id}`),
+              )
+            ) {
+              setText("");
+              draftStorage.removeItem(`draft:${id}`);
+              draftStorage.removeItem(`pending-turn:${id}`);
+            }
+          }
+          setError("");
+          return true;
+        } catch (e) {
+          if (
+            generation.current !== currentGeneration ||
+            controller.signal.aborted
+          )
+            return false;
+          if (
+            e instanceof ApiError &&
+            ["NOT_FOUND", "EXPIRED"].includes(e.code)
+          ) {
+            notFound();
+          }
+          if (e instanceof ApiError && e.code === "AUTH_REQUIRED") {
+            sessionRef.current = null;
+            setSession(null);
+            openAuthModal("login");
+          }
+          setError(
+            e instanceof Error ? e.message : "Couldn't open this session.",
+          );
+          return false;
+        } finally {
+          if (request.current?.controller === controller)
+            request.current = null;
+        }
+      })();
+      request.current = { controller, promise };
+      return promise;
+    },
+    [id, userId, openAuthModal, acceptSession],
+  );
+  const sessionLoaded = session !== null;
+  const sessionPending = !!session?.pending;
+  const latestStudentId = session?.messages.findLast(
+    (message) => message.role === "student",
+  )?.id;
   useEffect(() => {
-    void load();
-  }, [load, userId]);
+    if (!sessionLoaded) return;
+    const sessionKey = `${id}:${userId ?? ""}`;
+    const previous = lastStudent.current;
+    if (!previous || previous.sessionKey !== sessionKey || !latestStudentId) {
+      lastStudent.current = { sessionKey, messageId: latestStudentId };
+      setReplyKey(undefined);
+      return;
+    }
+    if (previous.messageId === latestStudentId) return;
+    if (busy || sessionPending) return;
+    lastStudent.current = { sessionKey, messageId: latestStudentId };
+    setReplyKey(latestStudentId);
+  }, [id, userId, latestStudentId, sessionLoaded, busy, sessionPending]);
+  useEffect(() => {
+    if (!replyKey) return;
+    const timer = setTimeout(() => setReplyKey(undefined), 1200);
+    return () => clearTimeout(timer);
+  }, [replyKey]);
+  useEffect(
+    () => () => {
+      if (listeningTimer.current) clearTimeout(listeningTimer.current);
+    },
+    [id],
+  );
+  useEffect(() => {
+    generation.current++;
+    request.current?.controller.abort();
+    request.current = null;
+    earlierRequest.current?.abort();
+    earlierRequest.current = null;
+    sessionRef.current = null;
+    setSession(null);
+    setOlder([]);
+    setOutgoing(null);
+    setBoard(undefined);
+    setBoardOpen(false);
+    setClassroomDetailsOpen(false);
+    setLoadingEarlier(false);
+    pendingSend.current = null;
+    busyRef.current = false;
+    setBusy(false);
+    setError("");
+    if (!authLoading) {
+      if (userId) void load();
+      else {
+        setError("Sign in to open your learning session.");
+        openAuthModal("login");
+      }
+    }
+    return () => {
+      generation.current++;
+      request.current?.controller.abort();
+      request.current = null;
+      earlierRequest.current?.abort();
+      earlierRequest.current = null;
+    };
+  }, [load, userId, authLoading, openAuthModal]);
   useEffect(() => {
     if (!session) return;
     const path = `/session/${id}${session.phase === "transfer" ? "/transfer" : session.phase === "report" ? "/report" : ""}`;
@@ -142,21 +315,52 @@ export function SessionExperience({ id }: { id: string }) {
   const messageCount = session?.messages?.length ?? 0;
   const outgoingId = outgoing?.id ?? null;
   useEffect(() => {
-    endRef.current?.scrollIntoView({
+    const thread = messagesRef.current;
+    thread?.scrollTo({
+      top: thread.scrollHeight,
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
         ? "instant"
         : "smooth",
-      block: "end",
     });
   }, [messageCount, outgoingId, busy]);
   useEffect(() => {
-    if (!session?.pending) return;
-    const timer = setInterval(() => void load(), 4000);
-    return () => clearInterval(timer);
-  }, [session?.pending, load]);
+    if (!session?.pending || busy || !userId) return;
+    let stopped = false;
+    let polling = false;
+    let delay = 4000;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      if (stopped || polling || document.hidden || busyRef.current) return;
+      polling = true;
+      const ok = await load(true);
+      polling = false;
+      if (stopped) return;
+      delay = ok ? 4000 : Math.min(delay * 2, 30000);
+      if (sessionRef.current?.pending && !document.hidden)
+        timer = setTimeout(poll, delay);
+    };
+    const visibility = () => {
+      clearTimeout(timer);
+      if (!document.hidden) void poll();
+    };
+    if (!document.hidden) timer = setTimeout(poll, delay);
+    document.addEventListener("visibilitychange", visibility);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", visibility);
+    };
+  }, [session?.pending, busy, userId, load]);
   async function mutate(endpoint: string, payload: object) {
     if (busyRef.current || !session) return false;
+    const currentGeneration = ++generation.current;
+    request.current?.controller.abort();
+    request.current = null;
+    earlierRequest.current?.abort();
+    earlierRequest.current = null;
+    setLoadingEarlier(false);
     busyRef.current = true;
+    setListening(false);
     setBusy(true);
     setError("");
     try {
@@ -168,16 +372,20 @@ export function SessionExperience({ id }: { id: string }) {
         `/api/sessions/${id}/${endpoint}`,
         { ...body, operationId },
       );
+      if (generation.current !== currentGeneration) return null;
       if (endpoint === "turns") draftStorage.removeItem(`pending-turn:${id}`);
-      setSession(result);
+      acceptSession(result);
       return true;
     } catch (e) {
+      if (generation.current !== currentGeneration) return null;
       if (e instanceof ApiError && e.code === "STALE_SESSION") await load();
       setError(e instanceof Error ? e.message : "Please try again.");
       return false;
     } finally {
-      busyRef.current = false;
-      setBusy(false);
+      if (generation.current === currentGeneration) {
+        busyRef.current = false;
+        setBusy(false);
+      }
     }
   }
   async function deliver(payload: { text: string; board?: BoardSubmission }) {
@@ -185,6 +393,7 @@ export function SessionExperience({ id }: { id: string }) {
       text: payload.text,
       ...(payload.board ? { board: payload.board } : {}),
     });
+    if (ok === null) return false;
     if (ok) {
       setOutgoing(null);
       pendingSend.current = null;
@@ -218,10 +427,33 @@ export function SessionExperience({ id }: { id: string }) {
   async function action(
     action: "hint" | "continue" | "start_transfer" | "end",
   ) {
+    if (
+      (action === "start_transfer" || action === "end") &&
+      (text.trim() || board) &&
+      !(await confirm({
+        title: "Discard unsent explanation?",
+        description:
+          "Your unsent text and board attachment will be discarded when you continue.",
+        confirmLabel: "Discard and continue",
+        destructive: true,
+      }))
+    )
+      return false;
     setEndOpen(false);
     return mutate("actions", { action });
   }
-  function attach(snapshot: BoardSubmission) {
+  async function attach(snapshot: BoardSubmission) {
+    if (
+      board &&
+      !(await confirm({
+        title: "Replace board snapshot?",
+        description:
+          "The attached snapshot will be replaced with the current board settings.",
+        confirmLabel: "Replace snapshot",
+        destructive: true,
+      }))
+    )
+      return false;
     setBoard(snapshot);
     setBoardOpen(false);
     composer.current?.focus();
@@ -254,72 +486,60 @@ export function SessionExperience({ id }: { id: string }) {
   return (
     <div className="session-shell">
       <header className="session-header">
-        <Brand />
-        <div className="session-topic">
-          {session?.lesson.title || "Your classroom"}
-          <span>
-            {session?.phase === "transfer"
-              ? "Independent check"
-              : session?.phase === "report"
-                ? "Learning report"
-                : "Learning by teaching"}
-          </span>
+        <div className="session-header-inner">
+          <Brand />
+          <div className="session-topic">
+            {session?.lesson.title || "Your classroom"}
+            <span>
+              {session?.phase === "transfer"
+                ? "Independent check"
+                : session?.phase === "report"
+                  ? "Learning report"
+                  : "Learning by teaching"}
+            </span>
+          </div>
+          <nav className="session-header-actions" aria-label="Session">
+            {isTeaching && (
+              <button
+                className="quiet-button"
+                disabled={unavailable}
+                onClick={() => setEndOpen(true)}
+              >
+                <Flag size={15} /> End session
+              </button>
+            )}
+            {user && (
+              <button
+                type="button"
+                className="quiet-button"
+                onClick={openSessionModal}
+                title="My Sessions"
+                aria-label="My Sessions"
+              >
+                <History size={15} />
+                <span className="button-text">My Sessions</span>
+              </button>
+            )}
+            {user ? (
+              <UserProfileMenu user={user} variant="session" />
+            ) : (
+              <button
+                type="button"
+                className="quiet-button signin-button-small"
+                onClick={() => openAuthModal("login")}
+              >
+                <LogIn size={14} />
+                <span>Sign In</span>
+              </button>
+            )}
+          </nav>
         </div>
-        <nav className="session-header-actions" aria-label="Session">
-          {isTeaching && (
-            <button
-              className="quiet-button"
-              disabled={unavailable}
-              onClick={() => setEndOpen(true)}
-            >
-              <Flag size={15} /> End session
-            </button>
-          )}
-          <button
-            type="button"
-            className="quiet-button"
-            onClick={openSessionModal}
-            title="My Sessions"
-            aria-label="My Sessions"
-          >
-            <History size={15} />
-            <span className="button-text">My Sessions</span>
-          </button>
-          {user ? (
-            <div className="user-profile-badge-small" title={user.email}>
-              {user.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={user.avatarUrl}
-                  alt={user.name}
-                  className="user-avatar-image-small"
-                  width={22}
-                  height={22}
-                />
-              ) : (
-                <span className="user-avatar-fallback-small">
-                  {user.name.charAt(0).toUpperCase()}
-                </span>
-              )}
-              <span className="user-name-small">{user.name}</span>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="quiet-button signin-button-small"
-              onClick={() => openAuthModal("login")}
-            >
-              <LogIn size={14} />
-              <span>Sign In</span>
-            </button>
-          )}
-        </nav>
       </header>
       {!session ? (
         <main tabIndex={-1} id="main" className="loading-page">
           {error ? (
             <>
-              <ErrorNotice message={error} onRetry={load} />
+              <ErrorNotice message={error} onRetry={() => void load()} />
               <Link className="secondary-button" href="/">
                 Start a new lesson
               </Link>
@@ -332,7 +552,11 @@ export function SessionExperience({ id }: { id: string }) {
           )}
         </main>
       ) : session.phase === "report" && session.report ? (
-        <ReportView session={session} />
+        <CompletedSessionView
+          key={`${session.id}:${userId}`}
+          session={session}
+          user={user}
+        />
       ) : session.phase === "transfer" ? (
         <main tabIndex={-1} id="main" className="transfer-main">
           <section className="transfer-card">
@@ -448,31 +672,83 @@ export function SessionExperience({ id }: { id: string }) {
           <section
             className="conversation-panel"
             aria-label="Conversation with Milo"
+            data-details-open={classroomDetailsOpen}
           >
             <div className="conversation-heading">
-              <Milo size={48} />
-              <div>
-                <h1>Milo’s classroom</h1>
-                <p>
+              <div
+                className="classroom-mascot"
+                aria-hidden={!classroomDetailsOpen}
+              >
+                <Milo
+                  size={48}
+                  state={
+                    unavailable
+                      ? "thinking"
+                      : listening
+                        ? "listening"
+                        : replyKey
+                          ? "reply"
+                          : "idle"
+                  }
+                  reactionKey={replyKey}
+                  interactive
+                />
+              </div>
+              <div className="classroom-heading-main">
+                <div className="classroom-heading-top">
+                  <h1>
+                    <span className="classroom-desktop-title">
+                      Milo’s classroom
+                    </span>
+                    <button
+                      type="button"
+                      className="classroom-details-toggle"
+                      aria-expanded={classroomDetailsOpen}
+                      aria-controls="classroom-introduction classroom-objectives"
+                      onClick={() => setClassroomDetailsOpen((open) => !open)}
+                    >
+                      <span>
+                        Milo’s classroom
+                        <small aria-hidden="true">
+                          {
+                            session.progress.filter(
+                              (p) => p.status === "supported",
+                            ).length
+                          }
+                          /{session.progress.length} objectives
+                        </small>
+                      </span>
+                      <ChevronDown size={18} aria-hidden="true" />
+                    </button>
+                  </h1>
+                  <button
+                    className="icon-button mobile-board-button"
+                    aria-label="Open teaching board"
+                    onClick={() => {
+                      setBoardOpen(true);
+                      void api(`/api/sessions/${id}/events`, {
+                        name: "board_opened",
+                      }).catch(() => {});
+                    }}
+                  >
+                    <Layers3 size={21} />
+                  </button>
+                </div>
+                <p
+                  id="classroom-introduction"
+                  aria-hidden={!classroomDetailsOpen}
+                >
                   <span className="status-dot" /> Curious student. You’re the
                   teacher.
                 </p>
               </div>
-              <button
-                className="icon-button mobile-board-button"
-                aria-label="Open teaching board"
-                onClick={() => {
-                  setBoardOpen(true);
-                  void api(`/api/sessions/${id}/events`, {
-                    name: "board_opened",
-                  }).catch(() => {});
-                }}
-              >
-                <Layers3 size={21} />
-              </button>
             </div>
             <div
               className="progress-strip"
+              id="classroom-objectives"
+              role="region"
+              tabIndex={classroomDetailsOpen ? 0 : -1}
+              aria-hidden={!classroomDetailsOpen}
               aria-label="Learning objective progress"
             >
               {session.progress.map((p, i) => (
@@ -489,6 +765,7 @@ export function SessionExperience({ id }: { id: string }) {
               ))}
             </div>
             <div
+              ref={messagesRef}
               className="messages"
               aria-label="Teaching messages"
               role="region"
@@ -502,64 +779,65 @@ export function SessionExperience({ id }: { id: string }) {
               {session.nextCursor !== undefined && (
                 <button
                   className="quiet-button load-earlier"
+                  disabled={loadingEarlier}
                   onClick={async () => {
+                    if (earlierRequest.current) return;
+                    const currentGeneration = generation.current;
+                    const controller = new AbortController();
+                    earlierRequest.current = controller;
+                    setLoadingEarlier(true);
                     try {
                       const result = await api<{
                         messages: Message[];
                         nextCursor?: number;
                       }>(
                         `/api/sessions/${id}/messages?before=${older[0]?.sequence ?? session.nextCursor}`,
+                        undefined,
+                        "GET",
+                        { signal: controller.signal },
                       );
+                      if (
+                        controller.signal.aborted ||
+                        generation.current !== currentGeneration
+                      )
+                        return;
                       setOlder((prev) => [...result.messages, ...prev]);
-                      if (result.nextCursor === undefined)
-                        setSession((s) => s && { ...s, nextCursor: undefined });
+                      const previous = sessionRef.current;
+                      if (previous) {
+                        const next = {
+                          ...previous,
+                          nextCursor: result.nextCursor,
+                        };
+                        sessionRef.current = next;
+                        setSession(next);
+                      }
                     } catch (e) {
-                      setError((e as Error).message);
+                      if (
+                        !controller.signal.aborted &&
+                        generation.current === currentGeneration
+                      )
+                        setError((e as Error).message);
+                    } finally {
+                      if (earlierRequest.current === controller)
+                        earlierRequest.current = null;
+                      if (generation.current === currentGeneration)
+                        setLoadingEarlier(false);
                     }
                   }}
                 >
-                  Load earlier messages
+                  {loadingEarlier ? (
+                    <Spinner label="Loading earlier messages…" />
+                  ) : (
+                    "Load earlier messages"
+                  )}
                 </button>
               )}
               {messages.map((message) => (
-                <article
+                <ConversationMessage
                   key={message.id}
-                  id={`message-${message.id}`}
-                  className={`message ${message.role}`}
-                >
-                  <div className="message-avatar">
-                    {message.role === "student" ? (
-                      <Milo size={34} />
-                    ) : (
-                      <LearnerMessageAvatar user={user} />
-                    )}
-                  </div>
-                  <div className="message-body">
-                    <span className="message-name">
-                      {message.role === "student" ? "Milo" : "You"}
-                      {message.kind === "hint" && (
-                        <small> A little nudge</small>
-                      )}
-                    </span>
-                    <div className="message-bubble">
-                      <div className="message-text">{message.text}</div>
-                    </div>
-                    {message.role === "student" && (
-                      <CopyButton text={message.text} />
-                    )}
-                    {message.board && (
-                      <div className="shared-board">
-                        <Layers3 size={15} />
-                        <span>
-                          Demonstration shared
-                          {message.board.kind === "cnn"
-                            ? ` · ${message.board.inputs.inputSize} × ${message.board.inputs.inputSize}`
-                            : ""}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </article>
+                  message={message}
+                  user={user}
+                />
               ))}
               {unavailable && (
                 <div className="message student thinking-message">
@@ -577,16 +855,6 @@ export function SessionExperience({ id }: { id: string }) {
                   </div>
                 </div>
               )}
-              <div ref={endRef} />
-            </div>
-            <div className="sr-status" role="status" aria-live="polite">
-              {unavailable
-                ? "Milo is thinking."
-                : session.messages.at(-1)?.role === "student"
-                  ? session.messages.at(-1)?.text
-                  : ""}
-            </div>
-            <div className="composer-area">
               {session.phase === "ready_for_check" && (
                 <div className="ready-card">
                   <div>
@@ -614,6 +882,15 @@ export function SessionExperience({ id }: { id: string }) {
                   </div>
                 </div>
               )}
+            </div>
+            <div className="sr-status" role="status" aria-live="polite">
+              {unavailable
+                ? "Milo is thinking."
+                : session.messages.at(-1)?.role === "student"
+                  ? session.messages.at(-1)?.text
+                  : ""}
+            </div>
+            <div className="composer-area">
               {error && (
                 <ErrorNotice
                   message={error}
@@ -631,7 +908,18 @@ export function SessionExperience({ id }: { id: string }) {
                     <button
                       type="button"
                       aria-label="Remove board snapshot"
-                      onClick={() => setBoard(undefined)}
+                      onClick={async () => {
+                        if (
+                          await confirm({
+                            title: "Remove board snapshot?",
+                            description:
+                              "This snapshot will be removed from your unsent explanation.",
+                            confirmLabel: "Remove snapshot",
+                            destructive: true,
+                          })
+                        )
+                          setBoard(undefined);
+                      }}
                     >
                       <X size={14} />
                     </button>
@@ -644,10 +932,19 @@ export function SessionExperience({ id }: { id: string }) {
                   ref={composer}
                   id="explanation"
                   value={text}
-                  rows={3}
+                  rows={2}
                   maxLength={2000}
                   disabled={unavailable}
-                  onChange={(e) => setText(e.target.value)}
+                  onChange={(e) => {
+                    setText(e.target.value);
+                    setListening(e.target.value.trim().length > 0);
+                    if (listeningTimer.current)
+                      clearTimeout(listeningTimer.current);
+                    listeningTimer.current = setTimeout(
+                      () => setListening(false),
+                      2000,
+                    );
+                  }}
                   placeholder="Explain it to Milo in your own words…"
                   onKeyDown={(e) => {
                     if (
@@ -724,7 +1021,10 @@ export function SessionExperience({ id }: { id: string }) {
             error={error}
             onDismiss={dismissCelebration}
             onStartTransfer={() => void action("start_transfer")}
-            onCloseSession={() => void action("end")}
+            onCloseSession={() => {
+              dismissCelebration();
+              setEndOpen(true);
+            }}
           />
           <Modal
             open={endOpen}
@@ -852,7 +1152,8 @@ function UnderstoodCelebration({
         className="understood-panel"
         onClick={(event) => event.stopPropagation()}
       >
-        <Milo size={88} />
+        {open && <Milo size={88} state="celebration" />}
+        <MiloMotionToggle />
         <h2 id="understood-title">Milo understood.</h2>
         <p>
           Your explanation landed. Take the independent check, close this
@@ -910,66 +1211,5 @@ function CheckCircleIcon() {
     <span className="ready-check">
       <Check size={14} />
     </span>
-  );
-}
-function LearnerMessageAvatar({ user }: { user: UserPublic | null }) {
-  const [imageFailed, setImageFailed] = useState(false);
-  const avatarUrl = user?.avatarUrl;
-  if (avatarUrl && !imageFailed) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={avatarUrl}
-        alt=""
-        className="message-avatar-image"
-        width={29}
-        height={29}
-        onError={() => setImageFailed(true)}
-      />
-    );
-  }
-  const fallbackLabel = user?.name
-    ? user.name.charAt(0).toUpperCase()
-    : "You";
-  return (
-    <span className="message-avatar-fallback" aria-hidden="true">
-      {fallbackLabel}
-    </span>
-  );
-}
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 1500);
-    return () => clearTimeout(timer);
-  }, [copied]);
-  return (
-    <button
-      type="button"
-      className="message-copy"
-      aria-label={copied ? "Copied" : "Copy Milo’s message"}
-      title={copied ? "Copied" : "Copy"}
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text);
-          setCopied(true);
-        } catch {
-          // Clipboard API blocked (e.g. embedded frames): fall back to a hidden textarea.
-          const area = document.createElement("textarea");
-          area.value = text;
-          area.setAttribute("readonly", "");
-          area.style.position = "fixed";
-          area.style.opacity = "0";
-          document.body.appendChild(area);
-          area.select();
-          if (document.execCommand("copy")) setCopied(true);
-          area.remove();
-        }
-      }}
-    >
-      {copied ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={2} />}
-      <span className="visually-hidden">{copied ? "Copied" : "Copy"}</span>
-    </button>
   );
 }

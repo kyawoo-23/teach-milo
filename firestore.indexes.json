@@ -138,6 +138,31 @@
       "collectionGroup": "operations",
       "fieldPath": "pendingAnswer",
       "indexes": []
+    },
+    {
+      "collectionGroup": "sessions",
+      "fieldPath": "lessonSummary",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "sessions",
+      "fieldPath": "activeOperation",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "messages",
+      "fieldPath": "createdAt",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "messages",
+      "fieldPath": "role",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "messages",
+      "fieldPath": "kind",
+      "indexes": []
     }
   ]
 }

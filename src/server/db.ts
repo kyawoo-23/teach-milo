@@ -74,8 +74,21 @@ export function assertOwned(
 }
 export async function readOwned<
   T extends { ownerId: string; expiresAt: string },
->(collection: string, id: string, ownerId: string): Promise<T> {
-  const snap = await database().collection(collection).doc(id).get();
+>(
+  collection: string,
+  id: string,
+  ownerId: string,
+  fields?: string[],
+): Promise<T> {
+  const f = database();
+  const ref = f.collection(collection).doc(id);
+  const snap = fields
+    ? (
+        await f.getAll(ref, {
+          fieldMask: [...new Set(["ownerId", "expiresAt", ...fields])],
+        })
+      )[0]
+    : await ref.get();
   const item = snap.exists ? decode<T>(snap.data()) : undefined;
   assertOwned(item, ownerId);
   return item!;

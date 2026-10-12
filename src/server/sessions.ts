@@ -10,6 +10,7 @@ import {
   ReportGeneratedSchema,
   Session,
   SessionPublic,
+  SessionUpdate,
   StudentReplySchema,
   TransferSchema,
   TurnSchema,
@@ -62,6 +63,12 @@ export async function createSession(
     id,
     ownerId,
     lessonId,
+    lessonSummary: {
+      title: lesson.title,
+      scope: lesson.scope,
+      level: lesson.level,
+      objectives: lesson.objectives.map(({ id, label }) => ({ id, label })),
+    },
     phase: "baseline",
     revision: 0,
     nextSequence: 1,
@@ -105,9 +112,17 @@ export async function readMessages(
     .doc(id)
     .collection("messages")
     .orderBy("sequence", "desc");
-  if (before !== undefined) query = query.where("sequence", "<", before);
+  if (before !== undefined) query = query.startAfter(before);
   const docs = await query.limit(limit).get();
   return docs.docs.map((d) => decode<Message>(d.data())).reverse();
+}
+export async function readMessagePage(id: string, before?: number) {
+  const page = await readMessages(id, 31, before);
+  const messages = page.slice(-30);
+  return {
+    messages,
+    ...(page.length > 30 ? { nextCursor: messages[0].sequence } : {}),
+  };
 }
 export async function evidenceMessages(
   session: Session,
@@ -147,6 +162,7 @@ async function maybePromoteReady(
   const candidate = { ...session, ledger };
   if (
     !["baseline", "teaching"].includes(session.phase) ||
+    (session.activeOperation && session.activeOperation.until > Date.now()) ||
     !readyForCheck(candidate, lesson)
   )
     return candidate;
@@ -156,23 +172,48 @@ async function maybePromoteReady(
     revision: session.revision + 1,
     updatedAt: new Date().toISOString(),
   };
-  await database().collection("sessions").doc(id).update({
-    phase: updated.phase,
-    ledger: updated.ledger,
-    revision: updated.revision,
-    updatedAt: updated.updatedAt,
+  const ref = database().collection("sessions").doc(id);
+  return database().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const current = snap.exists ? decode<Session>(snap.data()) : undefined;
+    assertOwned(current, session.ownerId);
+    if (
+      current!.revision !== session.revision ||
+      current!.phase !== session.phase ||
+      (current!.activeOperation && current!.activeOperation.until > Date.now())
+    )
+      return current!;
+    tx.update(ref, {
+      phase: updated.phase,
+      ledger: updated.ledger,
+      revision: updated.revision,
+      updatedAt: updated.updatedAt,
+    });
+    return updated;
   });
-  return updated;
 }
+export type SessionSnapshot = { session: Session; lesson?: Lesson };
 export async function publicSession(
   id: string,
   ownerId: string,
+  snapshot?: SessionSnapshot,
 ): Promise<SessionPublic> {
-  const initial = await readOwned<Session>("sessions", id, ownerId);
+  const initial =
+    snapshot?.session ?? (await readOwned<Session>("sessions", id, ownerId));
+  assertOwned(initial, ownerId);
+  if (initial.id !== id)
+    throw new AppError("NOT_FOUND", "This session is unavailable.", 404);
+  if (snapshot?.lesson) {
+    assertOwned(snapshot.lesson, ownerId);
+    if (snapshot.lesson.id !== initial.lessonId)
+      throw new AppError("NOT_FOUND", "This lesson is unavailable.", 404);
+  }
   // Session ownership is checked before starting either independent read.
-  const [lesson, messages] = await Promise.all([
-    readOwned<Lesson>("lessons", initial.lessonId, ownerId),
-    initial.phase === "transfer" ? Promise.resolve([]) : readMessages(id),
+  const [lesson, page] = await Promise.all([
+    snapshot?.lesson ?? readOwned<Lesson>("lessons", initial.lessonId, ownerId),
+    initial.phase === "transfer"
+      ? Promise.resolve({ messages: [] as Message[], nextCursor: undefined })
+      : readMessagePage(id),
   ]);
   const session = await maybePromoteReady(id, initial, lesson);
   // Once assessment begins, normal session retrieval cannot reopen practice aids.
@@ -187,9 +228,10 @@ export async function publicSession(
     hintUsed: session.hintUsed,
     expiresAt: session.expiresAt,
     lesson: publicLesson(lesson),
-    messages,
-    ...(messages.length === 30 && teaching
-      ? { nextCursor: messages[0].sequence }
+    messages: session.phase === "transfer" ? [] : page.messages,
+    ...(page.nextCursor !== undefined &&
+    (teaching || session.phase === "report")
+      ? { nextCursor: page.nextCursor }
       : {}),
     progress: lesson.objectives.map((o) => ({
       id: o.id,
@@ -210,13 +252,31 @@ export async function publicSession(
       !!session.activeOperation && session.activeOperation.until > Date.now(),
   };
 }
+export async function sessionUpdate(
+  id: string,
+  ownerId: string,
+  sinceRevision: number,
+): Promise<SessionUpdate> {
+  const session = await readOwned<
+    Pick<Session, "ownerId" | "expiresAt" | "revision" | "activeOperation">
+  >("sessions", id, ownerId, ["revision", "activeOperation"]);
+  if (session.revision === sinceRevision)
+    return {
+      unchanged: true,
+      revision: session.revision,
+      pending:
+        !!session.activeOperation && session.activeOperation.until > Date.now(),
+    };
+  return publicSession(id, ownerId);
+}
 export async function submitTurn(
   id: string,
   input: z.infer<typeof TurnSchema>,
   ctx: CallContext,
   model: Model = gemini,
 ) {
-  await sessionOperation(
+  let responseLesson: Lesson | undefined;
+  const committed = await sessionOperation(
     ctx.ownerId,
     id,
     input.operationId,
@@ -234,6 +294,7 @@ export async function submitTurn(
         session.lessonId,
         ctx.ownerId,
       );
+      responseLesson = lesson;
       const learner: Message = {
         id: input.operationId,
         role: "learner",
@@ -307,8 +368,11 @@ export async function submitTurn(
       return { session: next, messages: [learner, reply] };
     },
   );
-  await event(id, "turn_submitted", input.operationId);
-  if (input.board) await event(id, "board_shared", input.operationId);
+  await Promise.all([
+    event(id, "turn_submitted", input.operationId),
+    ...(input.board ? [event(id, "board_shared", input.operationId)] : []),
+  ]);
+  return { session: committed, lesson: responseLesson };
 }
 async function evaluate(
   session: Session,
@@ -355,7 +419,8 @@ export async function sessionAction(
   ctx: CallContext,
   model: Model = gemini,
 ) {
-  await sessionOperation(
+  let responseLesson: Lesson | undefined;
+  const committed = await sessionOperation(
     ctx.ownerId,
     id,
     input.operationId,
@@ -373,6 +438,7 @@ export async function sessionAction(
         session.lessonId,
         ctx.ownerId,
       );
+      responseLesson = lesson;
       if (input.action === "continue")
         return { session: { ...session, phase: "teaching" } };
       if (input.action === "start_transfer")
@@ -422,6 +488,7 @@ export async function sessionAction(
   );
   if (input.action === "end")
     await event(id, "session_completed", input.operationId);
+  return { session: committed, lesson: responseLesson };
 }
 export async function submitTransfer(
   id: string,
@@ -434,7 +501,8 @@ export async function submitTransfer(
       "ANSWER_REQUIRED",
       "Explain your answer, or choose Skip.",
     );
-  await sessionOperation(
+  let responseLesson: Lesson | undefined;
+  const committed = await sessionOperation(
     ctx.ownerId,
     id,
     input.operationId,
@@ -452,6 +520,7 @@ export async function submitTransfer(
         session.lessonId,
         ctx.ownerId,
       );
+      responseLesson = lesson;
       if (
         lesson.transfer.arithmetic === "cnn" &&
         !input.skip &&
@@ -508,6 +577,9 @@ export async function submitTransfer(
       };
     },
   );
-  await event(id, "transfer_submitted", input.operationId);
-  await event(id, "session_completed", input.operationId);
+  await Promise.all([
+    event(id, "transfer_submitted", input.operationId),
+    event(id, "session_completed", input.operationId),
+  ]);
+  return { session: committed, lesson: responseLesson };
 }

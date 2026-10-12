@@ -243,6 +243,10 @@ export type Session = {
   id: string;
   ownerId: string;
   lessonId: string;
+  lessonSummary?: Pick<
+    LessonPublic,
+    "title" | "scope" | "level" | "objectives"
+  >;
   phase: Phase;
   revision: number;
   nextSequence: number;
@@ -275,6 +279,13 @@ export type SessionPublic = Pick<
   report?: SessionReport;
   pending: boolean;
 };
+export type SessionUpdate =
+  | SessionPublic
+  | {
+      unchanged: true;
+      revision: number;
+      pending: boolean;
+    };
 export const CreateMaterialSchema = z
   .object({
     text: z.string().min(30).max(50_000),

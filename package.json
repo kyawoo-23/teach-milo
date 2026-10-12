@@ -21,7 +21,8 @@
     "format": "prettier --write src tests scripts *.ts *.json *.yaml deploy README.md",
     "format:check": "prettier --check src tests scripts *.ts *.json *.yaml deploy README.md",
     "test:http": "node scripts/smoke-http.mjs",
-    "record:walkthrough": "RECORD_WALKTHROUGH=1 playwright test --project=desktop --grep \"golden path\""
+    "record:walkthrough": "RECORD_WALKTHROUGH=1 playwright test --project=desktop --grep \"golden path\"",
+    "milo:export": "node --import tsx scripts/milo-export.tsx"
   },
   "dependencies": {
     "@google/genai": "2.28.0",

@@ -11,6 +11,8 @@ import {
   createSession,
   publicSession,
   readMessages,
+  readMessagePage,
+  sessionUpdate,
   sessionAction,
   submitTransfer,
   submitTurn,
@@ -779,5 +781,105 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
       await f.terminate();
       await deleteApp(app);
     }
+  });
+  it("serves new history summaries without lesson joins and keeps legacy fallback", async () => {
+    const ownerId = randomUUID();
+    const lesson = { ...lessonFixture(), ownerId };
+    const id = randomUUID();
+    const legacy = { ...sessionFixture(lesson), ownerId };
+    const f = database();
+    const lessonRef = f.collection("lessons").doc(lesson.id);
+    const legacyRef = f.collection("sessions").doc(legacy.id);
+    cleanup.push(id, legacy.id);
+    await lessonRef.create(encode(lesson));
+    await createSession(id, lesson.id, ownerId);
+    vi.mocked(getAuthenticatedUser).mockResolvedValue({
+      id: ownerId,
+      email: "summary@example.test",
+      name: "Summary learner",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    const joins = vi.spyOn(f, "getAll");
+    try {
+      const stored = await readOwned<Session>("sessions", id, ownerId);
+      expect(stored.lessonSummary?.objectives).toEqual(
+        lesson.objectives.map(({ id, label }) => ({ id, label })),
+      );
+      joins.mockClear();
+      const first = await sessionHistory(
+        new Request("http://localhost/api/sessions"),
+      );
+      expect(first.status).toBe(200);
+      expect((await first.json()).sessions).toHaveLength(1);
+      expect(joins).not.toHaveBeenCalled();
+      await legacyRef.create(encode(legacy));
+      const second = await sessionHistory(
+        new Request("http://localhost/api/sessions"),
+      );
+      expect((await second.json()).sessions).toHaveLength(2);
+      expect(joins).toHaveBeenCalledTimes(1);
+      expect(joins.mock.calls[0].slice(0, -1)).toEqual([lessonRef]);
+      console.info("History summary read counts", {
+        newSessionLessonReads: 0,
+        mixedPageLegacyLessonReads: 1,
+      });
+    } finally {
+      joins.mockRestore();
+      vi.mocked(getAuthenticatedUser).mockReset();
+      await lessonRef.delete();
+    }
+  });
+
+  it("returns committed mutation snapshots and unchanged polling without duplicating messages", async () => {
+    const { id } = await setup();
+    const input = {
+      operationId: randomUUID(),
+      revision: 0,
+      action: "hint" as const,
+    };
+    const snapshot = await sessionAction(id, input, ctx);
+    expect(snapshot.session).toEqual(
+      await readOwned<Session>("sessions", id, ctx.ownerId),
+    );
+    const result = await publicSession(id, ctx.ownerId, snapshot);
+    expect(result.revision).toBe(1);
+    expect(result.messages).toHaveLength(2);
+    const duplicate = await sessionAction(id, input, ctx);
+    expect(duplicate.session.revision).toBe(1);
+    expect(
+      (await publicSession(id, ctx.ownerId, duplicate)).messages,
+    ).toHaveLength(2);
+    expect(await sessionUpdate(id, ctx.ownerId, 1)).toEqual({
+      unchanged: true,
+      revision: 1,
+      pending: false,
+    });
+    await expect(sessionUpdate(id, "other-owner", 1)).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+  });
+
+  it("uses lookahead to avoid empty terminal message pages", async () => {
+    const { id } = await setup();
+    const ref = database().collection("sessions").doc(id);
+    const batch = database().batch();
+    for (let sequence = 1; sequence <= 30; sequence++)
+      batch.create(
+        ref.collection("messages").doc(randomUUID()),
+        encode({
+          ...messageFixture(),
+          sequence,
+          expiresAt: new Date(Date.now() + 60000).toISOString(),
+        }),
+      );
+    await batch.commit();
+    const newest = await readMessagePage(id);
+    expect(newest.messages).toHaveLength(30);
+    expect(newest.nextCursor).toBe(1);
+    const oldest = await readMessagePage(id, newest.nextCursor);
+    expect(oldest.messages).toHaveLength(1);
+    expect(oldest.messages[0].sequence).toBe(0);
+    expect(oldest.nextCursor).toBeUndefined();
   });
 });

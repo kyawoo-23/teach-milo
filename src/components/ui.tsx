@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 import { AlertCircle, LoaderCircle, X } from "lucide-react";
 
 export const draftStorage = {
@@ -25,48 +25,7 @@ export const draftStorage = {
     }
   },
 };
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public code = "ERROR",
-  ) {
-    super(message);
-  }
-}
-export async function api<T>(
-  url: string,
-  body?: unknown,
-  method = "POST",
-): Promise<T> {
-  const response = await fetch(url, {
-    method: body === undefined ? "GET" : method,
-    cache: "no-store",
-    headers:
-      body instanceof FormData
-        ? undefined
-        : body === undefined
-          ? undefined
-          : { "Content-Type": "application/json" },
-    body:
-      body instanceof FormData
-        ? body
-        : body === undefined
-          ? undefined
-          : JSON.stringify(body),
-  });
-  let result;
-  try {
-    result = await response.json();
-  } catch {
-    throw new ApiError("The connection was interrupted. Please retry.");
-  }
-  if (!response.ok)
-    throw new ApiError(
-      result.error?.message || "Something went wrong. Please retry.",
-      result.error?.code,
-    );
-  return result;
-}
+export { api, ApiError } from "@/lib/api-client";
 export function ErrorNotice({
   message,
   onRetry,
@@ -101,22 +60,39 @@ export function Modal({
   onClose,
   title,
   children,
+  role = "dialog",
+  descriptionId,
+  className = "",
+  initialFocusRef,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  role?: "dialog" | "alertdialog";
+  descriptionId?: string;
+  className?: string;
+  initialFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  useLayoutEffect(() => {
+    const dialog = ref.current;
+    return () => {
+      if (dialog?.open) dialog.close();
+    };
+  }, []);
   useEffect(() => {
     const dialog = ref.current;
-    if (open && !dialog?.open) dialog?.showModal();
-    else if (!open && dialog?.open) dialog.close();
-  }, [open]);
+    if (open && !dialog?.open) {
+      dialog?.showModal();
+      initialFocusRef?.current?.focus();
+    } else if (!open && dialog?.open) dialog.close();
+  }, [open, initialFocusRef]);
   return (
     <dialog
       ref={ref}
-      className="modal"
+      className={`modal ${className}`}
+      role={role}
       onPointerDown={(event) => {
         // A backdrop targets the dialog too; padding inside it should not dismiss.
         if (event.target !== event.currentTarget) return;
@@ -130,8 +106,11 @@ export function Modal({
           onClose();
       }}
       onCancel={onClose}
-      onClose={onClose}
+      onClose={(event) => {
+        if (!event.currentTarget.open) onClose();
+      }}
       aria-label={title}
+      aria-describedby={descriptionId}
     >
       <div className="modal-heading">
         <h2>{title}</h2>
