@@ -1077,22 +1077,20 @@ input::placeholder {
   background: #f8f9fc;
 }
 /* The classroom is an app shell: the window does not scroll, the thread does. */
-html:has(.classroom, .completed-session[data-view="chat"]),
-body:has(.classroom, .completed-session[data-view="chat"]) {
+html:has(.classroom, .completed-session),
+body:has(.classroom, .completed-session) {
   height: 100%;
   overflow: clip;
   overscroll-behavior: none;
-  scrollbar-gutter: auto;
 }
-.session-shell:has(.classroom, .completed-session[data-view="chat"]) {
+.session-shell:has(.classroom, .completed-session) {
   display: flex;
   flex-direction: column;
   height: 100dvh;
   max-height: 100dvh;
   overflow: hidden;
 }
-.session-shell:has(.classroom, .completed-session[data-view="chat"])
-  .session-header {
+.session-shell:has(.classroom, .completed-session) .session-header {
   flex: none;
 }
 .session-shell:has(.classroom) .classroom {
@@ -1261,12 +1259,19 @@ body:has(.classroom, .completed-session[data-view="chat"]) {
 .messages > .ready-card {
   margin: 8px 0 24px;
 }
-.conversation-start {
+.conversation-start,
+.conversation-end {
   display: flex;
   justify-content: center;
   font-size: 11px;
   color: #69647d;
+  text-align: center;
+}
+.conversation-start {
   margin: 24px 0 26px;
+}
+.conversation-end {
+  margin: 28px 0 4px;
 }
 .message {
   display: flex;
@@ -2114,60 +2119,61 @@ input[type="range"] {
 }
 
 .report-main {
-  max-width: 1050px;
+  max-width: var(--completed-content-max, 1050px);
   margin: 40px auto 55px;
-  padding: 0 30px;
+  padding: 0 var(--completed-content-gutter, 30px);
+}
+.completed-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  max-width: var(--completed-content-max, 1050px);
+  margin: 12px auto 0;
+  padding: 0 var(--completed-content-gutter, 30px);
+}
+.completed-header .report-milo {
+  margin-bottom: 0;
+  min-width: 0;
+  flex: 0 1 auto;
+  justify-content: flex-start;
+}
+.completed-header .report-milo > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .completed-tabs {
   display: flex;
+  flex-shrink: 0;
   gap: 6px;
   width: fit-content;
-  margin: 28px auto 0;
+  margin: 0;
   padding: 4px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: #fff;
 }
-.completed-session[data-view="chat"] {
+.completed-session {
+  --completed-content-max: 1050px;
+  --completed-chat-max: 858px;
+  --completed-content-gutter: 30px;
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  overflow: hidden;
-}
-.completed-session[data-view="chat"] .completed-tabs {
-  flex-shrink: 0;
-  margin-block: 12px;
-}
-.completed-session[data-view="chat"] > [role="tabpanel"]:not([hidden]) {
-  display: flex;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-.completed-session[data-view="chat"] .completed-chat {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-  margin-block: 0;
-  border-bottom: 0;
-  border-radius: 20px 20px 0 0;
-}
-.completed-session[data-view="chat"] .completed-chat-heading {
-  flex-shrink: 0;
-  margin-bottom: 12px;
-}
-.completed-session[data-view="chat"] .completed-chat > .load-earlier {
-  flex-shrink: 0;
-}
-.completed-session[data-view="chat"] .completed-messages {
-  flex: 1 1 auto;
-  min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+.completed-session > [role="tabpanel"]:not([hidden]) {
+  min-width: 0;
+}
+.completed-session[data-view="chat"] .completed-chat-heading {
+  margin-bottom: 12px;
 }
 .completed-tabs button {
   min-height: 44px;
@@ -2182,9 +2188,10 @@ input[type="range"] {
   color: #fff;
 }
 .completed-chat {
-  max-width: 850px;
+  width: 100%;
+  max-width: var(--completed-chat-max, 858px);
   margin: 28px auto 55px;
-  padding: 24px clamp(16px, 4vw, 32px);
+  padding: 24px var(--completed-content-gutter, 30px);
   border: 1px solid var(--line);
   border-radius: 20px;
   background: #fff;
@@ -2206,7 +2213,7 @@ input[type="range"] {
   margin-bottom: 24px;
 }
 .completed-messages {
-  margin-top: 24px;
+  margin-top: 0;
 }
 .completed-chat .message:last-child {
   margin-bottom: 0;
@@ -2803,6 +2810,13 @@ input[type="range"] {
       max(16px, env(safe-area-inset-right)) 8px
       max(16px, env(safe-area-inset-left));
   }
+  .completed-tabs button {
+    padding-inline: 20px;
+  }
+  .completed-header .report-milo > span {
+    padding: 9px 12px;
+    font-size: 11px;
+  }
   .session-topic {
     grid-column: 1 / -1;
     grid-row: 2;
@@ -3147,15 +3161,34 @@ input[type="range"] {
   .transfer-card textarea {
     font-size: 16px;
   }
+  .completed-session {
+    --completed-content-gutter: 20px;
+  }
+  .completed-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .completed-header .report-milo {
+    justify-content: flex-start;
+  }
+  .completed-tabs {
+    width: 100%;
+  }
+  .completed-tabs button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 12px;
+  }
+  .completed-header .report-milo .milo {
+    width: 56px;
+    height: 56px;
+  }
   .report-main {
     margin-top: 24px;
-    padding: 0 20px;
   }
   .report-intro h1 {
     font-size: clamp(1.5rem, 1rem + 3vw, 2rem);
-  }
-  .report-milo {
-    margin-bottom: 13px;
   }
   .report-milo .milo {
     width: 70px;
@@ -4110,8 +4143,27 @@ input[type="range"] {
   .messages {
     padding-inline: 16px;
   }
+  .completed-session {
+    --completed-content-gutter: 16px;
+  }
+  .completed-header {
+    margin-block-start: 8px;
+    gap: 10px;
+  }
+  .completed-header .report-milo {
+    gap: 8px;
+  }
+  .completed-header .report-milo .milo {
+    width: 48px;
+    height: 48px;
+  }
+  .completed-header .report-milo > span {
+    padding: 8px 10px;
+    font-size: 10px;
+    line-height: 1.45;
+  }
   .report-main {
-    padding-inline: 16px;
+    padding-inline: var(--completed-content-gutter);
   }
   .rp-skills summary {
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -4226,28 +4278,9 @@ input[type="range"] {
 .milo-greet[aria-disabled="true"] {
   cursor: default;
 }
-.milo-greet:focus-visible,
-.milo-motion-toggle:focus-visible {
+.milo-greet:focus-visible {
   outline: 2px solid #655dcc;
   outline-offset: 3px;
-}
-.milo-motion-toggle {
-  display: inline-grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  padding: 0;
-  border: 1px solid #dcd8ef;
-  border-radius: 50%;
-  color: #69647d;
-  background: #f8f6fe;
-  cursor: pointer;
-  vertical-align: middle;
-}
-.milo-motion-toggle:hover {
-  color: #4d58bb;
-  background: #eeecfa;
 }
 .classroom-mascot {
   flex-shrink: 0;
@@ -4377,10 +4410,4 @@ input[type="range"] {
   .classroom-details-toggle svg {
     transition: none;
   }
-}
-.conversation-heading .milo-motion-toggle {
-  margin-left: auto;
-}
-.understood-panel > .milo-motion-toggle {
-  margin-top: 8px;
 }

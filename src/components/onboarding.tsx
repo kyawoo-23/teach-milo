@@ -19,7 +19,7 @@ import { LessonPublic, SessionPublic, Source } from "@/lib/contracts";
 import { useAuth } from "./auth-context";
 import { MarkdownEditor } from "./markdown-editor";
 import { clearDraft, saveDraft, takeDraft } from "./material-draft";
-import { Milo, MiloMotionToggle } from "./milo";
+import { Milo } from "./milo";
 import { NavHeader } from "./nav-header";
 import {
   api,
@@ -592,7 +592,6 @@ export function Onboarding() {
                       interactive
                     />
                     <span>I’d love to learn about this.</span>
-                    <MiloMotionToggle />
                   </div>
                   <h1 className="flow-heading" tabIndex={-1}>
                     {lesson.title}
