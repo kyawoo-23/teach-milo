@@ -1,68 +1,8 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-import { Pause, Play } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { MiloArtwork } from "./milo-artwork";
 import { animateMilo, MILO_MOTIONS, type MiloState } from "./milo-motion";
-
-const MOTION_KEY = "teachback-milo-motion-paused";
-const MotionContext = createContext({ paused: false, toggle: () => {} });
-
-export function MiloMotionProvider({ children }: { children: ReactNode }) {
-  const [paused, setPaused] = useState(false);
-  useEffect(() => {
-    const read = () => {
-      try {
-        setPaused(localStorage.getItem(MOTION_KEY) === "1");
-      } catch {
-        /* Storage is optional. */
-      }
-    };
-    read();
-    window.addEventListener("storage", read);
-    return () => window.removeEventListener("storage", read);
-  }, []);
-  function toggle() {
-    const next = !paused;
-    setPaused(next);
-    try {
-      localStorage.setItem(MOTION_KEY, next ? "1" : "0");
-    } catch {
-      /* Keep the in-memory preference. */
-    }
-  }
-  return (
-    <MotionContext.Provider value={{ paused, toggle }}>
-      {children}
-    </MotionContext.Provider>
-  );
-}
-
-export function MiloMotionToggle() {
-  const { paused, toggle } = useContext(MotionContext);
-  return (
-    <button
-      type="button"
-      className="milo-motion-toggle"
-      onClick={toggle}
-      aria-label={paused ? "Resume Milo motion" : "Pause Milo motion"}
-      title={paused ? "Resume Milo motion" : "Pause Milo motion"}
-    >
-      {paused ? (
-        <Play size={13} aria-hidden="true" />
-      ) : (
-        <Pause size={13} aria-hidden="true" />
-      )}
-    </button>
-  );
-}
 
 export function Milo({
   size = 48,
@@ -80,7 +20,6 @@ export function Milo({
   reactionKey?: string | number;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const { paused } = useContext(MotionContext);
   const [greeting, setGreeting] = useState<{
     id: number;
     baseKey: string;
@@ -115,7 +54,7 @@ export function Milo({
     let animations: Animation[] = [];
     let disposed = false;
     const sync = () => {
-      if (paused || preference.matches) {
+      if (preference.matches) {
         animations.forEach((animation) => animation.cancel());
         animations = [];
         return;
@@ -157,7 +96,7 @@ export function Milo({
       document.removeEventListener("visibilitychange", sync);
       animations.forEach((animation) => animation.cancel());
     };
-  }, [animated, paused, playing, requestKey]);
+  }, [animated, playing, requestKey]);
 
   const artwork = (
     <MiloArtwork

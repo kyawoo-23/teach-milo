@@ -23,7 +23,6 @@ import {
   SessionReport,
 } from "@/lib/contracts";
 import { api, ErrorNotice, Modal } from "./ui";
-import { Milo, MiloMotionToggle } from "./milo";
 
 const skills: Record<Dimension, { label: string; hint: string }> = {
   accuracy: { label: "Getting the facts right", hint: "Concept accuracy" },
@@ -253,11 +252,6 @@ export function ReportView({
   return (
     <div className="report-main">
       <header className="report-intro">
-        <div className="report-milo">
-          <Milo size={86} state="reply" reactionKey={session.id} interactive />
-          <span>Thanks for teaching me.</span>
-          <MiloMotionToggle />
-        </div>
         <span className="small-label">Your learning report</span>
         <h1>How did your teaching go?</h1>
         <p>{session.lesson.title}</p>

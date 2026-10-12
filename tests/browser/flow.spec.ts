@@ -1045,7 +1045,7 @@ test("session history ignores stale pages after reopening and handles empty hist
   ).toBeVisible();
 });
 
-test("Milo greetings support keyboard, restart cleanly, and share a saved pause preference", async ({
+test("Milo greetings support keyboard and restart cleanly", async ({
   page,
 }) => {
   const { state } = await fixtures(page);
@@ -1069,38 +1069,6 @@ test("Milo greetings support keyboard, restart cleanly, and share a saved pause 
     .toBe(4);
   await expect(milo).toHaveAttribute("data-milo-state", "idle");
   await page.goto(`/session/${sessionId}`);
-  const headerMilo = page.locator(".conversation-heading .milo");
-  await page.getByRole("button", { name: "Pause Milo motion" }).click();
-  await expect
-    .poll(() =>
-      headerMilo.evaluate((svg) => svg.getAnimations({ subtree: true }).length),
-    )
-    .toBe(0);
-  await page.goto("/");
-  await expect
-    .poll(() =>
-      milo.evaluate((svg) => svg.getAnimations({ subtree: true }).length),
-    )
-    .toBe(0);
-  await page.goto(`/session/${sessionId}`);
-  await expect(
-    page.getByRole("button", { name: "Resume Milo motion" }),
-  ).toBeVisible();
-  await expect
-    .poll(() =>
-      headerMilo.evaluate((svg) => svg.getAnimations({ subtree: true }).length),
-    )
-    .toBe(0);
-  await page.reload();
-  await expect(
-    page.getByRole("button", { name: "Resume Milo motion" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Resume Milo motion" }).click();
-  await expect
-    .poll(() =>
-      headerMilo.evaluate((svg) => svg.getAnimations({ subtree: true }).length),
-    )
-    .toBe(2);
   const gradientIds = await page
     .locator(".message-avatar .milo linearGradient")
     .evaluateAll((nodes) => nodes.map((node) => node.id));
@@ -1388,6 +1356,9 @@ test("completed chat preserves paginated history, retries, and supports keyboard
   await expect(chat).toHaveAttribute("aria-selected", "true");
   const transcript = page.getByRole("region", { name: "Saved conversation" });
   await expect(transcript.getByText(/Session ended/)).toBeVisible();
+  await expect(
+    transcript.getByText("You've reached the end of this conversation."),
+  ).toBeVisible();
   await expect(transcript.getByText("A little nudge")).toBeVisible();
   await expect(transcript.getByText("Independent-check answer")).toBeVisible();
   await expect(
@@ -1449,6 +1420,7 @@ test("completed chat preserves paginated history, retries, and supports keyboard
     ),
   ).toBe(true);
   const savedMessages = page.getByRole("region", { name: "Saved messages" });
+  const completedMain = page.locator(".completed-session");
   await expect(savedMessages.locator(".message-bubble").first()).toHaveCSS(
     "font-size",
     "16px",
@@ -1458,10 +1430,10 @@ test("completed chat preserves paginated history, retries, and supports keyboard
       () => document.scrollingElement!.scrollHeight <= innerHeight,
     ),
   ).toBe(true);
-  await savedMessages.hover();
+  await completedMain.hover();
   await page.mouse.wheel(0, 10000);
   await expect
-    .poll(() => savedMessages.evaluate((el) => el.scrollTop))
+    .poll(() => completedMain.evaluate((el) => el.scrollTop))
     .toBeGreaterThan(0);
   expect(await page.evaluate(() => scrollY)).toBe(0);
   await page.screenshot({ path: testInfo.outputPath("completed-chat.png") });

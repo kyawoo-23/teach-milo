@@ -28,7 +28,7 @@ import {
 import { useAuth } from "./auth-context";
 import { Brand } from "./brand";
 import { UserProfileMenu } from "./user-profile-menu";
-import { Milo, MiloMotionToggle } from "./milo";
+import { Milo } from "./milo";
 import { TeachingBoard } from "./teaching-board";
 import { CompletedSessionView } from "./completed-session-view";
 import { ConversationMessage } from "./conversation-message";
@@ -1153,7 +1153,6 @@ function UnderstoodCelebration({
         onClick={(event) => event.stopPropagation()}
       >
         {open && <Milo size={88} state="celebration" />}
-        <MiloMotionToggle />
         <h2 id="understood-title">Milo understood.</h2>
         <p>
           Your explanation landed. Take the independent check, close this

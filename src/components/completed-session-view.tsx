@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { Message, SessionPublic, UserPublic } from "@/lib/contracts";
 import { ConversationMessage } from "./conversation-message";
+import { Milo } from "./milo";
 import { ReportView } from "./report-view";
 import { api, ErrorNotice, Spinner } from "./ui";
 
@@ -23,7 +24,6 @@ export function CompletedSessionView({
   const controller = useRef<AbortController | null>(null);
   const alive = useRef(true);
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
-
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -71,43 +71,54 @@ export function CompletedSessionView({
       className="completed-session"
       data-view={view}
     >
-      <div
-        className="completed-tabs"
-        role="tablist"
-        aria-label="Completed session"
-      >
-        {(["report", "chat"] as const).map((tab, index) => (
-          <button
-            key={tab}
-            ref={(element) => {
-              tabs.current[index] = element;
-            }}
-            type="button"
-            role="tab"
-            id={`${prefix}-${tab}-tab`}
-            aria-controls={`${prefix}-${tab}-panel`}
-            aria-selected={view === tab}
-            tabIndex={view === tab ? 0 : -1}
-            onClick={() => setView(tab)}
-            onKeyDown={(event) => {
-              if (event.altKey || event.ctrlKey || event.metaKey) return;
-              const target =
-                event.key === "Home"
-                  ? 0
-                  : event.key === "End"
-                    ? 1
-                    : event.key === "ArrowRight" || event.key === "ArrowLeft"
-                      ? 1 - index
-                      : undefined;
-              if (target === undefined) return;
-              event.preventDefault();
-              setView(target === 0 ? "report" : "chat");
-              tabs.current[target]?.focus();
-            }}
-          >
-            {tab === "report" ? "Report" : "Chat"}
-          </button>
-        ))}
+      <div className="completed-header">
+        <div className="report-milo">
+          <Milo
+            size={64}
+            state="reply"
+            reactionKey={session.id}
+            interactive
+          />
+          <span>Thanks for teaching me.</span>
+        </div>
+        <div
+          className="completed-tabs"
+          role="tablist"
+          aria-label="Completed session"
+        >
+          {(["report", "chat"] as const).map((tab, index) => (
+            <button
+              key={tab}
+              ref={(element) => {
+                tabs.current[index] = element;
+              }}
+              type="button"
+              role="tab"
+              id={`${prefix}-${tab}-tab`}
+              aria-controls={`${prefix}-${tab}-panel`}
+              aria-selected={view === tab}
+              tabIndex={view === tab ? 0 : -1}
+              onClick={() => setView(tab)}
+              onKeyDown={(event) => {
+                if (event.altKey || event.ctrlKey || event.metaKey) return;
+                const target =
+                  event.key === "Home"
+                    ? 0
+                    : event.key === "End"
+                      ? 1
+                      : event.key === "ArrowRight" || event.key === "ArrowLeft"
+                        ? 1 - index
+                        : undefined;
+                if (target === undefined) return;
+                event.preventDefault();
+                setView(target === 0 ? "report" : "chat");
+                tabs.current[target]?.focus();
+              }}
+            >
+              {tab === "report" ? "Report" : "Chat"}
+            </button>
+          ))}
+        </div>
       </div>
       <div
         role="tabpanel"
@@ -126,30 +137,6 @@ export function CompletedSessionView({
         hidden={view !== "chat"}
       >
         <section className="completed-chat" aria-label="Saved conversation">
-          <div className="completed-chat-heading">
-            <h1>Your conversation with Milo</h1>
-            <p>Session ended · You can read your saved conversation here.</p>
-          </div>
-          {error && (
-            <ErrorNotice
-              message={error}
-              onRetry={loading ? undefined : loadEarlier}
-            />
-          )}
-          {cursor !== undefined && (
-            <button
-              className="quiet-button load-earlier"
-              type="button"
-              disabled={loading}
-              onClick={loadEarlier}
-            >
-              {loading ? (
-                <Spinner label="Loading earlier messages…" />
-              ) : (
-                "Load earlier messages"
-              )}
-            </button>
-          )}
           <div
             className="completed-messages"
             role="region"
@@ -157,14 +144,43 @@ export function CompletedSessionView({
             tabIndex={0}
             aria-busy={loading}
           >
+            <div className="completed-chat-heading">
+              <h1>Your conversation with Milo</h1>
+              <p>Session ended · You can read your saved conversation here.</p>
+            </div>
+            {error && (
+              <ErrorNotice
+                message={error}
+                onRetry={loading ? undefined : loadEarlier}
+              />
+            )}
+            {cursor !== undefined && (
+              <button
+                className="quiet-button load-earlier"
+                type="button"
+                disabled={loading}
+                onClick={loadEarlier}
+              >
+                {loading ? (
+                  <Spinner label="Loading earlier messages…" />
+                ) : (
+                  "Load earlier messages"
+                )}
+              </button>
+            )}
             {messages.length ? (
-              messages.map((message) => (
-                <ConversationMessage
-                  key={message.id}
-                  message={message}
-                  user={user}
-                />
-              ))
+              <>
+                {messages.map((message) => (
+                  <ConversationMessage
+                    key={message.id}
+                    message={message}
+                    user={user}
+                  />
+                ))}
+                <div className="conversation-end">
+                  <span>You&apos;ve reached the end of this conversation.</span>
+                </div>
+              </>
             ) : (
               <p className="muted">No saved messages in this session.</p>
             )}

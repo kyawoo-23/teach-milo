@@ -3,7 +3,6 @@ import "./globals.css";
 import { AuthProvider } from "@/components/auth-context";
 import { AuthModal } from "@/components/auth-modal";
 import { SessionHistoryModal } from "@/components/session-history-modal";
-import { MiloMotionProvider } from "@/components/milo";
 import { ConfirmationProvider } from "@/components/confirmation";
 
 export const viewport: Viewport = {
@@ -47,13 +46,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           Skip to content
         </a>
         <AuthProvider>
-          <MiloMotionProvider>
-            <ConfirmationProvider>
-              <AuthModal />
-              <SessionHistoryModal />
-              {children}
-            </ConfirmationProvider>
-          </MiloMotionProvider>
+          <ConfirmationProvider>
+            <AuthModal />
+            <SessionHistoryModal />
+            {children}
+          </ConfirmationProvider>
         </AuthProvider>
       </body>
     </html>
