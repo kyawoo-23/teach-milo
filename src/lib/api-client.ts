@@ -1,11 +1,21 @@
 "use client";
+import {
+  isTranslationKey,
+  type TranslationKey,
+  type TranslationParams,
+} from "./i18n/messages";
 
 export class ApiError extends Error {
+  public messageKey?: TranslationKey;
   constructor(
     message: string,
     public code = "ERROR",
+    messageKey?: TranslationKey,
+    public params?: TranslationParams,
   ) {
     super(message);
+    this.messageKey =
+      messageKey ?? (isTranslationKey(message) ? message : undefined);
   }
 }
 
@@ -54,6 +64,10 @@ async function request(
     throw new ApiError(
       result.error?.message || "Something went wrong. Please retry.",
       result.error?.code,
+      isTranslationKey(result.error?.messageKey ?? "")
+        ? result.error.messageKey
+        : undefined,
+      result.error?.params,
     );
   return result;
 }

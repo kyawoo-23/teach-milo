@@ -1,5 +1,6 @@
 "use client";
 
+import { useI18n } from "@/components/locale-context";
 import { Suspense, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
@@ -22,6 +23,8 @@ export function AuthModal() {
 }
 
 function AuthModalContent() {
+  const { t, errorText } = useI18n();
+
   const {
     authModalOpen,
     closeAuthModal,
@@ -40,7 +43,7 @@ function AuthModalContent() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | Error>("");
 
   const urlAuthError = searchParams.get("authError");
 
@@ -59,7 +62,7 @@ function AuthModalContent() {
         await signup(email, password, name);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Authentication failed.");
+      setError(err instanceof Error ? err : "Authentication failed.");
     } finally {
       setBusy(false);
     }
@@ -91,12 +94,16 @@ function AuthModalContent() {
       }}
       title={
         authMode === "login"
-          ? "Sign In to TeachBack"
-          : "Create TeachBack Account"
+          ? t("Sign In to TeachBack")
+          : t("Create TeachBack Account")
       }
     >
       <div className="auth-modal-content">
-        <div className="auth-tabs" role="group" aria-label="Account access">
+        <div
+          className="auth-tabs"
+          role="group"
+          aria-label={t("Account access")}
+        >
           <button
             type="button"
             aria-pressed={authMode === "login"}
@@ -106,7 +113,7 @@ function AuthModalContent() {
               setError("");
             }}
           >
-            Sign In
+            {t("Sign In")}
           </button>
           <button
             type="button"
@@ -117,7 +124,7 @@ function AuthModalContent() {
               setError("");
             }}
           >
-            Create Account
+            {t("Create Account")}
           </button>
         </div>
 
@@ -128,7 +135,7 @@ function AuthModalContent() {
             style={{ marginBottom: "1rem" }}
           >
             <AlertCircle size={18} />
-            <span>{error || urlAuthError}</span>
+            <span>{errorText(error || urlAuthError || "")}</span>
           </div>
         )}
 
@@ -161,17 +168,17 @@ function AuthModalContent() {
               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
             />
           </svg>
-          <span>Continue with Google</span>
+          <span>{t("Continue with Google")}</span>
         </button>
 
         <div className="auth-divider">
-          <span>or with email</span>
+          <span>{t("or with email")}</span>
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
           {authMode === "signup" && (
             <div className="form-group">
-              <label htmlFor="auth-name">Your Name</label>
+              <label htmlFor="auth-name">{t("Your Name")}</label>
               <div className="input-with-icon">
                 <UserIcon size={16} className="input-icon" />
                 <input
@@ -180,7 +187,7 @@ function AuthModalContent() {
                   autoComplete="name"
                   type="text"
                   required
-                  placeholder="e.g. Marie Curie"
+                  placeholder={t("e.g. Marie Curie")}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   disabled={busy}
@@ -190,7 +197,7 @@ function AuthModalContent() {
           )}
 
           <div className="form-group">
-            <label htmlFor="auth-email">Email Address</label>
+            <label htmlFor="auth-email">{t("Email Address")}</label>
             <div className="input-with-icon">
               <Mail size={16} className="input-icon" />
               <input
@@ -209,7 +216,7 @@ function AuthModalContent() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="auth-password">Password</label>
+            <label htmlFor="auth-password">{t("Password")}</label>
             <div className="input-with-icon">
               <Lock size={16} className="input-icon" />
               <input
@@ -225,7 +232,9 @@ function AuthModalContent() {
                 }
                 minLength={authMode === "signup" ? 8 : undefined}
                 placeholder={
-                  authMode === "signup" ? "At least 8 characters" : "••••••••"
+                  authMode === "signup"
+                    ? t("At least 8 characters")
+                    : "••••••••"
                 }
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -234,7 +243,9 @@ function AuthModalContent() {
               <button
                 type="button"
                 className="password-toggle"
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-label={
+                  showPassword ? t("Hide password") : t("Show password")
+                }
                 aria-controls="auth-password"
                 onClick={() => setShowPassword((visible) => !visible)}
                 disabled={busy}
@@ -250,7 +261,9 @@ function AuthModalContent() {
 
           {authMode === "signup" && (
             <div className="form-group">
-              <label htmlFor="auth-confirm-password">Confirm Password</label>
+              <label htmlFor="auth-confirm-password">
+                {t("Confirm Password")}
+              </label>
               <div className="input-with-icon">
                 <Lock size={16} className="input-icon" />
                 <input
@@ -262,7 +275,7 @@ function AuthModalContent() {
                   autoCapitalize="none"
                   autoComplete="new-password"
                   required
-                  placeholder="Re-enter your password"
+                  placeholder={t("Re-enter your password")}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={busy}
@@ -272,8 +285,8 @@ function AuthModalContent() {
                   className="password-toggle"
                   aria-label={
                     showConfirmPassword
-                      ? "Hide confirm password"
-                      : "Show confirm password"
+                      ? t("Hide confirm password")
+                      : t("Show confirm password")
                   }
                   aria-controls="auth-confirm-password"
                   onClick={() => setShowConfirmPassword((visible) => !visible)}
@@ -298,13 +311,15 @@ function AuthModalContent() {
             {busy ? (
               <Spinner
                 label={
-                  authMode === "login" ? "Signing In…" : "Creating Account…"
+                  authMode === "login"
+                    ? t("Signing In…")
+                    : t("Creating Account…")
                 }
               />
             ) : authMode === "login" ? (
-              "Sign In"
+              t("Sign In")
             ) : (
-              "Create Account"
+              t("Create Account")
             )}
           </button>
         </form>
@@ -312,7 +327,7 @@ function AuthModalContent() {
         <p className="auth-switch-prompt">
           {authMode === "login" ? (
             <>
-              Don&apos;t have an account yet?{" "}
+              {t("Don't have an account yet?")}{" "}
               <button
                 type="button"
                 className="text-link"
@@ -321,12 +336,12 @@ function AuthModalContent() {
                   setError("");
                 }}
               >
-                Sign up
+                {t("Sign up")}
               </button>
             </>
           ) : (
             <>
-              Already have an account?{" "}
+              {t("Already have an account?")}{" "}
               <button
                 type="button"
                 className="text-link"
@@ -335,7 +350,7 @@ function AuthModalContent() {
                   setError("");
                 }}
               >
-                Sign in
+                {t("Sign in")}
               </button>
             </>
           )}

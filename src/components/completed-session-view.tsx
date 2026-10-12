@@ -1,5 +1,6 @@
 "use client";
 
+import { useI18n } from "@/components/locale-context";
 import { useEffect, useId, useRef, useState } from "react";
 import type { Message, SessionPublic, UserPublic } from "@/lib/contracts";
 import { ConversationMessage } from "./conversation-message";
@@ -14,12 +15,14 @@ export function CompletedSessionView({
   session: SessionPublic;
   user: UserPublic | null;
 }) {
+  const { t } = useI18n();
+
   const prefix = useId();
   const [view, setView] = useState<"report" | "chat">("report");
   const [older, setOlder] = useState<Message[]>([]);
   const [cursor, setCursor] = useState(session.nextCursor);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | Error>("");
   const pending = useRef(false);
   const controller = useRef<AbortController | null>(null);
   const alive = useRef(true);
@@ -55,9 +58,7 @@ export function CompletedSessionView({
       setCursor(result.nextCursor);
     } catch (e) {
       if (alive.current && !active.signal.aborted)
-        setError(
-          e instanceof Error ? e.message : "Couldn't load earlier messages.",
-        );
+        setError(e instanceof Error ? e : "Couldn't load earlier messages.");
     } finally {
       pending.current = false;
       if (alive.current) setLoading(false);
@@ -73,18 +74,13 @@ export function CompletedSessionView({
     >
       <div className="completed-header">
         <div className="report-milo">
-          <Milo
-            size={64}
-            state="reply"
-            reactionKey={session.id}
-            interactive
-          />
-          <span>Thanks for teaching me.</span>
+          <Milo size={64} state="reply" reactionKey={session.id} interactive />
+          <span>{t("Thanks for teaching me.")}</span>
         </div>
         <div
           className="completed-tabs"
           role="tablist"
-          aria-label="Completed session"
+          aria-label={t("Completed session")}
         >
           {(["report", "chat"] as const).map((tab, index) => (
             <button
@@ -115,7 +111,7 @@ export function CompletedSessionView({
                 tabs.current[target]?.focus();
               }}
             >
-              {tab === "report" ? "Report" : "Chat"}
+              {tab === "report" ? t("Report") : t("Chat")}
             </button>
           ))}
         </div>
@@ -136,17 +132,24 @@ export function CompletedSessionView({
         tabIndex={0}
         hidden={view !== "chat"}
       >
-        <section className="completed-chat" aria-label="Saved conversation">
+        <section
+          className="completed-chat"
+          aria-label={t("Saved conversation")}
+        >
           <div
             className="completed-messages"
             role="region"
-            aria-label="Saved messages"
+            aria-label={t("Saved messages")}
             tabIndex={0}
             aria-busy={loading}
           >
             <div className="completed-chat-heading">
-              <h1>Your conversation with Milo</h1>
-              <p>Session ended · You can read your saved conversation here.</p>
+              <h1>{t("Your conversation with Milo")}</h1>
+              <p>
+                {t(
+                  "Session ended · You can read your saved conversation here.",
+                )}
+              </p>
             </div>
             {error && (
               <ErrorNotice
@@ -162,9 +165,9 @@ export function CompletedSessionView({
                 onClick={loadEarlier}
               >
                 {loading ? (
-                  <Spinner label="Loading earlier messages…" />
+                  <Spinner label={t("Loading earlier messages…")} />
                 ) : (
-                  "Load earlier messages"
+                  t("Load earlier messages")
                 )}
               </button>
             )}
@@ -172,17 +175,20 @@ export function CompletedSessionView({
               <>
                 {messages.map((message) => (
                   <ConversationMessage
+                    teachingLanguage={session.lesson.teachingLanguage}
                     key={message.id}
                     message={message}
                     user={user}
                   />
                 ))}
                 <div className="conversation-end">
-                  <span>You&apos;ve reached the end of this conversation.</span>
+                  <span>
+                    {t("You've reached the end of this conversation.")}
+                  </span>
                 </div>
               </>
             ) : (
-              <p className="muted">No saved messages in this session.</p>
+              <p className="muted">{t("No saved messages in this session.")}</p>
             )}
           </div>
         </section>

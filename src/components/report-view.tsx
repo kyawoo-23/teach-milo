@@ -1,4 +1,7 @@
 "use client";
+
+import { lessonLanguage } from "@/lib/i18n/locales";
+import { useI18n } from "@/components/locale-context";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -129,11 +132,15 @@ function PointMeter({
   status: Status;
   score: number | null;
 }) {
+  const { t } = useI18n();
+
   return (
     <span
       className={`rp-meter rp-meter-${status}`}
       role="img"
-      aria-label={score === null ? "Not scored" : `${score} of 2 points`}
+      aria-label={
+        score === null ? t("Not scored") : t("{score} of 2 points", { score })
+      }
     >
       <i className={score !== null && score >= 1 ? "on" : ""} />
       <i className={score === 2 ? "on" : ""} />
@@ -142,10 +149,11 @@ function PointMeter({
 }
 
 function StatusBadge({ status }: { status: Status }) {
+  const { text: localizeText } = useI18n();
   const { word, icon: Icon } = statuses[status];
   return (
     <span className={`rp-badge rp-tone-${status}`}>
-      <Icon size={14} aria-hidden="true" /> {word}
+      <Icon size={14} aria-hidden="true" /> {localizeText(word)}
     </span>
   );
 }
@@ -157,9 +165,11 @@ export function ReportView({
   session: SessionPublic;
   active?: boolean;
 }) {
+  const { t, text: localizeText } = useI18n();
+
   const report = session.report!;
   const [evidence, setEvidence] = useState<Message | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | Error>("");
   const [remove, setRemove] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const evidenceRequest = useRef<AbortController | null>(null);
@@ -188,7 +198,8 @@ export function ReportView({
       );
       if (!controller.signal.aborted) setEvidence(result.messages[0]);
     } catch (e) {
-      if (!controller.signal.aborted) setError((e as Error).message);
+      if (!controller.signal.aborted)
+        setError(e instanceof Error ? e : "Please try again.");
     } finally {
       if (evidenceRequest.current === controller) {
         evidenceRequest.current = null;
@@ -214,7 +225,8 @@ export function ReportView({
     items.length > 0 && (
       <details className="rp-words">
         <summary>
-          See your words ({items.length})
+          {t("See your words (")}
+          {items.length})
           <ChevronDown size={14} aria-hidden="true" />
         </summary>
         {citations(items)}
@@ -238,10 +250,28 @@ export function ReportView({
         : "—";
   const summary =
     report.total !== null
-      ? `You scored ${report.total} out of 10 across all five skills.`
+      ? t("You scored {total} out of 10 across all five skills.", {
+          total: report.total,
+        })
       : scored === 0
-        ? "Milo didn’t see enough evidence to score any skill yet."
-        : `You earned ${report.earnedPoints} of ${report.availablePoints} points on the ${scored} skill${scored === 1 ? "" : "s"} Milo could check. ${5 - scored} skill${5 - scored === 1 ? "" : "s"} still need${5 - scored === 1 ? "s" : ""} evidence.`;
+        ? t("Milo didn’t see enough evidence to score any skill yet.")
+        : t(
+            scored === 1
+              ? "You earned {earned} of {available} points on the {scored} skill Milo could check."
+              : "You earned {earned} of {available} points on the {scored} skills Milo could check.",
+            {
+              earned: report.earnedPoints,
+              available: report.availablePoints,
+              scored,
+            },
+          ) +
+          " " +
+          t(
+            5 - scored === 1
+              ? "{count} skill still needs evidence."
+              : "{count} skills still need evidence.",
+            { count: 5 - scored },
+          );
   const transferStatus: Status =
     report.transferCorrect === null
       ? "missing"
@@ -252,8 +282,8 @@ export function ReportView({
   return (
     <div className="report-main">
       <header className="report-intro">
-        <span className="small-label">Your learning report</span>
-        <h1>How did your teaching go?</h1>
+        <span className="small-label">{t("Your learning report")}</span>
+        <h1>{t("How did your teaching go?")}</h1>
         <p>{session.lesson.title}</p>
       </header>
 
@@ -261,21 +291,21 @@ export function ReportView({
         <SkillRing
           items={items}
           center={center}
-          caption={report.total !== null ? "overall" : "points"}
+          caption={report.total !== null ? t("overall") : t("points")}
         />
         <div className="rp-overview-text">
           <h2 id="rp-verdict" className={`rp-verdict rp-tone-${verdict.tone}`}>
             <VerdictIcon size={20} aria-hidden="true" />
-            {verdict.title}
+            {localizeText(verdict.title)}
           </h2>
           <p>{summary}</p>
-          <ul className="rp-counts" aria-label="Skills by result">
+          <ul className="rp-counts" aria-label={t("Skills by result")}>
             {legendOrder
               .filter((s) => count(s) > 0)
               .map((s) => (
                 <li key={s} className={`rp-tone-${s}`}>
                   <i className={`rp-dot rp-fill-${s}`} aria-hidden="true" />
-                  <strong>{count(s)}</strong> {statuses[s].word}
+                  <strong>{count(s)}</strong> {localizeText(statuses[s].word)}
                 </li>
               ))}
           </ul>
@@ -284,10 +314,11 @@ export function ReportView({
 
       {report.criticalMisconception && (
         <div className="source-concerns">
-          <strong>One important idea still needs attention.</strong>
+          <strong>{t("One important idea still needs attention.")}</strong>
           <p>
-            An unresolved misconception appeared in your reasoning. Review the
-            next steps below before moving on.
+            {t(
+              "An unresolved misconception appeared in your reasoning. Review the next steps below before moving on.",
+            )}
           </p>
         </div>
       )}
@@ -295,8 +326,8 @@ export function ReportView({
 
       <section className="rp-panel" aria-labelledby="rp-skills-title">
         <div className="rp-panel-head">
-          <h2 id="rp-skills-title">Skill by skill</h2>
-          <p className="muted">Tap a skill to see why.</p>
+          <h2 id="rp-skills-title">{t("Skill by skill")}</h2>
+          <p className="muted">{t("Tap a skill to see why.")}</p>
         </div>
         <ul className="rp-skills">
           {items.map(({ name, status, dimension }) => {
@@ -309,8 +340,8 @@ export function ReportView({
                       <Icon size={20} aria-hidden="true" />
                     </span>
                     <span className="rp-skill-name">
-                      <strong>{skills[name].label}</strong>
-                      <small>{skills[name].hint}</small>
+                      <strong>{localizeText(skills[name].label)}</strong>
+                      <small>{localizeText(skills[name].hint)}</small>
                     </span>
                     <PointMeter status={status} score={dimension.score} />
                     <StatusBadge status={status} />
@@ -321,7 +352,9 @@ export function ReportView({
                     />
                   </summary>
                   <div className="rp-skill-body">
-                    <p>{dimension.explanation}</p>
+                    <p lang={lessonLanguage(session.lesson.teachingLanguage)}>
+                      {dimension.explanation}
+                    </p>
                     {citations(dimension.citations)}
                   </div>
                 </details>
@@ -329,11 +362,12 @@ export function ReportView({
             );
           })}
         </ul>
-        <ul className="rp-legend" aria-label="Legend">
+        <ul className="rp-legend" aria-label={t("Legend")}>
           {legendOrder.map((s) => (
             <li key={s}>
               <i className={`rp-dot rp-fill-${s}`} aria-hidden="true" />
-              <strong>{statuses[s].word}</strong> {statuses[s].legend}
+              <strong>{localizeText(statuses[s].word)}</strong>{" "}
+              {localizeText(statuses[s].legend)}
             </li>
           ))}
         </ul>
@@ -342,32 +376,37 @@ export function ReportView({
       <div className="rp-columns">
         <section className="rp-panel rp-list rp-strengths">
           <h2>
-            <CheckCircle2 size={20} aria-hidden="true" /> What went well
+            <CheckCircle2 size={20} aria-hidden="true" /> {t("What went well")}
           </h2>
           {report.strengths.length ? (
             <ul>
               {report.strengths.map((s, i) => (
                 <li key={i}>
-                  <p>{s.text}</p>
+                  <p lang={lessonLanguage(session.lesson.teachingLanguage)}>
+                    {s.text}
+                  </p>
                   {yourWords(s.citations)}
                 </li>
               ))}
             </ul>
           ) : (
             <p className="muted">
-              Nothing stood out clearly yet. Next time, try walking Milo through
-              a worked example.
+              {t(
+                "Nothing stood out clearly yet. Next time, try walking Milo through a worked example.",
+              )}
             </p>
           )}
         </section>
         <section className="rp-panel rp-list rp-next">
           <h2>
-            <Lightbulb size={20} aria-hidden="true" /> Try this next
+            <Lightbulb size={20} aria-hidden="true" /> {t("Try this next")}
           </h2>
           <ol>
             {report.nextSteps.map((s, i) => (
               <li key={i}>
-                <p>{s.text}</p>
+                <p lang={lessonLanguage(session.lesson.teachingLanguage)}>
+                  {s.text}
+                </p>
                 {yourWords(s.citations)}
               </li>
             ))}
@@ -380,16 +419,21 @@ export function ReportView({
           <span className={`rp-skill-icon rp-tone-${transferStatus}`}>
             <ShieldCheck size={20} aria-hidden="true" />
           </span>
-          <h2>Independent check</h2>
+          <h2>{t("Independent check")}</h2>
           <StatusBadge status={transferStatus} />
         </div>
-        <p>{report.scores.transfer.explanation}</p>
+        <p lang={lessonLanguage(session.lesson.teachingLanguage)}>
+          {report.scores.transfer.explanation}
+        </p>
         <details className="rp-words">
           <summary>
-            See the expected reasoning
+            {t("See the expected reasoning")}
             <ChevronDown size={14} aria-hidden="true" />
           </summary>
-          <p className="expected-explanation">
+          <p
+            className="expected-explanation"
+            lang={lessonLanguage(session.lesson.teachingLanguage)}
+          >
             {report.expectedTransferExplanation}
           </p>
         </details>
@@ -397,36 +441,38 @@ export function ReportView({
 
       <div className="report-actions">
         <Link className="primary-button" href="/">
-          Teach something new <ArrowRight size={18} />
+          {t("Teach something new")} <ArrowRight size={18} />
         </Link>
         <button className="quiet-button" onClick={() => setRemove(true)}>
-          <Trash2 size={15} /> Delete this session
+          <Trash2 size={15} /> {t("Delete this session")}
         </button>
       </div>
       <p className="report-disclaimer">
-        This is feedback on one session, not a final grade. Coming back to the
-        idea later shows what really sticks.
+        {t(
+          "This is feedback on one session, not a final grade. Coming back to the idea later shows what really sticks.",
+        )}
       </p>
       <Modal
         open={!!evidence}
         onClose={() => setEvidence(null)}
-        title="Your original explanation"
+        title={t("Your original explanation")}
       >
         <p className="evidence-original">{evidence?.text}</p>
         {evidence?.board && (
           <p className="muted">
-            A teaching-board snapshot accompanied this explanation.
+            {t("A teaching-board snapshot accompanied this explanation.")}
           </p>
         )}
       </Modal>
       <Modal
         open={remove}
         onClose={() => setRemove(false)}
-        title="Delete this session?"
+        title={t("Delete this session?")}
       >
         <p>
-          This removes its conversation, board submissions, and report. Your
-          original document was already discarded after extraction.
+          {t(
+            "This removes its conversation, board submissions, and report. Your original document was already discarded after extraction.",
+          )}
         </p>
         <div className="modal-actions">
           <button
@@ -438,16 +484,16 @@ export function ReportView({
                 await api(`/api/sessions/${session.id}`, {}, "DELETE");
                 window.location.assign("/");
               } catch (e) {
-                setError((e as Error).message);
+                setError(e instanceof Error ? e : "Please try again.");
                 setRemove(false);
                 setDeleting(false);
               }
             }}
           >
-            Delete session
+            {t("Delete session")}
           </button>
           <button className="quiet-button" onClick={() => setRemove(false)}>
-            Keep session
+            {t("Keep session")}
           </button>
         </div>
       </Modal>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useI18n } from "@/components/locale-context";
 import {
   createContext,
   useCallback,
@@ -29,6 +30,8 @@ export function ConfirmationProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const { t, text: localizeText } = useI18n();
+
   const descriptionId = useId();
   const cancelButton = useRef<HTMLButtonElement>(null);
   const [request, setRequest] = useState<
@@ -92,7 +95,7 @@ export function ConfirmationProvider({
           initialFocusRef={cancelButton}
           onClose={() => finish(request.id, false)}
         >
-          <p id={descriptionId}>{request.description}</p>
+          <p id={descriptionId}>{localizeText(request.description)}</p>
           <div className="modal-actions confirmation-actions">
             <button
               ref={cancelButton}
@@ -100,7 +103,7 @@ export function ConfirmationProvider({
               className="secondary-button"
               onClick={() => finish(request.id, false)}
             >
-              {request.cancelLabel ?? "Cancel"}
+              {request.cancelLabel ?? t("Cancel")}
             </button>
             <button
               type="button"
@@ -109,7 +112,7 @@ export function ConfirmationProvider({
               }
               onClick={() => finish(request.id, true)}
             >
-              {request.confirmLabel}
+              {localizeText(request.confirmLabel)}
             </button>
           </div>
         </Modal>

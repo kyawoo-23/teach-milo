@@ -1,6 +1,8 @@
 "use client";
 
+import { useI18n } from "@/components/locale-context";
 import { History, LogIn } from "lucide-react";
+import { LanguageSelector } from "./language-selector";
 import { Brand } from "./brand";
 import { useAuth } from "./auth-context";
 import { UserProfileMenu } from "./user-profile-menu";
@@ -10,6 +12,8 @@ export function NavHeader({
 }: {
   extraActions?: React.ReactNode;
 }) {
+  const { t } = useI18n();
+
   const { user, loading, openAuthModal, openSessionModal } = useAuth();
 
   return (
@@ -17,18 +21,19 @@ export function NavHeader({
       <div className="header-inner">
         <Brand />
 
-        <nav className="header-actions" aria-label="Main">
+        <nav className="header-actions" aria-label={t("Main")}>
+          <LanguageSelector />
           {extraActions}
           {user && (
             <button
               type="button"
               className="header-nav-button"
               onClick={openSessionModal}
-              title="View saved learning sessions"
-              aria-label="My Sessions"
+              title={t("View saved learning sessions")}
+              aria-label={t("My Sessions")}
             >
               <History size={16} />
-              <span className="button-text">My Sessions</span>
+              <span className="button-text">{t("My Sessions")}</span>
             </button>
           )}
 
@@ -43,7 +48,7 @@ export function NavHeader({
                   onClick={() => openAuthModal("login")}
                 >
                   <LogIn size={15} />
-                  <span>Sign In</span>
+                  <span>{t("Sign In")}</span>
                 </button>
               )}
             </>

@@ -1,4 +1,6 @@
 "use client";
+
+import { useI18n } from "@/components/locale-context";
 import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 import { AlertCircle, LoaderCircle, X } from "lucide-react";
 
@@ -30,17 +32,19 @@ export function ErrorNotice({
   message,
   onRetry,
 }: {
-  message: string;
+  message: string | Error;
   onRetry?: () => void;
 }) {
+  const { t, errorText } = useI18n();
+
   return (
     <div className="error-notice" role="alert">
       <AlertCircle size={19} />
       <div>
-        {message}
+        {errorText(message)}
         {onRetry && (
           <button className="text-button" onClick={onRetry}>
-            Try again
+            {t("Try again")}
           </button>
         )}
       </div>
@@ -48,10 +52,11 @@ export function ErrorNotice({
   );
 }
 export function Spinner({ label = "Loading" }: { label?: string }) {
+  const { text: localizeText } = useI18n();
   return (
     <span className="loading-inline">
       <LoaderCircle className="spin" size={18} />
-      {label}
+      {localizeText(label)}
     </span>
   );
 }
@@ -74,6 +79,8 @@ export function Modal({
   className?: string;
   initialFocusRef?: RefObject<HTMLElement | null>;
 }) {
+  const { t, text: localizeText } = useI18n();
+
   const ref = useRef<HTMLDialogElement>(null);
   useLayoutEffect(() => {
     const dialog = ref.current;
@@ -109,14 +116,14 @@ export function Modal({
       onClose={(event) => {
         if (!event.currentTarget.open) onClose();
       }}
-      aria-label={title}
+      aria-label={localizeText(title)}
       aria-describedby={descriptionId}
     >
       <div className="modal-heading">
-        <h2>{title}</h2>
+        <h2>{localizeText(title)}</h2>
         <button
           className="icon-button"
-          aria-label="Close dialog"
+          aria-label={t("Close dialog")}
           onClick={onClose}
         >
           <X size={20} />

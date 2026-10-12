@@ -1,5 +1,6 @@
 "use client";
 
+import { useI18n } from "@/components/locale-context";
 import { useEffect, useRef, useState } from "react";
 import { MiloArtwork } from "./milo-artwork";
 import { animateMilo, MILO_MOTIONS, type MiloState } from "./milo-motion";
@@ -19,6 +20,8 @@ export function Milo({
   animated?: boolean;
   reactionKey?: string | number;
 }) {
+  const { t } = useI18n();
+
   const svgRef = useRef<SVGSVGElement>(null);
   const [greeting, setGreeting] = useState<{
     id: number;
@@ -100,6 +103,7 @@ export function Milo({
 
   const artwork = (
     <MiloArtwork
+      label={t("Milo, your AI student")}
       size={size}
       state={playing}
       svgRef={svgRef}
@@ -111,7 +115,7 @@ export function Milo({
     <button
       type="button"
       className="milo-greet"
-      aria-label="Say hello to Milo"
+      aria-label={t("Say hello to Milo")}
       aria-disabled={!greetingAllowed || undefined}
       onClick={() => {
         if (!greetingAllowed) return;

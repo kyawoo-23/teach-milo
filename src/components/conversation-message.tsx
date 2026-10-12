@@ -1,4 +1,7 @@
 "use client";
+
+import { lessonLanguage, type Locale } from "@/lib/i18n/locales";
+import { useI18n } from "@/components/locale-context";
 import { memo, useEffect, useState } from "react";
 import { Check, Copy, Layers3 } from "lucide-react";
 import type { Message, UserPublic } from "@/lib/contracts";
@@ -7,10 +10,14 @@ import { Milo } from "./milo";
 export const ConversationMessage = memo(function ConversationMessage({
   message,
   user,
+  teachingLanguage,
 }: {
   message: Message;
+  teachingLanguage?: Locale;
   user: UserPublic | null;
 }) {
+  const { t } = useI18n();
+
   return (
     <article
       key={message.id}
@@ -26,21 +33,30 @@ export const ConversationMessage = memo(function ConversationMessage({
       </div>
       <div className="message-body">
         <span className="message-name">
-          {message.role === "student" ? "Milo" : "You"}
+          {message.role === "student" ? "Milo" : t("You")}
           {message.kind === "transfer" && (
-            <small> Independent-check answer</small>
+            <small> {t("Independent-check answer")}</small>
           )}
-          {message.kind === "hint" && <small> A little nudge</small>}
+          {message.kind === "hint" && <small> {t("A little nudge")}</small>}
         </span>
         <div className="message-bubble">
-          <div className="message-text">{message.text}</div>
+          <div
+            className="message-text"
+            lang={
+              message.role === "student"
+                ? lessonLanguage(teachingLanguage)
+                : undefined
+            }
+          >
+            {message.text}
+          </div>
         </div>
         {message.role === "student" && <CopyButton text={message.text} />}
         {message.board && (
           <div className="shared-board">
             <Layers3 size={15} />
             <span>
-              Demonstration shared
+              {t("Demonstration shared")}
               {message.board.kind === "cnn"
                 ? ` · ${message.board.inputs.inputSize} × ${message.board.inputs.inputSize}`
                 : ""}
@@ -76,6 +92,8 @@ function LearnerMessageAvatar({ user }: { user: UserPublic | null }) {
   );
 }
 function CopyButton({ text }: { text: string }) {
+  const { t } = useI18n();
+
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (!copied) return;
@@ -86,8 +104,8 @@ function CopyButton({ text }: { text: string }) {
     <button
       type="button"
       className="message-copy"
-      aria-label={copied ? "Copied" : "Copy Milo’s message"}
-      title={copied ? "Copied" : "Copy"}
+      aria-label={copied ? t("Copied") : t("Copy Milo’s message")}
+      title={copied ? t("Copied") : t("Copy")}
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(text);
@@ -111,7 +129,9 @@ function CopyButton({ text }: { text: string }) {
       ) : (
         <Copy size={12} strokeWidth={2} />
       )}
-      <span className="visually-hidden">{copied ? "Copied" : "Copy"}</span>
+      <span className="visually-hidden">
+        {copied ? t("Copied") : t("Copy")}
+      </span>
     </button>
   );
 }

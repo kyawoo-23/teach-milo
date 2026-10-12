@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { isTranslationKey } from "@/lib/i18n/messages";
 import { AppError } from "@/lib/errors";
 import { getAuthenticatedUser } from "./auth";
 
@@ -78,13 +79,23 @@ export async function route(fn: () => Promise<Response>): Promise<Response> {
           error: {
             code: "VALIDATION",
             message: e.issues[0]?.message || "Check the submitted values.",
+            messageKey: isTranslationKey(e.issues[0]?.message || "")
+              ? e.issues[0].message
+              : "Check the submitted values.",
           },
         },
         400,
       );
     if (e instanceof AppError)
       return Response.json(
-        { error: { code: e.code, message: e.message } },
+        {
+          error: {
+            code: e.code,
+            message: e.message,
+            ...(e.messageKey ? { messageKey: e.messageKey } : {}),
+            ...(e.params ? { params: e.params } : {}),
+          },
+        },
         {
           status: e.status,
           headers: {
@@ -102,6 +113,8 @@ export async function route(fn: () => Promise<Response>): Promise<Response> {
       {
         error: {
           code: "SERVICE_UNAVAILABLE",
+          messageKey:
+            "The service is unavailable. Check that Firestore is running, then retry. Your saved progress is preserved.",
           message:
             "The service is unavailable. Check that Firestore is running, then retry. Your saved progress is preserved.",
         },
