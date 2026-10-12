@@ -1,3 +1,5 @@
+import { lessonLanguage, type Locale } from "./i18n/locales";
+import { translate } from "./i18n/messages";
 import {
   Citation,
   Ledger,
@@ -41,12 +43,27 @@ export function allowedMoves(session: Session) {
     moves.push("surface_misconception");
   return moves;
 }
-// Milo's first message: drop any greeting the model wrote (e.g. "Hi Milo!") and open with "Hi!".
-export function greetLearner(opening: string) {
+// Keep greeting and reply limits consistent across spaced and unspaced languages.
+export function greetLearner(opening: string, language?: Locale) {
   const body = opening
-    .replace(/^\s*(?:hi|hello|hey|greetings)\b[^.!?,\n]{0,40}[.!?,]\s*/i, "")
+    .replace(
+      /^\s*(?:(?:hi|hello|hey|greetings)\b[^.!?,\n]{0,40}[.!?,]|(?:你好|您好|嗨|こんにちは|こんばんは|おはようございます)[！!。,.，、]?)[\s]*/i,
+      "",
+    )
     .trim();
-  return `Hi! ${body.charAt(0).toUpperCase()}${body.slice(1)}`;
+  const locale = lessonLanguage(language);
+  return `${translate(locale, "Hi!")} ${locale === "en" ? body.charAt(0).toUpperCase() + body.slice(1) : body}`;
+}
+export function replyWords(text: string, language?: Locale) {
+  return [
+    ...new Intl.Segmenter(lessonLanguage(language), {
+      granularity: "word",
+    }).segment(text),
+  ].filter((s) => s.isWordLike);
+}
+function limitReply(text: string, language?: Locale) {
+  const words = replyWords(text, language);
+  return words.length > 65 ? text.slice(0, words[65].index).trim() : text;
 }
 export function normalizeStudentReply(
   reply: StudentReply,
@@ -60,14 +77,15 @@ export function normalizeStudentReply(
   ) as StudentReply["move"];
   let studentMessage = reply.studentMessage
     .replace(/\bmastered\b/gi, "understood")
+    .replace(/完全掌握|精通/g, "理解")
+    .replace(/完全に習得/g, "理解")
     .replace(/\d+\s*\/\s*10/gi, "")
     .replace(/\s+/g, " ")
     .trim();
-  const question = studentMessage.indexOf("?");
-  if (question !== -1 && studentMessage.indexOf("?", question + 1) !== -1)
+  const question = studentMessage.search(/[?？]/);
+  if (question !== -1 && /[?？]/.test(studentMessage.slice(question + 1)))
     studentMessage = studentMessage.slice(0, question + 1).trim();
-  const words = studentMessage.split(/\s+/).filter(Boolean);
-  if (words.length > 65) studentMessage = words.slice(0, 65).join(" ");
+  studentMessage = limitReply(studentMessage, lesson.teachingLanguage);
   const keep = (citations: Citation[]) =>
     validCitations(citations, messages, "teaching");
   const ids = new Set(lesson.objectives.map((o) => o.id));
@@ -88,7 +106,12 @@ export function normalizeStudentReply(
   return {
     ...reply,
     move,
-    studentMessage: studentMessage || "Can you say a bit more about that?",
+    studentMessage:
+      studentMessage ||
+      translate(
+        lessonLanguage(lesson.teachingLanguage),
+        "Can you say a bit more about that?",
+      ),
     mechanism,
     demonstration: keep(reply.demonstration).length
       ? keep(reply.demonstration)
@@ -121,9 +144,11 @@ export function validateStudent(
 ): Ledger {
   if (
     !allowedMoves(session).includes(reply.move) ||
-    reply.studentMessage.split(/\s+/).length > 65 ||
-    (reply.studentMessage.match(/\?/g) || []).length > 1 ||
-    /\b(mastered|\d+\s*\/\s*10)\b/i.test(reply.studentMessage)
+    replyWords(reply.studentMessage, lesson.teachingLanguage).length > 65 ||
+    (reply.studentMessage.match(/[?？]/g) || []).length > 1 ||
+    /(?:\bmastered\b|\d+\s*\/\s*10|完全掌握|精通|完全に習得)/i.test(
+      reply.studentMessage,
+    )
   )
     throw new AppError(
       "MODEL_FAILURE",

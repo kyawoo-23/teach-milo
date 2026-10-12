@@ -1,3 +1,4 @@
+import { lessonLanguage } from "@/lib/i18n/locales";
 import { FieldPath, Timestamp } from "firebase-admin/firestore";
 import { z } from "zod";
 import {
@@ -30,7 +31,10 @@ type HistorySession = Pick<
   | "updatedAt"
   | "expiresAt"
 > & { ledger: Pick<Session["ledger"], "evidence"> };
-type HistoryLesson = Pick<Lesson, "title" | "scope" | "level" | "objectives">;
+type HistoryLesson = Pick<
+  Lesson,
+  "title" | "scope" | "level" | "objectives" | "teachingLanguage"
+>;
 
 const PAGE_SIZE = 20;
 const CursorSchema = z
@@ -108,7 +112,13 @@ export async function GET(request: Request) {
     const lessonDocs =
       lessonRefs.length > 0
         ? await database().getAll(...lessonRefs, {
-            fieldMask: ["title", "scope", "level", "objectives"],
+            fieldMask: [
+              "title",
+              "scope",
+              "level",
+              "objectives",
+              "teachingLanguage",
+            ],
           })
         : [];
     const lessonMap = new Map<string, HistoryLesson>();
@@ -126,6 +136,7 @@ export async function GET(request: Request) {
         scope: lesson?.scope || "",
         level: lesson?.level || "introductory",
         phase: s.phase,
+        teachingLanguage: lessonLanguage(lesson?.teachingLanguage),
         createdAt: s.createdAt,
         updatedAt: s.updatedAt,
         expiresAt: s.expiresAt,

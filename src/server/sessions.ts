@@ -1,4 +1,6 @@
 import "server-only";
+import { lessonLanguage } from "@/lib/i18n/locales";
+import { localize } from "@/lib/i18n/messages";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
@@ -26,7 +28,11 @@ import {
 import { validateBoardInputs } from "@/lib/boards";
 import { finalizeReport } from "@/lib/assessment";
 import { AppError } from "@/lib/errors";
-import { EVALUATE_PROMPT, STUDENT_PROMPT } from "@/content/prompts";
+import {
+  EVALUATE_PROMPT,
+  STUDENT_PROMPT,
+  languageInstruction,
+} from "@/content/prompts";
 import {
   assertOwned,
   database,
@@ -67,6 +73,7 @@ export async function createSession(
       title: lesson.title,
       scope: lesson.scope,
       level: lesson.level,
+      teachingLanguage: lessonLanguage(lesson.teachingLanguage),
       objectives: lesson.objectives.map(({ id, label }) => ({ id, label })),
     },
     phase: "baseline",
@@ -89,7 +96,7 @@ export async function createSession(
   const greeting: Message = {
     id: randomUUID(),
     role: "student",
-    text: greetLearner(lesson.opening),
+    text: greetLearner(lesson.opening, lesson.teachingLanguage),
     createdAt: now,
     sequence: 0,
     kind: "teaching",
@@ -318,8 +325,9 @@ export async function submitTurn(
       ];
       const response = await model.generate(
         StudentReplySchema,
-        STUDENT_PROMPT,
+        STUDENT_PROMPT + languageInstruction(lesson.teachingLanguage),
         {
+          teachingLanguage: lessonLanguage(lesson.teachingLanguage),
           knowledge: lesson.knowledge,
           objectives: lesson.objectives,
           allowedMoves: allowedMoves(session),
@@ -359,7 +367,10 @@ export async function submitTurn(
           replyData.move === "surface_misconception"
             ? lesson.misconception
             : next.phase === "ready_for_check"
-              ? "Your explanation has helped me connect the key ideas. Would you like to try a new example on your own, or keep teaching me?"
+              ? localize(
+                  lessonLanguage(lesson.teachingLanguage),
+                  "Your explanation has helped me connect the key ideas. Would you like to try a new example on your own, or keep teaching me?",
+                )
               : replyData.studentMessage,
         createdAt: new Date().toISOString(),
         sequence: session.nextSequence + 1,
@@ -385,8 +396,9 @@ async function evaluate(
 ) {
   const raw = await model.generate(
     ReportGeneratedSchema,
-    EVALUATE_PROMPT,
+    EVALUATE_PROMPT + languageInstruction(lesson.teachingLanguage),
     {
+      teachingLanguage: lessonLanguage(lesson.teachingLanguage),
       knowledge: lesson.knowledge,
       objectives: lesson.objectives,
       concerns: lesson.concerns,
@@ -461,7 +473,10 @@ export async function sessionAction(
             {
               id: randomUUID(),
               role: "student",
-              text: "Could you pick one small example, walk me through what happens, and explain why each step follows? Start with the part you feel most sure about.",
+              text: localize(
+                lessonLanguage(lesson.teachingLanguage),
+                "Could you pick one small example, walk me through what happens, and explain why each step follows? Start with the part you feel most sure about.",
+              ),
               createdAt: new Date().toISOString(),
               sequence: session.nextSequence,
               kind: "hint",

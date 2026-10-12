@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { LocaleProvider } from "@/components/locale-context";
+import { getLocale } from "@/lib/i18n/server";
+import { translate } from "@/lib/i18n/messages";
 import { AuthProvider } from "@/components/auth-context";
 import { AuthModal } from "@/components/auth-modal";
 import { SessionHistoryModal } from "@/components/session-history-modal";
@@ -13,45 +16,57 @@ export const viewport: Viewport = {
   themeColor: "#f8f9fc",
 };
 
-export const metadata: Metadata = {
-  title: {
-    default: "TeachBack AI — Learn by teaching",
-    template: "%s | TeachBack AI",
-  },
-  description:
-    "Bring your learning material. Teach Milo, a curious AI student. Find out what your explanations really show.",
-  icons: {
-    icon: [
-      {
-        url: "/brand/teachback-icon-64.png",
-        sizes: "64x64",
-        type: "image/png",
-      },
-    ],
-    apple: [
-      {
-        url: "/brand/teachback-icon-master.png",
-        sizes: "1254x1254",
-        type: "image/png",
-      },
-    ],
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return {
+    title: {
+      default: translate(locale, "TeachBack AI — Learn by teaching"),
+      template: "%s | TeachBack AI",
+    },
+    description: translate(
+      locale,
+      "Bring your learning material. Teach Milo, a curious AI student. Find out what your explanations really show.",
+    ),
+    icons: {
+      icon: [
+        {
+          url: "/brand/teachback-icon-64.png",
+          sizes: "64x64",
+          type: "image/png",
+        },
+      ],
+      apple: [
+        {
+          url: "/brand/teachback-icon-master.png",
+          sizes: "1254x1254",
+          type: "image/png",
+        },
+      ],
+    },
+  };
+}
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default async function Layout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const locale = await getLocale();
   return (
-    <html lang="en" data-scroll-behavior="smooth">
+    <html lang={locale} data-scroll-behavior="smooth">
       <body>
-        <a className="skip-link" href="#main">
-          Skip to content
-        </a>
-        <AuthProvider>
-          <ConfirmationProvider>
-            <AuthModal />
-            <SessionHistoryModal />
-            {children}
-          </ConfirmationProvider>
-        </AuthProvider>
+        <LocaleProvider initialLocale={locale}>
+          <a className="skip-link" href="#main">
+            {translate(locale, "Skip to content")}
+          </a>
+          <AuthProvider>
+            <ConfirmationProvider>
+              <AuthModal />
+              <SessionHistoryModal />
+              {children}
+            </ConfirmationProvider>
+          </AuthProvider>
+        </LocaleProvider>
       </body>
     </html>
   );

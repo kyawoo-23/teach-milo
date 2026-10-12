@@ -1,4 +1,14 @@
 "use client";
+
+import { useI18n } from "@/components/locale-context";
+import { LanguageSelector } from "./language-selector";
+import {
+  isLocale,
+  localeNames,
+  lessonLanguage,
+  formatNumber,
+  type Locale,
+} from "@/lib/i18n/locales";
 import { useConfirmation } from "./confirmation";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -32,6 +42,8 @@ import {
 
 type MaterialResult = { id: string; name: string; sources: Source[] };
 export function Onboarding() {
+  const { t, text: localizeText, locale } = useI18n();
+
   const confirm = useConfirmation();
   const router = useRouter();
   const getOperation = useOperationId();
@@ -44,12 +56,16 @@ export function Onboarding() {
   const [file, setFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
   const [topic, setTopic] = useState("");
+  const [chosenTeachingLanguage, setTeachingLanguage] = useState<Locale | null>(
+    null,
+  );
+  const teachingLanguage = chosenTeachingLanguage ?? locale;
   const [level, setLevel] = useState("introductory");
   const [material, setMaterial] = useState<MaterialResult | null>(null);
   const [sources, setSources] = useState<Source[]>([]);
   const [lesson, setLesson] = useState<LessonPublic | null>(null);
   const [busy, setBusy] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | Error>("");
   const [help, setHelp] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [missing, setMissing] = useState<string[]>([]);
@@ -77,6 +93,8 @@ export function Onboarding() {
       setNotes(saved.draft.notes);
       setTopic(saved.draft.topic);
       setLevel(saved.draft.level);
+      if (isLocale(saved.draft.teachingLanguage))
+        setTeachingLanguage(saved.draft.teachingLanguage);
       setFile(saved.file);
       if (saved.draft.mode === "upload" && !saved.file)
         setError("Choose your file again to continue.");
@@ -125,7 +143,7 @@ export function Onboarding() {
       if (!isCurrent()) return;
       if (e instanceof ApiError && e.code === "AUTH_REQUIRED")
         openAuthModal("login");
-      setError(e instanceof Error ? e.message : "Please try again.");
+      setError(e instanceof Error ? e : "Please try again.");
     } finally {
       if (isCurrent()) {
         setBusy("");
@@ -168,7 +186,7 @@ export function Onboarding() {
         return;
       }
       setError("");
-      await saveDraft({ mode, notes, topic, level }, file);
+      await saveDraft({ mode, notes, topic, level, teachingLanguage }, file);
       setResume(true);
       openAuthModal("login");
       return;
@@ -210,7 +228,13 @@ export function Onboarding() {
     await run(
       "Finding a focused lesson in your material…",
       async (isCurrent) => {
-        const payload = { materialId: material!.id, topic, level, sources };
+        const payload = {
+          materialId: material!.id,
+          topic,
+          level,
+          sources,
+          teachingLanguage,
+        };
         const result = await api<LessonPublic>("/api/lessons", {
           ...payload,
           operationId: getOperation(JSON.stringify(payload)),
@@ -235,7 +259,7 @@ export function Onboarding() {
       <NavHeader
         extraActions={
           <button className="quiet-button" onClick={() => setHelp(true)}>
-            How it works <MessageCircle size={16} />
+            {t("How it works")} <MessageCircle size={16} />
           </button>
         }
       />
@@ -248,17 +272,18 @@ export function Onboarding() {
           <>
             <section className="home-intro">
               <div className="intro-tag">
-                <span className="status-dot" /> A little curiosity goes a long
-                way
+                <span className="status-dot" />{" "}
+                {t("A little curiosity goes a long way")}
               </div>
               <h1>
-                You know it.
+                {t("You know it.")}
                 <br />
-                Can you teach it?
+                {t("Can you teach it?")}
               </h1>
               <p className="hero-description">
-                Meet Milo, your curious AI student. Bring what you’re learning,
-                explain it in your own words, and discover what really clicks.
+                {t(
+                  "Meet Milo, your curious AI student. Bring what you’re learning, explain it in your own words, and discover what really clicks.",
+                )}
               </p>
               <div className="milo-introduction">
                 <div className="milo-orbit">
@@ -271,11 +296,13 @@ export function Onboarding() {
                   <span className="orbit-star star-two">✧</span>
                 </div>
                 <div className="intro-speech">
-                  <span className="small-label">Milo’s ready to learn</span>
+                  <span className="small-label">
+                    {t("Milo’s ready to learn")}
+                  </span>
                   <p>
-                    “You do the teaching.
+                    {t("“You do the teaching.")}
                     <br />
-                    I’ll bring the questions.”
+                    {t("I’ll bring the questions.”")}
                   </p>
                   <span className="speech-dot" />
                 </div>
@@ -283,17 +310,17 @@ export function Onboarding() {
               <div className="learning-path">
                 <div>
                   <MessageCircle size={17} />
-                  <span>Explain it</span>
+                  <span>{t("Explain it")}</span>
                 </div>
                 <i />
                 <div>
                   <Lightbulb size={18} />
-                  <span>Make it click</span>
+                  <span>{t("Make it click")}</span>
                 </div>
                 <i />
                 <div>
                   <CheckCircle2 size={17} />
-                  <span>Try it yourself</span>
+                  <span>{t("Try it yourself")}</span>
                 </div>
               </div>
             </section>
@@ -303,29 +330,29 @@ export function Onboarding() {
                   <FileText size={22} />
                 </span>
                 <div>
-                  <h2 id="material-title">What are we learning?</h2>
-                  <p>Start with something you want to understand.</p>
+                  <h2 id="material-title">{t("What are we learning?")}</h2>
+                  <p>{t("Start with something you want to understand.")}</p>
                 </div>
               </div>
               <form onSubmit={submitMaterial}>
                 <div
                   className="segmented"
                   role="group"
-                  aria-label="Material input method"
+                  aria-label={t("Material input method")}
                 >
                   <button
                     type="button"
                     aria-pressed={mode === "upload"}
                     onClick={() => setMode("upload")}
                   >
-                    <UploadCloud size={17} /> Upload a document
+                    <UploadCloud size={17} /> {t("Upload a document")}
                   </button>
                   <button
                     type="button"
                     aria-pressed={mode === "paste"}
                     onClick={() => setMode("paste")}
                   >
-                    <FileText size={17} /> Paste notes
+                    <FileText size={17} /> {t("Paste notes")}
                   </button>
                 </div>
                 {mode === "upload" ? (
@@ -357,7 +384,8 @@ export function Onboarding() {
                         </span>
                         <strong>{file.name}</strong>
                         <span>
-                          {(file.size / 1024).toFixed(0)} KB · Ready to read
+                          {(file.size / 1024).toFixed(0)}{" "}
+                          {t("KB · Ready to read")}
                         </span>
                         <button
                           type="button"
@@ -377,7 +405,7 @@ export function Onboarding() {
                             if (inputRef.current) inputRef.current.value = "";
                           }}
                         >
-                          Choose another file
+                          {t("Choose another file")}
                         </button>
                       </>
                     ) : (
@@ -386,11 +414,12 @@ export function Onboarding() {
                           <UploadCloud size={28} />
                         </span>
                         <label htmlFor="material-file" className="file-label">
-                          Choose a file <span>or drop it here</span>
+                          {t("Choose a file")}{" "}
+                          <span>{t("or drop it here")}</span>
                         </label>
-                        <span>PDF, DOCX, or TXT · Up to 10 MB</span>
+                        <span>{t("PDF, DOCX, or TXT · Up to 10 MB")}</span>
                         <span className="ocr-note">
-                          Scanned PDFs welcome. We’ll read those too.
+                          {t("Scanned PDFs welcome. We’ll read those too.")}
                         </span>
                       </>
                     )}
@@ -398,7 +427,7 @@ export function Onboarding() {
                 ) : (
                   <div className="paste-field">
                     <label htmlFor="notes" className="visually-hidden">
-                      Your learning notes
+                      {t("Your learning notes")}
                     </label>
                     <textarea
                       id="notes"
@@ -410,15 +439,17 @@ export function Onboarding() {
                       maxLength={50000}
                       required
                       rows={7}
-                      placeholder="Paste a passage, your class notes, or an explanation you want to understand better…"
+                      placeholder={t(
+                        "Paste a passage, your class notes, or an explanation you want to understand better…",
+                      )}
                     />
                     <span className="character-count">
-                      {notes.length.toLocaleString()} / 50,000
+                      {formatNumber(locale, notes.length)} / 50,000
                     </span>
                   </div>
                 )}
                 <label className="field-label" htmlFor="topic">
-                  What would you like to focus on?
+                  {t("What would you like to focus on?")}
                 </label>
                 <input
                   id="topic"
@@ -427,32 +458,40 @@ export function Onboarding() {
                   className="text-input"
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
-                  placeholder="e.g. How photosynthesis stores energy"
-                  minLength={3}
+                  placeholder={t("e.g. How photosynthesis stores energy")}
+                  minLength={1}
                   maxLength={200}
                   required
                 />
+                <LanguageSelector
+                  teaching
+                  value={teachingLanguage}
+                  onChange={setTeachingLanguage}
+                  disabled={!!busy}
+                />
                 <fieldset className="level-field">
-                  <legend>Choose your depth</legend>
+                  <legend>{t("Choose your depth")}</legend>
                   <div className="level-options">
-                    {["introductory", "intermediate", "advanced"].map((l) => (
-                      <label key={l}>
-                        <input
-                          type="radio"
-                          name="level"
-                          value={l}
-                          checked={level === l}
-                          onChange={() => setLevel(l)}
-                        />
-                        <span>
-                          {l === "introductory"
-                            ? "Introductory"
-                            : l === "intermediate"
-                              ? "Intermediate"
-                              : "Advanced"}
-                        </span>
-                      </label>
-                    ))}
+                    {[t("introductory"), t("intermediate"), t("advanced")].map(
+                      (l) => (
+                        <label key={l}>
+                          <input
+                            type="radio"
+                            name="level"
+                            value={l}
+                            checked={level === l}
+                            onChange={() => setLevel(l)}
+                          />
+                          <span>
+                            {l === t("introductory")
+                              ? t("Introductory")
+                              : l === t("intermediate")
+                                ? t("Intermediate")
+                                : t("Advanced")}
+                          </span>
+                        </label>
+                      ),
+                    )}
                   </div>
                 </fieldset>
                 {error && <ErrorNotice message={error} />}
@@ -462,21 +501,24 @@ export function Onboarding() {
                   disabled={!!busy}
                 >
                   {busy ? (
-                    <Spinner label="Reading your material" />
+                    <Spinner label={t("Reading your material")} />
                   ) : (
                     <>
-                      Prepare my lesson <ArrowRight size={18} />
+                      {t("Prepare my lesson")} <ArrowRight size={18} />
                     </>
                   )}
                 </button>
                 {busy && (
                   <p className="processing-note" role="status">
-                    {busy} Larger PDFs may take a few minutes.
+                    {localizeText(busy)}{" "}
+                    {t("Larger PDFs may take a few minutes.")}
                   </p>
                 )}
                 <p className="privacy-note">
-                  <LockKeyhole size={13} /> Private to your account. Material is
-                  processed with Gemini.
+                  <LockKeyhole size={13} />{" "}
+                  {t(
+                    "Private to your account. Material is processed with Gemini.",
+                  )}
                 </p>
               </form>
             </section>
@@ -503,40 +545,54 @@ export function Onboarding() {
               }}
             >
               <ChevronLeft size={17} />{" "}
-              {step === "lesson" ? "Review material" : "Change material"}
+              {step === "lesson" ? t("Review material") : t("Change material")}
             </button>
-            <div className="flow-progress" aria-label="Preparation progress">
+            <div
+              className="flow-progress"
+              aria-label={t("Preparation progress")}
+            >
               <span className="complete">
-                <Check size={14} /> Your material
+                <Check size={14} /> {t("Your material")}
               </span>
               <i />
               <span className={step === "review" ? "current" : "complete"}>
-                Review extraction
+                {t("Review extraction")}
               </span>
               <i />
               <span className={step === "lesson" ? "current" : ""}>
-                Your lesson
+                {t("Your lesson")}
               </span>
             </div>
             {step === "review" ? (
               <>
                 <h1 className="flow-heading" tabIndex={-1}>
-                  Does this look right?
+                  {t("Does this look right?")}
                 </h1>
                 <p className="section-description">
-                  Review what we read from <strong>{material?.name}</strong>.
-                  Correct unclear words or formulas before Milo learns from it.
+                  {t("Review what we read from")}{" "}
+                  <strong>{localizeText(material?.name ?? "")}</strong>
+                  {t(
+                    ". Correct unclear words or formulas before Milo learns from it.",
+                  )}
                 </p>
                 <div className="source-list">
                   {sources.map((source, i) => (
                     <div className="source-section" key={source.id}>
                       <label className="field-label" htmlFor={`source-${i}`}>
                         <FileText size={15} />
-                        {source.label}
+                        {/^p\d+$/.test(source.id)
+                          ? t("Page {page}", {
+                              page: Number(source.id.slice(1)),
+                            })
+                          : /^Section \d+$/.test(source.label)
+                            ? t("Section {section}", {
+                                section: Number(source.id.slice(1)),
+                              })
+                            : localizeText(source.label)}
                       </label>
                       {source.warnings.map((w, n) => (
                         <p className="source-warning" key={n}>
-                          {w}
+                          {localizeText(w)}
                         </p>
                       ))}
                       <MarkdownEditor
@@ -557,27 +613,34 @@ export function Onboarding() {
                 </div>
                 <div className="review-summary">
                   <span>
-                    <Paperclip size={15} /> {sources.length} source{" "}
-                    {sources.length === 1 ? "section" : "sections"}
+                    <Paperclip size={15} /> {sources.length} {t("source")}{" "}
+                    {t(sources.length === 1 ? "section" : "sections")}
                   </span>
                   <span>
                     {sources
                       .reduce((n, s) => n + s.text.length, 0)
-                      .toLocaleString()}{" "}
-                    characters
+                      .toLocaleString(locale)}{" "}
+                    {t("characters")}
                   </span>
                 </div>
                 {error && <ErrorNotice message={error} />}
+                <LanguageSelector
+                  teaching
+                  value={teachingLanguage}
+                  onChange={setTeachingLanguage}
+                  disabled={!!busy}
+                />
                 <button
                   className="primary-button"
                   disabled={!!busy}
                   onClick={prepare}
                 >
                   {busy ? (
-                    <Spinner label="Preparing your lesson" />
+                    <Spinner label={t("Preparing your lesson")} />
                   ) : (
                     <>
-                      Looks right. Find my lesson <ArrowRight size={17} />
+                      {t("Looks right. Find my lesson")}{" "}
+                      <ArrowRight size={17} />
                     </>
                   )}
                 </button>
@@ -591,17 +654,36 @@ export function Onboarding() {
                       state={busy ? "thinking" : "idle"}
                       interactive
                     />
-                    <span>I’d love to learn about this.</span>
+                    <span>{t("I’d love to learn about this.")}</span>
                   </div>
-                  <h1 className="flow-heading" tabIndex={-1}>
+                  <h1
+                    className="flow-heading"
+                    tabIndex={-1}
+                    lang={lessonLanguage(lesson.teachingLanguage)}
+                  >
                     {lesson.title}
                   </h1>
-                  <p className="section-description">{lesson.scope}</p>
-                  <span className="level-chip">{lesson.level} depth</span>
+                  <p
+                    className="section-description"
+                    lang={lessonLanguage(lesson.teachingLanguage)}
+                  >
+                    {lesson.scope}
+                  </p>
+                  <p className="muted">
+                    {t("Teaching language: {language}", {
+                      language: localeNames[lesson.teachingLanguage ?? "en"],
+                    })}
+                  </p>
+                  <span className="level-chip">
+                    {localizeText(lesson.level)} {t("depth")}
+                  </span>
                   <h2 className="objectives-heading">
-                    What you’ll help Milo understand
+                    {t("What you’ll help Milo understand")}
                   </h2>
-                  <ul className="lesson-objectives">
+                  <ul
+                    className="lesson-objectives"
+                    lang={lessonLanguage(lesson.teachingLanguage)}
+                  >
                     {lesson.objectives.map((o) => (
                       <li key={o.id}>
                         <span>
@@ -613,22 +695,28 @@ export function Onboarding() {
                   </ul>
                   {lesson.concerns.length > 0 && (
                     <div className="source-concerns">
-                      <strong>A few things to clarify</strong>
+                      <strong>{t("A few things to clarify")}</strong>
                       <p>
-                        These source uncertainties may leave some report
-                        criteria unscored. You can revise the material or
-                        explore the concept with Milo.
+                        {t(
+                          "These source uncertainties may leave some report criteria unscored. You can revise the material or explore the concept with Milo.",
+                        )}
                       </p>
                       {lesson.concerns.map((c, i) => (
-                        <p key={i}>{c}</p>
+                        <p
+                          key={i}
+                          lang={lessonLanguage(lesson.teachingLanguage)}
+                        >
+                          {c}
+                        </p>
                       ))}
                     </div>
                   )}
                   <div className="lesson-promise">
                     <MessageCircle size={20} />
                     <p>
-                      Teach at your own pace. When the ideas connect, Milo will
-                      offer a fresh challenge. You can end whenever you like.
+                      {t(
+                        "Teach at your own pace. When the ideas connect, Milo will offer a fresh challenge. You can end whenever you like.",
+                      )}
                     </p>
                   </div>
                   {error && <ErrorNotice message={error} />}
@@ -638,10 +726,10 @@ export function Onboarding() {
                     onClick={start}
                   >
                     {busy ? (
-                      <Spinner label="Opening your classroom" />
+                      <Spinner label={t("Opening your classroom")} />
                     ) : (
                       <>
-                        Let’s teach Milo <ArrowRight size={18} />
+                        {t("Let’s teach Milo")} <ArrowRight size={18} />
                       </>
                     )}
                   </button>
@@ -652,38 +740,44 @@ export function Onboarding() {
         )}
       </main>
       <footer className="site-footer">
-        <span>Understanding grows when you explain.</span>
-        <span>Formative feedback · Sign in to save your sessions</span>
+        <span>{t("Understanding grows when you explain.")}</span>
+        <span>{t("Formative feedback · Sign in to save your sessions")}</span>
       </footer>
       {missing.length > 0 && (
         <div className="setup-note">
-          <span>Local setup needed</span> Add {missing.join(" and ")} in{" "}
-          <code>.env.local</code> to start a real session.
+          <span>{t("Local setup needed")}</span> {t("Add")}{" "}
+          {missing.join(t(" and "))} {t("in")} <code>.env.local</code>{" "}
+          {t("to start a real session.")}
         </div>
       )}
       <Modal
         open={help}
         onClose={() => setHelp(false)}
-        title="Learn by teaching"
+        title={t("Learn by teaching")}
       >
         <div className="help-steps">
           <p>
-            <strong>Bring your material.</strong> Upload a document or paste
-            notes, then check the extracted content.
+            <strong>{t("Bring your material.")}</strong>{" "}
+            {t(
+              "Upload a document or paste notes, then check the extracted content.",
+            )}
           </p>
           <p>
-            <strong>Teach Milo.</strong> Explain the idea in your own words. His
-            questions and a visual board help you make your reasoning concrete.
+            <strong>{t("Teach Milo.")}</strong>{" "}
+            {t(
+              "Explain the idea in your own words. His questions and a visual board help you make your reasoning concrete.",
+            )}
           </p>
           <p>
-            <strong>Try it independently.</strong> Take a new application
-            question with practice aids hidden, then see feedback linked to your
-            own explanations.
+            <strong>{t("Try it independently.")}</strong>{" "}
+            {t(
+              "Take a new application question with practice aids hidden, then see feedback linked to your own explanations.",
+            )}
           </p>
           <p className="muted">
-            Sessions and extracted content expire after seven days. Uploaded
-            originals are discarded after extraction. Feedback is formative and
-            can be imperfect.
+            {t(
+              "Sessions and extracted content expire after seven days. Uploaded originals are discarded after extraction. Feedback is formative and can be imperfect.",
+            )}
           </p>
         </div>
       </Modal>
