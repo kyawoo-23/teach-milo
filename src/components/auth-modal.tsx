@@ -2,7 +2,14 @@
 
 import { Suspense, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { AlertCircle, Lock, Mail, User as UserIcon } from "lucide-react";
+import {
+  AlertCircle,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  User as UserIcon,
+} from "lucide-react";
 import { useAuth } from "./auth-context";
 import { Modal, Spinner } from "./ui";
 
@@ -28,6 +35,9 @@ function AuthModalContent() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -36,6 +46,10 @@ function AuthModalContent() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (authMode === "signup" && password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -60,6 +74,9 @@ function AuthModalContent() {
     <Modal
       open={authModalOpen || !!urlAuthError}
       onClose={() => {
+        setShowPassword(false);
+        setShowConfirmPassword(false);
+        setConfirmPassword("");
         setError("");
         closeAuthModal();
         if (urlAuthError) {
@@ -198,7 +215,10 @@ function AuthModalContent() {
               <input
                 id="auth-password"
                 name="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
+                className="password-input"
+                spellCheck={false}
+                autoCapitalize="none"
                 required
                 autoComplete={
                   authMode === "login" ? "current-password" : "new-password"
@@ -211,8 +231,63 @@ function AuthModalContent() {
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={busy}
               />
+              <button
+                type="button"
+                className="password-toggle"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-controls="auth-password"
+                onClick={() => setShowPassword((visible) => !visible)}
+                disabled={busy}
+              >
+                {showPassword ? (
+                  <EyeOff size={18} aria-hidden="true" />
+                ) : (
+                  <Eye size={18} aria-hidden="true" />
+                )}
+              </button>
             </div>
           </div>
+
+          {authMode === "signup" && (
+            <div className="form-group">
+              <label htmlFor="auth-confirm-password">Confirm Password</label>
+              <div className="input-with-icon">
+                <Lock size={16} className="input-icon" />
+                <input
+                  id="auth-confirm-password"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  className="password-input"
+                  spellCheck={false}
+                  autoCapitalize="none"
+                  autoComplete="new-password"
+                  required
+                  placeholder="Re-enter your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  disabled={busy}
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  aria-label={
+                    showConfirmPassword
+                      ? "Hide confirm password"
+                      : "Show confirm password"
+                  }
+                  aria-controls="auth-confirm-password"
+                  onClick={() => setShowConfirmPassword((visible) => !visible)}
+                  disabled={busy}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff size={18} aria-hidden="true" />
+                  ) : (
+                    <Eye size={18} aria-hidden="true" />
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"

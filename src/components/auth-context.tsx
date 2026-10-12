@@ -6,6 +6,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
   ReactNode,
 } from "react";
 import { UserPublic } from "@/lib/contracts";
@@ -37,25 +38,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
 
+  const authGeneration = useRef(0);
+  const authRead = useRef<AbortController | null>(null);
   const refreshUser = useCallback(async () => {
+    const generation = ++authGeneration.current;
+    authRead.current?.abort();
+    const controller = new AbortController();
+    authRead.current = controller;
     try {
       const res = await api<{ user: UserPublic | null }>(
         "/api/auth/me",
         undefined,
         "GET",
+        { signal: controller.signal },
       );
-      setUser(res.user);
+      if (generation === authGeneration.current) setUser(res.user);
     } catch {
-      setUser(null);
+      if (!controller.signal.aborted && generation === authGeneration.current)
+        setUser(null);
     } finally {
-      setLoading(false);
+      if (generation === authGeneration.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    refreshUser();
+    void refreshUser();
+    return () => {
+      authGeneration.current++;
+      authRead.current?.abort();
+    };
   }, [refreshUser]);
 
+  const beginAuthChange = () => {
+    authRead.current?.abort();
+    setLoading(false);
+    return ++authGeneration.current;
+  };
   const openAuthModal = useCallback((mode: "login" | "signup" = "login") => {
     setAuthMode(mode);
     setAuthModalOpen(true);
@@ -74,26 +92,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
+    const generation = beginAuthChange();
     const res = await api<{ user: UserPublic }>("/api/auth/login", {
       email,
       password,
     });
+    if (generation !== authGeneration.current) return;
+    setLoading(false);
     setUser(res.user);
     setAuthModalOpen(false);
   };
 
   const signup = async (email: string, password: string, name: string) => {
+    const generation = beginAuthChange();
     const res = await api<{ user: UserPublic }>("/api/auth/signup", {
       email,
       password,
       name,
     });
+    if (generation !== authGeneration.current) return;
+    setLoading(false);
     setUser(res.user);
     setAuthModalOpen(false);
   };
 
   const logout = async () => {
+    const generation = beginAuthChange();
     await api("/api/auth/logout", {});
+    if (generation !== authGeneration.current) return;
+    setLoading(false);
+    setSessionModalOpen(false);
     setUser(null);
   };
 

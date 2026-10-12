@@ -22,7 +22,13 @@ export const runtime = "nodejs";
 
 type HistorySession = Pick<
   Session,
-  "id" | "lessonId" | "phase" | "createdAt" | "updatedAt" | "expiresAt"
+  | "id"
+  | "lessonId"
+  | "lessonSummary"
+  | "phase"
+  | "createdAt"
+  | "updatedAt"
+  | "expiresAt"
 > & { ledger: Pick<Session["ledger"], "evidence"> };
 type HistoryLesson = Pick<Lesson, "title" | "scope" | "level" | "objectives">;
 
@@ -72,6 +78,7 @@ export async function GET(request: Request) {
       .select(
         "id",
         "lessonId",
+        "lessonSummary",
         "phase",
         "createdAt",
         "updatedAt",
@@ -93,9 +100,11 @@ export async function GET(request: Request) {
       decode<HistorySession>(d.data()),
     );
 
-    const lessonRefs = [...new Set(activeSessions.map((s) => s.lessonId))].map(
-      (id) => database().collection("lessons").doc(id),
-    );
+    const lessonRefs = [
+      ...new Set(
+        activeSessions.filter((s) => !s.lessonSummary).map((s) => s.lessonId),
+      ),
+    ].map((id) => database().collection("lessons").doc(id));
     const lessonDocs =
       lessonRefs.length > 0
         ? await database().getAll(...lessonRefs, {
@@ -110,7 +119,7 @@ export async function GET(request: Request) {
     }
 
     const summaries: SessionSummary[] = activeSessions.map((s) => {
-      const lesson = lessonMap.get(s.lessonId);
+      const lesson = s.lessonSummary ?? lessonMap.get(s.lessonId);
       return {
         id: s.id,
         title: lesson?.title || "Untitled Lesson",

@@ -743,7 +743,7 @@ for (const viewport of [
       .boundingBox();
     const brand = await page.locator(".session-header .brand").boundingBox();
     expect(end!.x).toBeGreaterThanOrEqual(brand!.x + brand!.width);
-    if (viewport.width <= 960) {
+    if (viewport.width <= 1100) {
       await expect(page.locator(".board-sidebar")).toBeHidden();
       await page.getByRole("button", { name: "Open teaching board" }).click();
     }
@@ -854,9 +854,9 @@ test("small-screen account and history dialogs remain accessible", async ({
   await expect(
     page.getByRole("button", { name: "Sign In", exact: true }),
   ).toBeFocused();
-  await page.getByRole("button", { name: "My Sessions", exact: true }).click();
-  await expect(dialog.getByText("Sign in to see your sessions.")).toBeVisible();
-  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "My Sessions", exact: true }),
+  ).toHaveCount(0);
   signedIn = true;
   await page.reload();
   await page.getByRole("button", { name: "My Sessions", exact: true }).click();
@@ -920,10 +920,24 @@ test("session history appends pages, retries in place, and preserves deletion", 
   await page.getByRole("button", { name: "My Sessions", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.locator(".session-card")).toHaveCount(2);
-  page.once("dialog", (confirmation) => confirmation.accept());
   await dialog
     .getByRole("button", { name: "Delete session: Lesson B" })
     .click();
+  const confirmation = page.getByRole("alertdialog", {
+    name: "Delete this session?",
+  });
+  await expect(
+    confirmation.getByRole("button", { name: "Keep session" }),
+  ).toBeFocused();
+  await confirmation.getByRole("button", { name: "Keep session" }).click();
+  await expect(dialog.locator(".session-card")).toHaveCount(2);
+  await dialog
+    .getByRole("button", { name: "Delete session: Lesson B" })
+    .click();
+  await confirmation
+    .getByRole("button", { name: "Delete session", exact: true })
+    .click();
+  await expect(confirmation).toBeHidden();
   await expect(dialog.locator(".session-card")).toHaveCount(1);
   await dialog.getByRole("button", { name: "Load more", exact: true }).click();
   await expect(dialog.getByRole("alert")).toContainText(
@@ -964,6 +978,10 @@ test("session history ignores stale pages after reopening and handles empty hist
 }) => {
   const { state } = await fixtures(page);
   let firstLoads = 0;
+  let cancelled = false;
+  page.on("requestfailed", (request) => {
+    if (request.url().includes("cursor=page2")) cancelled = true;
+  });
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
@@ -1017,15 +1035,1073 @@ test("session history ignores stale pages after reopening and handles empty hist
   await expect(
     dialog.getByRole("heading", { name: "No sessions found" }),
   ).toBeVisible();
-  const staleResponse = page.waitForResponse((response) =>
-    response.url().includes("cursor=page2"),
-  );
   release();
-  await staleResponse;
+  await expect.poll(() => cancelled).toBe(true);
   await expect(dialog.getByRole("link", { name: "Stale lesson" })).toHaveCount(
     0,
   );
   await expect(
     dialog.getByRole("heading", { name: "No sessions found" }),
   ).toBeVisible();
+});
+
+test("Milo greetings support keyboard, restart cleanly, and share a saved pause preference", async ({
+  page,
+}) => {
+  const { state } = await fixtures(page);
+  state.messages.push({
+    ...state.messages[0],
+    id: "66666666-6666-4666-8666-666666666666",
+    sequence: 1,
+  });
+  await page.goto("/");
+  const greet = page.getByRole("button", { name: "Say hello to Milo" });
+  const milo = greet.locator("svg");
+  await expect(milo).toHaveAttribute("data-milo-state", "idle");
+  await greet.focus();
+  await page.keyboard.press("Enter");
+  await expect(milo).toHaveAttribute("data-milo-state", "greeting");
+  await page.keyboard.press("Space");
+  await expect
+    .poll(() =>
+      milo.evaluate((svg) => svg.getAnimations({ subtree: true }).length),
+    )
+    .toBe(4);
+  await expect(milo).toHaveAttribute("data-milo-state", "idle");
+  await page.goto(`/session/${sessionId}`);
+  const headerMilo = page.locator(".conversation-heading .milo");
+  await page.getByRole("button", { name: "Pause Milo motion" }).click();
+  await expect
+    .poll(() =>
+      headerMilo.evaluate((svg) => svg.getAnimations({ subtree: true }).length),
+    )
+    .toBe(0);
+  await page.goto("/");
+  await expect
+    .poll(() =>
+      milo.evaluate((svg) => svg.getAnimations({ subtree: true }).length),
+    )
+    .toBe(0);
+  await page.goto(`/session/${sessionId}`);
+  await expect(
+    page.getByRole("button", { name: "Resume Milo motion" }),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      headerMilo.evaluate((svg) => svg.getAnimations({ subtree: true }).length),
+    )
+    .toBe(0);
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Resume Milo motion" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Resume Milo motion" }).click();
+  await expect
+    .poll(() =>
+      headerMilo.evaluate((svg) => svg.getAnimations({ subtree: true }).length),
+    )
+    .toBe(2);
+  const gradientIds = await page
+    .locator(".message-avatar .milo linearGradient")
+    .evaluateAll((nodes) => nodes.map((node) => node.id));
+  expect(gradientIds).toHaveLength(2);
+  expect(new Set(gradientIds).size).toBe(2);
+  expect(
+    await page
+      .locator(".message-avatar .milo")
+      .evaluateAll((nodes) =>
+        nodes.flatMap((node) => node.getAnimations({ subtree: true })),
+      ),
+  ).toHaveLength(0);
+});
+
+test("Milo follows typing, thinking, failed turns and new replies without reacting to history", async ({
+  page,
+}) => {
+  const { state } = await fixtures(page);
+  state.nextCursor = 0;
+  await page.route("**/api/sessions/*/messages?before=*", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        messages: [
+          {
+            ...state.messages[0],
+            id: "66666666-6666-4666-8666-666666666666",
+            sequence: -1,
+          },
+        ],
+      }),
+    }),
+  );
+  let release: (() => void) | undefined;
+  let first = true;
+  await page.route("**/api/sessions/*/turns", async (route) => {
+    if (!first) return route.fallback();
+    first = false;
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return route.fulfill({
+      status: 502,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: {
+          code: "MODEL_FAILURE",
+          message: "Temporary model failure. Please retry.",
+        },
+      }),
+    });
+  });
+  await page.goto(`/session/${sessionId}`);
+  const milo = page.locator(".conversation-heading .milo");
+  await expect(milo).toHaveAttribute("data-milo-state", "idle");
+  await page.getByRole("button", { name: "Load earlier messages" }).click();
+  await expect(page.locator(".message.student")).toHaveCount(2);
+  await expect(milo).toHaveAttribute("data-milo-state", "idle");
+  const explanation = page.getByLabel("Your explanation to Milo");
+  await explanation.fill("Weights are reused.");
+  await expect(milo).toHaveAttribute("data-milo-state", "listening");
+  await expect(milo).toHaveAttribute("data-milo-state", "idle");
+  await explanation.fill("The same weights are reused.");
+  await page.getByRole("button", { name: "Send explanation" }).click();
+  await expect(milo).toHaveAttribute("data-milo-state", "thinking");
+  await expect(
+    page.getByRole("button", { name: "Say hello to Milo" }),
+  ).toHaveAttribute("aria-disabled", "true");
+  await expect.poll(() => Boolean(release)).toBe(true);
+  release!();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Temporary model failure" }),
+  ).toBeVisible();
+  await expect(milo).toHaveAttribute("data-milo-state", "idle");
+  await expect(explanation).toHaveValue("The same weights are reused.");
+  await page.getByRole("button", { name: "Send explanation" }).click();
+  await expect(milo).toHaveAttribute("data-milo-state", "reply");
+  await expect(milo).toHaveAttribute("data-milo-state", "idle");
+  await page.reload();
+  await expect(milo).toHaveAttribute("data-milo-state", "idle");
+});
+
+test("Milo respects reduced motion and pauses outside the viewport or hidden tab", async ({
+  page,
+}) => {
+  const { state } = await fixtures(page);
+  state.pending = true;
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(`/session/${sessionId}`);
+  const milo = page.locator(".conversation-heading .milo");
+  await expect(milo).toHaveAttribute("data-milo-state", "thinking");
+  await expect
+    .poll(() =>
+      milo.evaluate((svg) => svg.getAnimations({ subtree: true }).length),
+    )
+    .toBe(0);
+  await expect(milo.locator('[data-milo-part="eyes"]')).toHaveCSS(
+    "transform",
+    "matrix(1, 0, 0, 1, 0, -2)",
+  );
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await expect
+    .poll(() =>
+      milo.evaluate(
+        (svg) =>
+          svg
+            .getAnimations({ subtree: true })
+            .filter((animation) => animation.playState === "running").length,
+      ),
+    )
+    .toBe(4);
+  await page.evaluate(() => {
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      value: true,
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await expect
+    .poll(() =>
+      milo.evaluate((svg) =>
+        svg
+          .getAnimations({ subtree: true })
+          .every((animation) => animation.playState === "paused"),
+      ),
+    )
+    .toBe(true);
+  await page.evaluate(() => {
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      value: false,
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await expect
+    .poll(() =>
+      milo.evaluate(
+        (svg) =>
+          svg
+            .getAnimations({ subtree: true })
+            .filter((animation) => animation.playState === "running").length,
+      ),
+    )
+    .toBe(4);
+  await milo.evaluate((svg) => {
+    svg.style.position = "fixed";
+    svg.style.top = "-200px";
+  });
+  await expect
+    .poll(() =>
+      milo.evaluate((svg) =>
+        svg
+          .getAnimations({ subtree: true })
+          .every((animation) => animation.playState === "paused"),
+      ),
+    )
+    .toBe(true);
+  await milo.evaluate((svg) => {
+    svg.style.position = "";
+    svg.style.top = "";
+  });
+  await expect
+    .poll(() =>
+      milo.evaluate(
+        (svg) =>
+          svg
+            .getAnimations({ subtree: true })
+            .filter((animation) => animation.playState === "running").length,
+      ),
+    )
+    .toBe(4);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect
+    .poll(() =>
+      milo.evaluate((svg) => svg.getAnimations({ subtree: true }).length),
+    )
+    .toBe(0);
+});
+
+test("Milo celebrates each dialog opening and thanks the learner on the report", async ({
+  page,
+}) => {
+  const { state } = await fixtures(page);
+  state.phase = "ready_for_check";
+  await page.goto(`/session/${sessionId}`);
+  const dialog = page.getByRole("dialog", { name: "Milo understood." });
+  const milo = dialog.locator(".milo");
+  await expect(milo).toHaveAttribute("data-milo-state", "celebration");
+  await expect(milo).toHaveAttribute("data-milo-state", "idle");
+  await dialog.getByRole("button", { name: "Keep chatting" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.locator(".understood-panel .milo")).toHaveCount(0);
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload();
+  await expect(milo).toHaveAttribute("data-milo-state", "celebration");
+  await dialog.getByRole("button", { name: "Close session" }).click();
+  await expect(page.locator(".report-milo .milo")).toHaveAttribute(
+    "data-milo-state",
+    "reply",
+  );
+  await expect(page.locator(".report-milo .milo")).toHaveAttribute(
+    "data-milo-state",
+    "idle",
+  );
+});
+
+async function completedSessionFixture(page: Page) {
+  const { state } = await fixtures(page);
+  await page.goto("/");
+  await page.evaluate(async (id) => {
+    await fetch(`/api/sessions/${id}/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "end" }),
+    });
+  }, sessionId);
+  return state;
+}
+
+test("completed chat preserves paginated history, retries, and supports keyboard tabs", async ({
+  page,
+}, testInfo) => {
+  const state = await completedSessionFixture(page);
+  const message = (sequence: number) => ({
+    id: `history-${sequence}`,
+    role: sequence % 2 ? "learner" : "student",
+    text: `Saved explanation ${sequence}`,
+    sequence,
+    createdAt: new Date().toISOString(),
+    kind: sequence === 58 ? "hint" : sequence === 59 ? "transfer" : "teaching",
+    ...(sequence === 57
+      ? {
+          board: {
+            kind: "cnn",
+            version: 1,
+            inputs: { inputSize: 64 },
+            verified: true,
+          },
+        }
+      : {}),
+  });
+  state.messages = Array.from({ length: 30 }, (_, index) =>
+    message(index + 30),
+  );
+  state.nextCursor = 30;
+  let attempts = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    `**/api/sessions/${sessionId}/messages?before=*`,
+    async (route) => {
+      const before = new URL(route.request().url()).searchParams.get("before");
+      if (before === "0") return route.fulfill({ json: { messages: [] } });
+      expect(before).toBe("30");
+      attempts++;
+      if (attempts === 1)
+        return route.fulfill({
+          status: 503,
+          json: { error: { message: "History temporarily unavailable" } },
+        });
+      await gate;
+      return route.fulfill({
+        json: {
+          messages: [
+            ...Array.from({ length: 30 }, (_, index) => message(index)),
+            message(30),
+          ],
+          nextCursor: 0,
+        },
+      });
+    },
+  );
+  await page.goto(`/session/${sessionId}/report`);
+  const report = page.getByRole("tab", { name: "Report", exact: true });
+  const chat = page.getByRole("tab", { name: "Chat", exact: true });
+  await expect(report).toHaveAttribute("aria-selected", "true");
+  await expect(
+    page.getByRole("heading", { name: "How did your teaching go?" }),
+  ).toBeVisible();
+  await report.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(chat).toBeFocused();
+  await expect(chat).toHaveAttribute("aria-selected", "true");
+  const transcript = page.getByRole("region", { name: "Saved conversation" });
+  await expect(transcript.getByText(/Session ended/)).toBeVisible();
+  await expect(transcript.getByText("A little nudge")).toBeVisible();
+  await expect(transcript.getByText("Independent-check answer")).toBeVisible();
+  await expect(
+    transcript.getByText("Demonstration shared · 64 × 64"),
+  ).toBeVisible();
+  await expect(transcript.locator(".message.student")).toHaveCount(15);
+  await expect(transcript.locator(".message.learner")).toHaveCount(15);
+  await expect(
+    transcript.getByRole("button", { name: "Copy Milo’s message" }),
+  ).toHaveCount(15);
+  await expect(page.getByRole("textbox")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "End session", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Open teaching board" }),
+  ).toHaveCount(0);
+  await transcript
+    .getByRole("button", { name: "Load earlier messages" })
+    .click();
+  await expect(transcript.getByRole("alert")).toContainText(
+    "History temporarily unavailable",
+  );
+  await expect(transcript.locator(".message")).toHaveCount(30);
+  await transcript.getByRole("button", { name: "Try again" }).click();
+  try {
+    await expect(
+      transcript.getByRole("button", { name: "Loading earlier messages…" }),
+    ).toBeDisabled();
+  } finally {
+    release();
+  }
+  await expect(transcript.locator(".message")).toHaveCount(60);
+  expect(attempts).toBe(2);
+  expect(await transcript.locator(".message-text").allTextContents()).toEqual(
+    Array.from({ length: 60 }, (_, index) => `Saved explanation ${index}`),
+  );
+  await report.click();
+  await expect(
+    page.getByRole("heading", { name: "How did your teaching go?" }),
+  ).toBeVisible();
+  await report.press("End");
+  await expect(chat).toBeFocused();
+  await expect(transcript.locator(".message")).toHaveCount(60);
+  await transcript
+    .getByRole("button", { name: "Load earlier messages" })
+    .click();
+  await expect(
+    transcript.getByRole("button", { name: "Load earlier messages" }),
+  ).toHaveCount(0);
+  await expect(transcript.locator(".message")).toHaveCount(60);
+  const accessibility = await new AxeBuilder({ page })
+    .include(".completed-session")
+    .analyze();
+  expect(accessibility.violations).toEqual([]);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  const savedMessages = page.getByRole("region", { name: "Saved messages" });
+  await expect(savedMessages.locator(".message-bubble").first()).toHaveCSS(
+    "font-size",
+    "16px",
+  );
+  expect(
+    await page.evaluate(
+      () => document.scrollingElement!.scrollHeight <= innerHeight,
+    ),
+  ).toBe(true);
+  await savedMessages.hover();
+  await page.mouse.wheel(0, 10000);
+  await expect
+    .poll(() => savedMessages.evaluate((el) => el.scrollTop))
+    .toBeGreaterThan(0);
+  expect(await page.evaluate(() => scrollY)).toBe(0);
+  await page.screenshot({ path: testInfo.outputPath("completed-chat.png") });
+  await page.reload();
+  await expect(report).toHaveAttribute("aria-selected", "true");
+});
+
+test("completed chat handles empty history and resets for another session", async ({
+  page,
+}) => {
+  const state = await completedSessionFixture(page);
+  state.messages = [];
+  await page.goto(`/session/${sessionId}/report`);
+  await page.getByRole("tab", { name: "Chat", exact: true }).click();
+  await expect(
+    page.getByText("No saved messages in this session."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Load earlier messages" }),
+  ).toHaveCount(0);
+  const nextId = "66666666-6666-4666-8666-666666666666";
+  await page.route(`**/api/sessions/${nextId}`, (route) =>
+    route.fulfill({ json: { ...state, id: nextId } }),
+  );
+  await page.evaluate((id) => {
+    const link = document.createElement("a");
+    link.href = `/session/${id}/report`;
+    link.textContent = "Open another completed session";
+    document.querySelector(".session-header")!.append(link);
+  }, nextId);
+  await page
+    .getByRole("link", { name: "Open another completed session" })
+    .click();
+  await expect(
+    page.getByRole("tab", { name: "Report", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await expect(
+    page.getByRole("heading", { name: "How did your teaching go?" }),
+  ).toBeVisible();
+});
+
+for (const viewport of [
+  { width: 320, height: 568 },
+  { width: 390, height: 844 },
+  { width: 615, height: 887 },
+  { width: 1024, height: 768 },
+  { width: 1440, height: 900 },
+  { width: 844, height: 390 },
+]) {
+  test(`classroom keeps chat readable and scrolls only the thread at ${viewport.width} × ${viewport.height}`, async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "desktop",
+      "Explicit viewports run once.",
+    );
+    await page.setViewportSize(viewport);
+    const { state } = await fixtures(page);
+    state.phase = "ready_for_check";
+    state.messages = Array.from({ length: 24 }, (_, index) => ({
+      id: `scroll-${index}`,
+      role: index % 2 ? "learner" : "student",
+      text: `Explanation ${index}. The same filter weights are reused at every spatial position. A larger input changes the amount of computation while keeping learned parameters fixed.`,
+      sequence: index,
+      kind: "teaching",
+      createdAt: new Date().toISOString(),
+    }));
+    await page.addInitScript(
+      (id) => sessionStorage.setItem(`understood-dismissed:${id}`, "1"),
+      sessionId,
+    );
+    await page.goto(`/session/${sessionId}`);
+    await expect(
+      page.getByRole("heading", { name: "Milo’s classroom" }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath("classroom-layout.png"),
+    });
+    const thread = page.getByRole("region", { name: "Teaching messages" });
+    const box = await thread.boundingBox();
+    expect(
+      box!.height,
+      "Messages should receive at least 40% of the viewport",
+    ).toBeGreaterThan(viewport.height * 0.4);
+    await expect(page.locator(".classroom .message-bubble").first()).toHaveCSS(
+      "font-size",
+      "16px",
+    );
+    await page
+      .getByLabel("Your explanation to Milo")
+      .fill("I can still type while reading the conversation.");
+    await expect
+      .poll(() =>
+        page.evaluate(() => ({
+          top: window.scrollY,
+          height: document.scrollingElement!.scrollHeight,
+          client: document.scrollingElement!.clientHeight,
+        })),
+      )
+      .toEqual({ top: 0, height: viewport.height, client: viewport.height });
+    await thread.hover();
+    await page.mouse.wheel(0, -10000);
+    await expect.poll(() => thread.evaluate((el) => el.scrollTop)).toBe(0);
+    const headerBefore = await page.locator(".session-header").boundingBox();
+    await page.mouse.wheel(0, -10000);
+    expect(await page.evaluate(() => scrollY)).toBe(0);
+    expect((await page.locator(".session-header").boundingBox())!.y).toBe(
+      headerBefore!.y,
+    );
+    await page.mouse.wheel(0, 10000);
+    await expect
+      .poll(() => thread.evaluate((el) => el.scrollTop))
+      .toBeGreaterThan(0);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    const composer = await page.locator(".composer-area").boundingBox();
+    expect(composer!.y + composer!.height).toBeLessThanOrEqual(
+      viewport.height + 1,
+    );
+    await page
+      .getByRole("button", { name: "End session", exact: true })
+      .click();
+    await expect(
+      page.getByRole("dialog", { name: "Ready to wrap up?" }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Keep teaching", exact: true })
+      .last()
+      .click();
+    await expect(
+      page.getByRole("dialog", { name: "Ready to wrap up?" }),
+    ).toBeHidden();
+    expect(await page.evaluate(() => scrollY)).toBe(0);
+  });
+}
+
+test("mobile classroom details expand with keyboard and give space back to chat", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== "desktop",
+    "Explicit viewports run once.",
+  );
+  await page.setViewportSize({ width: 661, height: 887 });
+  await fixtures(page);
+  await page.goto(`/session/${sessionId}`);
+  const toggle = page.getByRole("button", {
+    name: "Milo’s classroom",
+    exact: true,
+  });
+  const objectives = page.getByRole("region", {
+    name: "Learning objective progress",
+  });
+  const thread = page.getByRole("region", { name: "Teaching messages" });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(objectives).toBeHidden();
+  await expect(page.locator("#classroom-introduction")).toBeHidden();
+  const collapsed = (await thread.boundingBox())!.height;
+  await toggle.focus();
+  await page.keyboard.press("Enter");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(objectives).toBeVisible();
+  await expect(page.locator("#classroom-introduction")).toBeVisible();
+  expect((await thread.boundingBox())!.height).toBeLessThan(collapsed - 40);
+  await page.keyboard.press("Space");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect
+    .poll(async () => (await thread.boundingBox())!.height)
+    .toBe(collapsed);
+  await page
+    .getByRole("button", { name: "Open teaching board", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Teaching board" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  for (const width of [320, 661, 844]) {
+    await page.setViewportSize({ width, height: 887 });
+    await expect(toggle).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    expect(
+      await page.evaluate(() => document.scrollingElement!.scrollHeight),
+    ).toBe(887);
+  }
+  await page.screenshot({
+    path: testInfo.outputPath("collapsed-classroom.png"),
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(toggle).toBeHidden();
+  await expect(objectives).toBeVisible();
+  await expect(page.locator("#classroom-introduction")).toBeVisible();
+});
+
+test("confirmation modals cancel safely, restore focus, and confirm sign out", async ({
+  page,
+}, testInfo) => {
+  await fixtures(page);
+  let logouts = 0;
+  const nativeDialogs: string[] = [];
+  page.on("dialog", async (dialog) => {
+    nativeDialogs.push(dialog.type());
+    await dialog.dismiss();
+  });
+  await page.route("**/api/auth/logout", (route) => {
+    logouts++;
+    return route.fulfill({ json: { ok: true } });
+  });
+  await page.goto("/");
+  const accountMenu = page.getByRole("button", {
+    name: "Open account menu",
+    exact: true,
+  });
+  const signOut = page.getByRole("button", { name: "Log out", exact: true });
+  const openSignOut = async () => {
+    if (!(await signOut.isVisible())) await accountMenu.click();
+  };
+  const modal = page.getByRole("alertdialog", { name: "Sign out?" });
+  await openSignOut();
+  await signOut.click();
+  await expect(modal).toBeVisible();
+  const cancel = modal.getByRole("button", { name: "Stay signed in" });
+  await expect(cancel).toBeFocused();
+  expect(logouts).toBe(0);
+  expect(
+    (await new AxeBuilder({ page }).include(".confirmation-modal").analyze())
+      .violations,
+  ).toEqual([]);
+  await page.screenshot({
+    path: testInfo.outputPath("sign-out-confirmation.png"),
+  });
+  await cancel.press("Tab");
+  await expect(
+    modal.getByRole("button", { name: "Sign out", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(cancel).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(modal).toBeHidden();
+  await expect(signOut).toBeFocused();
+  expect(logouts).toBe(0);
+  await openSignOut();
+  await signOut.click();
+  await modal.getByRole("button", { name: "Close dialog" }).click();
+  await openSignOut();
+  await expect(signOut).toBeVisible();
+  expect(logouts).toBe(0);
+  await openSignOut();
+  await signOut.click();
+  await page.mouse.click(1, 1);
+  await expect(modal).toBeHidden();
+  expect(logouts).toBe(0);
+  await openSignOut();
+  await signOut.click();
+  await modal.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Sign In", exact: true }),
+  ).toBeVisible();
+  expect(logouts).toBe(1);
+  expect(nativeDialogs).toEqual([]);
+});
+
+test("confirmation modals guard board resets, snapshot replacement and removal", async ({
+  page,
+}, testInfo) => {
+  await fixtures(page);
+  await page.goto(`/session/${sessionId}`);
+  const openBoard = async () => {
+    if (testInfo.project.name === "mobile")
+      await page.getByRole("button", { name: "Open teaching board" }).click();
+    return page.locator(".teaching-board:visible");
+  };
+  let teachingBoard = await openBoard();
+  await teachingBoard
+    .getByRole("button", { name: "64 × 64", exact: true })
+    .click();
+  await teachingBoard
+    .getByRole("button", { name: "Reset board", exact: true })
+    .click();
+  const reset = page.getByRole("alertdialog", { name: "Reset this board?" });
+  await reset.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(
+    teachingBoard.getByRole("button", { name: "64 × 64", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await teachingBoard
+    .getByRole("button", { name: "Reset board", exact: true })
+    .click();
+  await reset.getByRole("button", { name: "Reset board", exact: true }).click();
+  await expect(
+    teachingBoard.getByRole("button", { name: "32 × 32", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await teachingBoard
+    .getByRole("button", { name: "Use this to explain it" })
+    .click();
+  await expect(page.locator(".attachment-chip")).toBeVisible();
+  teachingBoard = await openBoard();
+  await teachingBoard
+    .getByRole("button", { name: "64 × 64", exact: true })
+    .click();
+  await teachingBoard
+    .getByRole("button", { name: "Use this to explain it" })
+    .click();
+  const replace = page.getByRole("alertdialog", {
+    name: "Replace board snapshot?",
+  });
+  await replace.getByRole("button", { name: "Cancel", exact: true }).click();
+  await teachingBoard
+    .getByRole("button", { name: "Use this to explain it" })
+    .click();
+  await replace
+    .getByRole("button", { name: "Replace snapshot", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Remove board snapshot" }).click();
+  const remove = page.getByRole("alertdialog", {
+    name: "Remove board snapshot?",
+  });
+  await remove.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.locator(".attachment-chip")).toBeVisible();
+  await page.getByRole("button", { name: "Remove board snapshot" }).click();
+  await remove
+    .getByRole("button", { name: "Remove snapshot", exact: true })
+    .click();
+  await expect(page.locator(".attachment-chip")).toHaveCount(0);
+});
+
+test("confirmation modals guard file removal, replacement and changing reviewed material", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await page.goto("/");
+  const fileInput = page.locator("#material-file");
+  const first = {
+    name: "first.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from(notes),
+  };
+  const second = {
+    name: "second.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from(notes),
+  };
+  await fileInput.setInputFiles(first);
+  await expect(page.getByText("first.txt", { exact: true })).toBeVisible();
+  await fileInput.setInputFiles(second);
+  const replace = page.getByRole("alertdialog", {
+    name: "Replace selected file?",
+  });
+  await replace.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByText("first.txt", { exact: true })).toBeVisible();
+  await fileInput.setInputFiles(second);
+  await replace
+    .getByRole("button", { name: "Replace file", exact: true })
+    .click();
+  await expect(page.getByText("second.txt", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Choose another file" }).click();
+  const remove = page.getByRole("alertdialog", {
+    name: "Remove selected file?",
+  });
+  await remove.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByText("second.txt", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Choose another file" }).click();
+  await remove
+    .getByRole("button", { name: "Remove file", exact: true })
+    .click();
+  await expect(page.getByText("second.txt", { exact: true })).toHaveCount(0);
+  await fileInput.setInputFiles(first);
+  await page.getByRole("button", { name: "Paste notes" }).click();
+  await page.getByLabel("Your learning notes").fill(notes);
+  await page
+    .getByLabel("What would you like to focus on?")
+    .fill("CNN weight sharing");
+  await page.getByRole("button", { name: "Prepare my lesson" }).click();
+  await page.getByRole("button", { name: "Change material" }).click();
+  const change = page.getByRole("alertdialog", { name: "Change material?" });
+  await change.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Does this look right?" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Change material" }).click();
+  await change
+    .getByRole("button", { name: "Change material", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "What are we learning?" }),
+  ).toBeVisible();
+});
+
+test("confirmation modals guard unsent explanations during a session transition", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await page.goto(`/session/${sessionId}`);
+  const draft = page.getByLabel("Your explanation to Milo");
+  await draft.fill("I want to keep this unsent explanation.");
+  await page.getByRole("button", { name: "End session", exact: true }).click();
+  const wrapUp = page.getByRole("dialog", { name: "Ready to wrap up?" });
+  await wrapUp
+    .getByRole("button", { name: "Try the independent check" })
+    .click();
+  const discard = page.getByRole("alertdialog", {
+    name: "Discard unsent explanation?",
+  });
+  await discard.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(wrapUp).toBeVisible();
+  await wrapUp
+    .getByRole("button", { name: "Keep teaching", exact: true })
+    .click();
+  await expect(draft).toHaveValue("I want to keep this unsent explanation.");
+  await page.getByRole("button", { name: "End session", exact: true }).click();
+  await wrapUp
+    .getByRole("button", { name: "Try the independent check" })
+    .click();
+  await discard
+    .getByRole("button", { name: "Discard and continue", exact: true })
+    .click();
+  await expect(page.getByLabel("Explain your thinking")).toBeVisible();
+});
+
+for (const phase of ["teaching", "transfer"] as const) {
+  test(`fetching retains report pagination after completing ${phase}`, async ({
+    page,
+  }) => {
+    const state = await completedSessionFixture(page);
+    const message = (sequence: number) => ({
+      id: `transition-${sequence}`,
+      role: sequence % 2 ? "learner" : "student",
+      text: `Transition explanation ${sequence}`,
+      sequence,
+      createdAt: new Date().toISOString(),
+      kind: "teaching",
+    });
+    const completed = {
+      ...state,
+      revision: 2,
+      nextCursor: 31,
+      messages: Array.from({ length: 30 }, (_, index) => message(index + 31)),
+    };
+    state.phase = phase;
+    state.messages =
+      phase === "transfer"
+        ? []
+        : Array.from({ length: 30 }, (_, index) => message(index + 30));
+    state.nextCursor = phase === "transfer" ? undefined : 30;
+    state.transferQuestion = "Explain a fresh example.";
+    state.numericalCheck = false;
+    await page.route(
+      `**/api/sessions/${sessionId}/${phase === "transfer" ? "transfer" : "actions"}`,
+      (route) => route.fulfill({ json: completed }),
+    );
+    let cursor: string | null = null;
+    await page.route(
+      `**/api/sessions/${sessionId}/messages?before=*`,
+      (route) => {
+        cursor = new URL(route.request().url()).searchParams.get("before");
+        return route.fulfill({ json: { messages: [message(30)] } });
+      },
+    );
+    await page.goto(
+      `/session/${sessionId}${phase === "transfer" ? "/transfer" : ""}`,
+    );
+    if (phase === "transfer") {
+      await page
+        .getByLabel("Explain your thinking")
+        .fill("The same weights are reused.");
+      await page
+        .getByRole("button", { name: "See my learning report" })
+        .click();
+    } else {
+      await page
+        .getByRole("button", { name: "End session", exact: true })
+        .click();
+      await page
+        .getByRole("button", { name: "End and see my feedback" })
+        .click();
+    }
+    await page.getByRole("tab", { name: "Chat", exact: true }).click();
+    await page.getByRole("button", { name: "Load earlier messages" }).click();
+    await expect(
+      page.getByText("Transition explanation 30", { exact: true }),
+    ).toBeVisible();
+    expect(cursor).toBe("31");
+  });
+}
+
+test("fetching waits for auth and shares initial session reads", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/auth/me" || path === `/api/sessions/${sessionId}`)
+      requests.push(path);
+  });
+  await page.goto(`/session/${sessionId}`);
+  await expect(
+    page.getByRole("heading", { name: "Milo’s classroom" }),
+  ).toBeVisible();
+  expect(requests.filter((path) => path === "/api/auth/me")).toHaveLength(1);
+  expect(
+    requests.filter((path) => path === `/api/sessions/${sessionId}`),
+  ).toHaveLength(1);
+});
+
+test("fetching polls revisions without overlapping and applies a fresh completed operation", async ({
+  page,
+}) => {
+  await page.clock.install();
+  const { state } = await fixtures(page);
+  state.revision = 3;
+  state.pending = true;
+  let polls = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    `**/api/sessions/${sessionId}?sinceRevision=*`,
+    async (route) => {
+      expect(
+        new URL(route.request().url()).searchParams.get("sinceRevision"),
+      ).toBe("3");
+      polls++;
+      if (polls === 1) {
+        await gate;
+        return route.fulfill({
+          json: { unchanged: true, revision: 3, pending: true },
+        });
+      }
+      return route.fulfill({ json: state });
+    },
+  );
+  await page.goto(`/session/${sessionId}`);
+  await expect(
+    page.getByRole("heading", { name: "Milo’s classroom" }),
+  ).toBeVisible();
+  await page.clock.fastForward(4000);
+  await expect.poll(() => polls).toBe(1);
+  await page.clock.fastForward(8000);
+  expect(polls).toBe(1);
+  const response = page.waitForResponse((response) =>
+    new URL(response.url()).searchParams.has("sinceRevision"),
+  );
+  release();
+  await response;
+  await page.clock.runFor(100);
+  state.pending = false;
+  state.revision = 4;
+  state.messages.push({
+    id: "new-reply",
+    role: "student",
+    text: "The background operation finished with a new reply.",
+    sequence: 1,
+    createdAt: new Date().toISOString(),
+    kind: "teaching",
+  });
+  await page.clock.fastForward(4000);
+  await expect(
+    page
+      .getByRole("region", { name: "Teaching messages" })
+      .getByText("The background operation finished with a new reply.", {
+        exact: true,
+      }),
+  ).toBeVisible();
+  expect(polls).toBe(2);
+  await page.clock.fastForward(12000);
+  expect(polls).toBe(2);
+});
+
+test("fetching pauses pending session polls while hidden", async ({ page }) => {
+  await page.clock.install();
+  const { state } = await fixtures(page);
+  state.pending = true;
+  let polls = 0;
+  await page.route(`**/api/sessions/${sessionId}?sinceRevision=*`, (route) => {
+    polls++;
+    return route.fulfill({
+      json: { unchanged: true, revision: 0, pending: true },
+    });
+  });
+  await page.goto(`/session/${sessionId}`);
+  await expect(
+    page.getByRole("heading", { name: "Milo’s classroom" }),
+  ).toBeVisible();
+  await page.evaluate(() => {
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      get: () => true,
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await page.clock.fastForward(12000);
+  expect(polls).toBe(0);
+  await page.evaluate(() => {
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      get: () => false,
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await expect.poll(() => polls).toBe(1);
+});
+
+test("fetching cannot replace a new login with a delayed old auth response", async ({
+  page,
+}) => {
+  await fixtures(page);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/auth/me", async (route) => {
+    await gate;
+    await route.fulfill({ json: { user: null } });
+  });
+  await page.route("**/api/auth/login", (route) =>
+    route.fulfill({
+      json: {
+        user: { id: "new-owner", name: "New owner", email: "new@example.test" },
+      },
+    }),
+  );
+  await page.goto("/?authError=Please%20sign%20in");
+  const dialog = page.getByRole("dialog", { name: "Sign In to TeachBack" });
+  await dialog.getByLabel("Email Address").fill("new@example.test");
+  await dialog.getByLabel("Password", { exact: true }).fill("valid-password");
+  await dialog
+    .locator("form")
+    .getByRole("button", { name: "Sign In", exact: true })
+    .click();
+  await expect(page.locator(".user-display-name")).toHaveText("New owner");
+  await dialog.getByRole("button", { name: "Close dialog" }).click();
+  release();
+  await page.getByRole("button", { name: "How it works" }).click();
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  await expect(page.locator(".user-display-name")).toHaveText("New owner");
 });

@@ -15,8 +15,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Learned Workspace Facts
 
-- TeachBack AI is a Next.js MVP: Firestore persistence, Gemini for OCR/lessons/chat, session phases through report; auth is email/password with optional Google OAuth (`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, not in `cloudbuild.yaml` by default).
-- Production app deploy is Cloud Build / Cloud Run only (`cloudbuild.yaml`: image, env, Secret Manager `teachback-gemini-key` and `teachback-rate-limit-secret`, `_APP_ORIGIN`, `_GEMINI_MODEL`); `firebase.json` has no Hosting—use `pnpm exec firebase deploy --only firestore:indexes` (and `firestore:rules` if changed) for Firestore config; wait for new composite indexes before paginated session history in prod.
+- TeachBack AI is a Next.js MVP: Firestore persistence, Gemini for OCR/lessons/chat, session phases through report; auth is email/password with optional Google OAuth (`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` in `.env.local` locally).
+- Production app deploy is Cloud Build / Cloud Run only (`cloudbuild.yaml`: image, env, Secret Manager `teachback-gemini-key`, `teachback-rate-limit-secret`, `teachback-google-client-id`, `teachback-google-client-secret`, `_APP_ORIGIN`, `_GEMINI_MODEL`); `firebase.json` has no Hosting—use `pnpm exec firebase deploy --only firestore:indexes` (and `firestore:rules` if changed) for Firestore config; wait for new composite indexes before paginated session history in prod.
 - Workspace path includes a trailing space (`TeachBack AI `); quote paths in shell commands.
 - Local dev expects JDK 21+, Firestore emulator (`pnpm emulators` on 127.0.0.1:8080), and `pnpm dev` in a second terminal; `node scripts/doctor.mjs` checks setup.
 - Match browser origin to `APP_ORIGIN` in `.env.local` (typically `http://127.0.0.1:3000`, not `localhost`); Google OAuth redirect URI is `{APP_ORIGIN}/api/auth/google/callback` with the same origin authorized on the Web client.

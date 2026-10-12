@@ -1,15 +1,16 @@
 "use client";
 
-import { History, LogIn, LogOut } from "lucide-react";
+import { History, LogIn } from "lucide-react";
 import { Brand } from "./brand";
 import { useAuth } from "./auth-context";
+import { UserProfileMenu } from "./user-profile-menu";
 
 export function NavHeader({
   extraActions,
 }: {
   extraActions?: React.ReactNode;
 }) {
-  const { user, loading, openAuthModal, openSessionModal, logout } = useAuth();
+  const { user, loading, openAuthModal, openSessionModal } = useAuth();
 
   return (
     <header className="site-header">
@@ -18,50 +19,23 @@ export function NavHeader({
 
         <nav className="header-actions" aria-label="Main">
           {extraActions}
-          <button
-            type="button"
-            className="header-nav-button"
-            onClick={openSessionModal}
-            title="View saved learning sessions"
-            aria-label="My Sessions"
-          >
-            <History size={16} />
-            <span className="button-text">My Sessions</span>
-          </button>
+          {user && (
+            <button
+              type="button"
+              className="header-nav-button"
+              onClick={openSessionModal}
+              title="View saved learning sessions"
+              aria-label="My Sessions"
+            >
+              <History size={16} />
+              <span className="button-text">My Sessions</span>
+            </button>
+          )}
 
           {!loading && (
             <>
               {user ? (
-                <div className="user-profile-menu">
-                  <div className="user-info-badge" title={user.email}>
-                    {user.avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={user.avatarUrl}
-                        alt={user.name}
-                        className="user-avatar-image"
-                        width={26}
-                        height={26}
-                      />
-                    ) : (
-                      <span className="user-avatar-fallback">
-                        {user.name.charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                    <span className="user-display-name">{user.name}</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="header-logout-button"
-                    onClick={logout}
-                    title="Log out"
-                    aria-label="Log out"
-                  >
-                    <LogOut size={16} />
-                    <span className="logout-text">Sign Out</span>
-                  </button>
-                </div>
+                <UserProfileMenu user={user} />
               ) : (
                 <button
                   type="button"

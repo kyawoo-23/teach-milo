@@ -28,6 +28,7 @@ for (const collection of [
       .collection(collection)
       .where("expiresAt", "<=", Timestamp.now())
       .limit(100)
+      .select()
       .get();
     if (batch.empty) break;
     for (const doc of batch.docs) {

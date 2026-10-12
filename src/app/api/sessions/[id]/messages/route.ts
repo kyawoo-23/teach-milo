@@ -2,7 +2,7 @@ import { Id, Message, Session } from "@/lib/contracts";
 import { AppError } from "@/lib/errors";
 import { database, decode, readOwned } from "@/server/db";
 import { requireUserId, respond, route } from "@/server/http";
-import { readMessages } from "@/server/sessions";
+import { readMessagePage } from "@/server/sessions";
 export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> },
@@ -10,7 +10,9 @@ export async function GET(
   return route(async () => {
     const owner = await requireUserId();
     const id = Id.parse((await context.params).id);
-    const session = await readOwned<Session>("sessions", id, owner);
+    const session = await readOwned<
+      Pick<Session, "ownerId" | "expiresAt" | "phase">
+    >("sessions", id, owner, ["phase"]);
     if (session.phase === "transfer")
       throw new AppError(
         "ASSESSMENT_ACTIVE",
@@ -39,10 +41,6 @@ export async function GET(
       : undefined;
     if (before !== undefined && (!Number.isSafeInteger(before) || before < 0))
       throw new AppError("INVALID_CURSOR", "Invalid message cursor.");
-    const messages = await readMessages(id, 30, before);
-    return respond({
-      messages,
-      nextCursor: messages.length === 30 ? messages[0].sequence : undefined,
-    });
+    return respond(await readMessagePage(id, before));
   });
 }

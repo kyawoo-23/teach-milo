@@ -1,4 +1,5 @@
 "use client";
+import { useConfirmation } from "./confirmation";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -18,7 +19,7 @@ import { LessonPublic, SessionPublic, Source } from "@/lib/contracts";
 import { useAuth } from "./auth-context";
 import { MarkdownEditor } from "./markdown-editor";
 import { clearDraft, saveDraft, takeDraft } from "./material-draft";
-import { Milo } from "./milo";
+import { Milo, MiloMotionToggle } from "./milo";
 import { NavHeader } from "./nav-header";
 import {
   api,
@@ -31,6 +32,7 @@ import {
 
 type MaterialResult = { id: string; name: string; sources: Source[] };
 export function Onboarding() {
+  const confirm = useConfirmation();
   const router = useRouter();
   const getOperation = useOperationId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -52,11 +54,25 @@ export function Onboarding() {
   const [dragging, setDragging] = useState(false);
   const [missing, setMissing] = useState<string[]>([]);
   const { user, loading, authModalOpen, openAuthModal } = useAuth();
+  const mounted = useRef(true);
+  const currentOwner = useRef(user?.id);
+  currentOwner.current = user?.id;
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    busyRef.current = false;
+    setBusy("");
+  }, [user?.id]);
+
   // Set when the learner submitted material while signed out; the submission resumes after sign-in.
   const [resume, setResume] = useState(false);
   useEffect(() => {
     takeDraft().then((saved) => {
-      if (!saved) return;
+      if (!saved || !mounted.current) return;
       setMode(saved.draft.mode);
       setNotes(saved.draft.notes);
       setTopic(saved.draft.topic);
@@ -80,31 +96,44 @@ export function Onboarding() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resume, user, loading, authModalOpen]);
   useEffect(() => {
-    api<{ missing: string[] }>("/api/status")
+    const controller = new AbortController();
+    api<{ missing: string[] }>("/api/status", undefined, "GET", {
+      signal: controller.signal,
+      priority: "low",
+    })
       .then((r) => setMissing(r.missing))
       .catch(() => {});
+    return () => controller.abort();
   }, []);
   useEffect(() => {
     if (step !== "material")
       document.querySelector<HTMLElement>(".flow-heading")?.focus();
   }, [step]);
-  async function run(label: string, action: () => Promise<void>) {
+  async function run(
+    label: string,
+    action: (isCurrent: () => boolean) => Promise<void>,
+  ) {
     if (busyRef.current) return;
+    const owner = currentOwner.current;
+    const isCurrent = () => mounted.current && owner === currentOwner.current;
     busyRef.current = true;
     setBusy(label);
     setError("");
     try {
-      await action();
+      await action(isCurrent);
     } catch (e) {
+      if (!isCurrent()) return;
       if (e instanceof ApiError && e.code === "AUTH_REQUIRED")
         openAuthModal("login");
       setError(e instanceof Error ? e.message : "Please try again.");
     } finally {
-      setBusy("");
-      busyRef.current = false;
+      if (isCurrent()) {
+        setBusy("");
+        busyRef.current = false;
+      }
     }
   }
-  function chooseFile(chosen?: File) {
+  async function chooseFile(chosen?: File) {
     if (!chosen) return;
     if (!/\.(pdf|docx|txt)$/i.test(chosen.name)) {
       setError("Choose a PDF, DOCX, or TXT file.");
@@ -112,6 +141,19 @@ export function Onboarding() {
     }
     if (chosen.size > 10 * 1024 * 1024) {
       setError("Choose a file smaller than 10 MB.");
+      return;
+    }
+    if (
+      file &&
+      !(await confirm({
+        title: "Replace selected file?",
+        description:
+          "The current file will be removed from your lesson preparation.",
+        confirmLabel: "Replace file",
+        destructive: true,
+      }))
+    ) {
+      if (inputRef.current) inputRef.current.value = "";
       return;
     }
     setFile(chosen);
@@ -138,7 +180,7 @@ export function Onboarding() {
       mode === "upload" && file?.name.toLowerCase().endsWith(".pdf")
         ? "Reading your pages, including scanned content…"
         : "Reading your learning material…",
-      async () => {
+      async (isCurrent) => {
         let result: MaterialResult;
         if (mode === "upload") {
           if (!file) throw new Error("Choose a learning document first.");
@@ -157,6 +199,7 @@ export function Onboarding() {
             name: "Pasted notes",
             operationId: getOperation(`paste:${notes}`),
           });
+        if (!isCurrent()) return;
         setMaterial(result);
         setSources(result.sources);
         setStep("review");
@@ -164,23 +207,27 @@ export function Onboarding() {
     );
   }
   async function prepare() {
-    await run("Finding a focused lesson in your material…", async () => {
-      const payload = { materialId: material!.id, topic, level, sources };
-      const result = await api<LessonPublic>("/api/lessons", {
-        ...payload,
-        operationId: getOperation(JSON.stringify(payload)),
-      });
-      setLesson(result);
-      setStep("lesson");
-    });
+    await run(
+      "Finding a focused lesson in your material…",
+      async (isCurrent) => {
+        const payload = { materialId: material!.id, topic, level, sources };
+        const result = await api<LessonPublic>("/api/lessons", {
+          ...payload,
+          operationId: getOperation(JSON.stringify(payload)),
+        });
+        if (!isCurrent()) return;
+        setLesson(result);
+        setStep("lesson");
+      },
+    );
   }
   async function start() {
-    await run("Milo is getting ready to learn…", async () => {
+    await run("Milo is getting ready to learn…", async (isCurrent) => {
       const result = await api<SessionPublic>("/api/sessions", {
         lessonId: lesson!.id,
         operationId: getOperation(`start:${lesson!.id}`),
       });
-      router.push(`/session/${result.id}`);
+      if (isCurrent()) router.push(`/session/${result.id}`);
     });
   }
   return (
@@ -216,7 +263,11 @@ export function Onboarding() {
               <div className="milo-introduction">
                 <div className="milo-orbit">
                   <span className="orbit-star star-one">✦</span>
-                  <Milo size={112} />
+                  <Milo
+                    size={112}
+                    state={busy ? "thinking" : "greeting"}
+                    interactive
+                  />
                   <span className="orbit-star star-two">✧</span>
                 </div>
                 <div className="intro-speech">
@@ -311,7 +362,17 @@ export function Onboarding() {
                         <button
                           type="button"
                           className="text-button"
-                          onClick={() => {
+                          onClick={async () => {
+                            if (
+                              !(await confirm({
+                                title: "Remove selected file?",
+                                description:
+                                  "You’ll need to choose a file again before preparing your lesson.",
+                                confirmLabel: "Remove file",
+                                destructive: true,
+                              }))
+                            )
+                              return;
                             setFile(null);
                             if (inputRef.current) inputRef.current.value = "";
                           }}
@@ -425,7 +486,18 @@ export function Onboarding() {
             <button
               className="quiet-button back-button"
               disabled={!!busy}
-              onClick={() => {
+              onClick={async () => {
+                if (
+                  step === "review" &&
+                  !(await confirm({
+                    title: "Change material?",
+                    description:
+                      "Reading new material will replace your reviewed text and lesson preparation.",
+                    confirmLabel: "Change material",
+                    destructive: true,
+                  }))
+                )
+                  return;
                 setError("");
                 setStep(step === "lesson" ? "review" : "material");
               }}
@@ -514,8 +586,13 @@ export function Onboarding() {
               lesson && (
                 <>
                   <div className="lesson-milo">
-                    <Milo size={80} />
+                    <Milo
+                      size={80}
+                      state={busy ? "thinking" : "idle"}
+                      interactive
+                    />
                     <span>I’d love to learn about this.</span>
+                    <MiloMotionToggle />
                   </div>
                   <h1 className="flow-heading" tabIndex={-1}>
                     {lesson.title}

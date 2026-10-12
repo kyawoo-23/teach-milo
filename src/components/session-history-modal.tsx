@@ -1,4 +1,5 @@
 "use client";
+import { useConfirmation } from "./confirmation";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -27,6 +28,7 @@ const PHASE_LABELS: Record<string, { label: string; badgeClass: string }> = {
 };
 
 export function SessionHistoryModal() {
+  const confirm = useConfirmation();
   const { sessionModalOpen, closeSessionModal, user, openAuthModal } =
     useAuth();
   const router = useRouter();
@@ -37,7 +39,11 @@ export function SessionHistoryModal() {
   const [nextCursor, setNextCursor] = useState<string>();
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const requests = useRef({ generation: 0, pending: false });
+  const requests = useRef<{
+    generation: number;
+    pending: boolean;
+    controller?: AbortController;
+  }>({ generation: 0, pending: false });
   const deletedIds = useRef(new Set<string>());
   const retryCursor = useRef<string | undefined>(undefined);
 
@@ -45,6 +51,8 @@ export function SessionHistoryModal() {
     if (requests.current.pending) return;
     const generation = requests.current.generation;
     requests.current.pending = true;
+    const controller = new AbortController();
+    requests.current.controller = controller;
     retryCursor.current = cursor;
     setLoading(!cursor);
     setLoadingMore(!!cursor);
@@ -56,6 +64,7 @@ export function SessionHistoryModal() {
           : "/api/sessions",
         undefined,
         "GET",
+        { signal: controller.signal },
       );
       if (requests.current.generation !== generation) return;
       setSessions((previous) =>
@@ -84,6 +93,7 @@ export function SessionHistoryModal() {
 
   const userId = user?.id;
   useEffect(() => {
+    requests.current.controller?.abort();
     requests.current = {
       generation: requests.current.generation + 1,
       pending: false,
@@ -98,6 +108,7 @@ export function SessionHistoryModal() {
     deletedIds.current.clear();
     if (sessionModalOpen && userId) void loadSessions();
     return () => {
+      requests.current.controller?.abort();
       requests.current = {
         generation: requests.current.generation + 1,
         pending: false,
@@ -107,9 +118,19 @@ export function SessionHistoryModal() {
 
   async function handleDelete(id: string, e: React.MouseEvent) {
     e.stopPropagation();
-    if (!window.confirm("Are you sure you want to delete this session?"))
-      return;
     const generation = requests.current.generation;
+    if (
+      !(await confirm({
+        title: "Delete this session?",
+        description:
+          "Its conversation, board submissions, and report will be permanently removed.",
+        confirmLabel: "Delete session",
+        cancelLabel: "Keep session",
+        destructive: true,
+      })) ||
+      requests.current.generation !== generation
+    )
+      return;
     setDeletingId(id);
     try {
       await api(`/api/sessions/${id}`, {}, "DELETE");
@@ -128,7 +149,7 @@ export function SessionHistoryModal() {
 
   return (
     <Modal
-      open={sessionModalOpen}
+      open={sessionModalOpen && !!user}
       onClose={closeSessionModal}
       title="My Learning Sessions"
     >
