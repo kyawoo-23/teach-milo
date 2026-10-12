@@ -533,6 +533,10 @@ test("understood celebration offers the independent check, a close, or a return 
   await page.evaluate(() => sessionStorage.clear());
   await page.reload();
   await dialog.getByRole("button", { name: "Close session" }).click();
+  await page
+    .getByRole("dialog", { name: "Ready to wrap up?" })
+    .getByRole("button", { name: "End and see my feedback" })
+    .click();
   await expect(
     page.getByRole("heading", {
       name: "How did your teaching go?",
@@ -1135,7 +1139,7 @@ test("Milo follows typing, thinking, failed turns and new replies without reacti
   await page.getByRole("button", { name: "Send explanation" }).click();
   await expect(milo).toHaveAttribute("data-milo-state", "thinking");
   await expect(
-    page.getByRole("button", { name: "Say hello to Milo" }),
+    page.locator(".conversation-heading .milo-greet"),
   ).toHaveAttribute("aria-disabled", "true");
   await expect.poll(() => Boolean(release)).toBe(true);
   release!();
@@ -1265,6 +1269,10 @@ test("Milo celebrates each dialog opening and thanks the learner on the report",
   await page.reload();
   await expect(milo).toHaveAttribute("data-milo-state", "celebration");
   await dialog.getByRole("button", { name: "Close session" }).click();
+  await page
+    .getByRole("dialog", { name: "Ready to wrap up?" })
+    .getByRole("button", { name: "End and see my feedback" })
+    .click();
   await expect(page.locator(".report-milo .milo")).toHaveAttribute(
     "data-milo-state",
     "reply",
@@ -1600,7 +1608,9 @@ test("mobile classroom details expand with keyboard and give space back to chat"
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
   await expect(objectives).toBeVisible();
   await expect(page.locator("#classroom-introduction")).toBeVisible();
-  expect((await thread.boundingBox())!.height).toBeLessThan(collapsed - 40);
+  await expect
+    .poll(async () => (await thread.boundingBox())!.height)
+    .toBeLessThan(collapsed - 40);
   await page.keyboard.press("Space");
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await expect
@@ -1653,7 +1663,7 @@ test("confirmation modals cancel safely, restore focus, and confirm sign out", a
     name: "Open account menu",
     exact: true,
   });
-  const signOut = page.getByRole("button", { name: "Log out", exact: true });
+  const signOut = page.getByRole("menuitem", { name: "Log out", exact: true });
   const openSignOut = async () => {
     if (!(await signOut.isVisible())) await accountMenu.click();
   };

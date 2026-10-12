@@ -1,4 +1,6 @@
 "use client";
+
+import { useI18n } from "@/components/locale-context";
 import { useConfirmation } from "./confirmation";
 import Link from "next/link";
 import { notFound, usePathname, useRouter } from "next/navigation";
@@ -26,6 +28,8 @@ import {
   SessionUpdate,
 } from "@/lib/contracts";
 import { useAuth } from "./auth-context";
+import { lessonLanguage } from "@/lib/i18n/locales";
+import { LanguageSelector } from "./language-selector";
 import { Brand } from "./brand";
 import { UserProfileMenu } from "./user-profile-menu";
 import { Milo } from "./milo";
@@ -43,6 +47,8 @@ import {
 } from "./ui";
 
 export function SessionExperience({ id }: { id: string }) {
+  const { t } = useI18n();
+
   const confirm = useConfirmation();
   const router = useRouter();
   const pathname = usePathname();
@@ -56,7 +62,7 @@ export function SessionExperience({ id }: { id: string }) {
   const getOperation = useOperationId(id);
   const busyRef = useRef(false);
   const [session, setSession] = useState<SessionPublic | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | Error>("");
   const [busy, setBusy] = useState(false);
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
@@ -73,9 +79,7 @@ export function SessionExperience({ id }: { id: string }) {
   const [boardOpen, setBoardOpen] = useState(false);
   const [classroomDetailsOpen, setClassroomDetailsOpen] = useState(false);
   useEffect(() => {
-    const mq = window.matchMedia(
-      "(max-width: 960px), (max-height: 860px)",
-    );
+    const mq = window.matchMedia("(max-width: 960px), (max-height: 860px)");
     const sync = () => {
       setClassroomDetailsOpen(!mq.matches);
     };
@@ -186,9 +190,7 @@ export function SessionExperience({ id }: { id: string }) {
             setSession(null);
             openAuthModal("login");
           }
-          setError(
-            e instanceof Error ? e.message : "Couldn't open this session.",
-          );
+          setError(e instanceof Error ? e : "Couldn't open this session.");
           return false;
         } finally {
           if (request.current?.controller === controller)
@@ -379,7 +381,7 @@ export function SessionExperience({ id }: { id: string }) {
     } catch (e) {
       if (generation.current !== currentGeneration) return null;
       if (e instanceof ApiError && e.code === "STALE_SESSION") await load();
-      setError(e instanceof Error ? e.message : "Please try again.");
+      setError(e instanceof Error ? e : "Please try again.");
       return false;
     } finally {
       if (generation.current === currentGeneration) {
@@ -489,35 +491,38 @@ export function SessionExperience({ id }: { id: string }) {
         <div className="session-header-inner">
           <Brand />
           <div className="session-topic">
-            {session?.lesson.title || "Your classroom"}
+            {session?.lesson.title || t("Your classroom")}
             <span>
               {session?.phase === "transfer"
-                ? "Independent check"
+                ? t("Independent check")
                 : session?.phase === "report"
-                  ? "Learning report"
-                  : "Learning by teaching"}
+                  ? t("Learning report")
+                  : t("Learning by teaching")}
             </span>
           </div>
-          <nav className="session-header-actions" aria-label="Session">
+          <nav className="session-header-actions" aria-label={t("Session")}>
+            <LanguageSelector />
             {isTeaching && (
               <button
                 className="quiet-button"
+                aria-label={t("End session")}
                 disabled={unavailable}
                 onClick={() => setEndOpen(true)}
               >
-                <Flag size={15} /> End session
+                <Flag size={15} />{" "}
+                <span className="session-end-label">{t("End session")}</span>
               </button>
             )}
             {user && (
               <button
                 type="button"
-                className="quiet-button"
+                className="quiet-button session-history-button"
                 onClick={openSessionModal}
-                title="My Sessions"
-                aria-label="My Sessions"
+                title={t("My Sessions")}
+                aria-label={t("My Sessions")}
               >
                 <History size={15} />
-                <span className="button-text">My Sessions</span>
+                <span className="button-text">{t("My Sessions")}</span>
               </button>
             )}
             {user ? (
@@ -529,7 +534,7 @@ export function SessionExperience({ id }: { id: string }) {
                 onClick={() => openAuthModal("login")}
               >
                 <LogIn size={14} />
-                <span>Sign In</span>
+                <span>{t("Sign In")}</span>
               </button>
             )}
           </nav>
@@ -541,13 +546,13 @@ export function SessionExperience({ id }: { id: string }) {
             <>
               <ErrorNotice message={error} onRetry={() => void load()} />
               <Link className="secondary-button" href="/">
-                Start a new lesson
+                {t("Start a new lesson")}
               </Link>
             </>
           ) : (
             <>
               <Milo size={96} thinking />
-              <Spinner label="Opening your classroom" />
+              <Spinner label={t("Opening your classroom")} />
             </>
           )}
         </main>
@@ -564,18 +569,24 @@ export function SessionExperience({ id }: { id: string }) {
               <ShieldCheck size={30} />
             </span>
             <span className="small-label">
-              A fresh example, in your own words
+              {t("A fresh example, in your own words")}
             </span>
             <h1>
-              One last challenge.
+              {t("One last challenge.")}
               <br />
-              On your own.
+              {t("On your own.")}
             </h1>
             <p className="section-description">
-              Put the idea to work in a new situation. Take your time—your
-              reasoning matters more than a perfect answer.
+              {t(
+                "Put the idea to work in a new situation. Take your time—your reasoning matters more than a perfect answer.",
+              )}
             </p>
-            <div className="transfer-question">{session.transferQuestion}</div>
+            <div
+              className="transfer-question"
+              lang={lessonLanguage(session.lesson.teachingLanguage)}
+            >
+              {session.transferQuestion}
+            </div>
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
@@ -596,7 +607,7 @@ export function SessionExperience({ id }: { id: string }) {
               {session.numericalCheck && (
                 <div className="number-fields">
                   <label>
-                    Parameters at 20 × 20
+                    {t("Parameters at 20 × 20")}
                     <input
                       className="text-input"
                       type="number"
@@ -609,7 +620,7 @@ export function SessionExperience({ id }: { id: string }) {
                     />
                   </label>
                   <label>
-                    Parameters at 40 × 40
+                    {t("Parameters at 40 × 40")}
                     <input
                       className="text-input"
                       type="number"
@@ -624,7 +635,7 @@ export function SessionExperience({ id }: { id: string }) {
                 </div>
               )}
               <label className="field-label" htmlFor="transfer-answer">
-                Explain your thinking
+                {t("Explain your thinking")}
               </label>
               <textarea
                 id="transfer-answer"
@@ -633,7 +644,7 @@ export function SessionExperience({ id }: { id: string }) {
                 value={answer}
                 onChange={(e) => setAnswer(e.target.value)}
                 required
-                placeholder="Here’s what I think happens, and why…"
+                placeholder={t("Here’s what I think happens, and why…")}
                 disabled={unavailable}
               />
               {error && <ErrorNotice message={error} />}
@@ -643,10 +654,10 @@ export function SessionExperience({ id }: { id: string }) {
                 type="submit"
               >
                 {unavailable ? (
-                  <Spinner label="Reflecting on your explanations" />
+                  <Spinner label={t("Reflecting on your explanations")} />
                 ) : (
                   <>
-                    See my learning report <ArrowRight size={18} />
+                    {t("See my learning report")} <ArrowRight size={18} />
                   </>
                 )}
               </button>
@@ -658,11 +669,12 @@ export function SessionExperience({ id }: { id: string }) {
                   void mutate("transfer", { answer: "", skip: true })
                 }
               >
-                Skip this check
+                {t("Skip this check")}
               </button>
               <p className="transfer-note">
-                Your teaching board and conversation are tucked away for this
-                independent check.
+                {t(
+                  "Your teaching board and conversation are tucked away for this independent check.",
+                )}
               </p>
             </form>
           </section>
@@ -671,13 +683,14 @@ export function SessionExperience({ id }: { id: string }) {
         <main tabIndex={-1} id="main" className="classroom">
           <section
             className="conversation-panel"
-            aria-label="Conversation with Milo"
+            aria-label={t("Conversation with Milo")}
             data-details-open={classroomDetailsOpen}
           >
             <div className="conversation-heading">
               <div
                 className="classroom-mascot"
                 aria-hidden={!classroomDetailsOpen}
+                inert={!classroomDetailsOpen}
               >
                 <Milo
                   size={48}
@@ -698,7 +711,7 @@ export function SessionExperience({ id }: { id: string }) {
                 <div className="classroom-heading-top">
                   <h1>
                     <span className="classroom-desktop-title">
-                      Milo’s classroom
+                      {t("Milo’s classroom")}
                     </span>
                     <button
                       type="button"
@@ -708,14 +721,14 @@ export function SessionExperience({ id }: { id: string }) {
                       onClick={() => setClassroomDetailsOpen((open) => !open)}
                     >
                       <span>
-                        Milo’s classroom
+                        {t("Milo’s classroom")}
                         <small aria-hidden="true">
                           {
                             session.progress.filter(
                               (p) => p.status === "supported",
                             ).length
                           }
-                          /{session.progress.length} objectives
+                          /{session.progress.length} {t("objectives")}
                         </small>
                       </span>
                       <ChevronDown size={18} aria-hidden="true" />
@@ -723,7 +736,7 @@ export function SessionExperience({ id }: { id: string }) {
                   </h1>
                   <button
                     className="icon-button mobile-board-button"
-                    aria-label="Open teaching board"
+                    aria-label={t("Open teaching board")}
                     onClick={() => {
                       setBoardOpen(true);
                       void api(`/api/sessions/${id}/events`, {
@@ -738,8 +751,8 @@ export function SessionExperience({ id }: { id: string }) {
                   id="classroom-introduction"
                   aria-hidden={!classroomDetailsOpen}
                 >
-                  <span className="status-dot" /> Curious student. You’re the
-                  teacher.
+                  <span className="status-dot" />{" "}
+                  {t("Curious student. You’re the teacher.")}
                 </p>
               </div>
             </div>
@@ -749,7 +762,7 @@ export function SessionExperience({ id }: { id: string }) {
               role="region"
               tabIndex={classroomDetailsOpen ? 0 : -1}
               aria-hidden={!classroomDetailsOpen}
-              aria-label="Learning objective progress"
+              aria-label={t("Learning objective progress")}
             >
               {session.progress.map((p, i) => (
                 <div
@@ -767,13 +780,13 @@ export function SessionExperience({ id }: { id: string }) {
             <div
               ref={messagesRef}
               className="messages"
-              aria-label="Teaching messages"
+              aria-label={t("Teaching messages")}
               role="region"
               tabIndex={0}
             >
               <div className="conversation-start">
                 <span>
-                  Every good explanation starts with a little curiosity.
+                  {t("Every good explanation starts with a little curiosity.")}
                 </span>
               </div>
               {session.nextCursor !== undefined && (
@@ -816,7 +829,7 @@ export function SessionExperience({ id }: { id: string }) {
                         !controller.signal.aborted &&
                         generation.current === currentGeneration
                       )
-                        setError((e as Error).message);
+                        setError(e instanceof Error ? e : "Please try again.");
                     } finally {
                       if (earlierRequest.current === controller)
                         earlierRequest.current = null;
@@ -826,14 +839,15 @@ export function SessionExperience({ id }: { id: string }) {
                   }}
                 >
                   {loadingEarlier ? (
-                    <Spinner label="Loading earlier messages…" />
+                    <Spinner label={t("Loading earlier messages…")} />
                   ) : (
-                    "Load earlier messages"
+                    t("Load earlier messages")
                   )}
                 </button>
               )}
               {messages.map((message) => (
                 <ConversationMessage
+                  teachingLanguage={session.lesson.teachingLanguage}
                   key={message.id}
                   message={message}
                   user={user}
@@ -846,7 +860,7 @@ export function SessionExperience({ id }: { id: string }) {
                     <span className="message-name">Milo</span>
                     <div
                       className="thinking-dots"
-                      aria-label="Milo is thinking"
+                      aria-label={t("Milo is thinking")}
                     >
                       <i />
                       <i />
@@ -859,10 +873,12 @@ export function SessionExperience({ id }: { id: string }) {
                 <div className="ready-card">
                   <div>
                     <CheckCircleIcon />
-                    <strong>The key ideas are connecting.</strong>
+                    <strong>{t("The key ideas are connecting.")}</strong>
                   </div>
                   <p>
-                    Try a new example independently, or keep exploring together.
+                    {t(
+                      "Try a new example independently, or keep exploring together.",
+                    )}
                   </p>
                   <div>
                     <button
@@ -870,14 +886,14 @@ export function SessionExperience({ id }: { id: string }) {
                       disabled={unavailable}
                       onClick={() => action("start_transfer")}
                     >
-                      Take the independent check <ArrowRight size={15} />
+                      {t("Take the independent check")} <ArrowRight size={15} />
                     </button>
                     <button
                       className="quiet-button"
                       disabled={unavailable}
                       onClick={() => action("continue")}
                     >
-                      Keep teaching
+                      {t("Keep teaching")}
                     </button>
                   </div>
                 </div>
@@ -885,7 +901,7 @@ export function SessionExperience({ id }: { id: string }) {
             </div>
             <div className="sr-status" role="status" aria-live="polite">
               {unavailable
-                ? "Milo is thinking."
+                ? t("Milo is thinking.")
                 : session.messages.at(-1)?.role === "student"
                   ? session.messages.at(-1)?.text
                   : ""}
@@ -904,10 +920,10 @@ export function SessionExperience({ id }: { id: string }) {
               <form className="composer" onSubmit={send}>
                 {board && (
                   <div className="attachment-chip">
-                    <Layers3 size={14} /> Board snapshot attached
+                    <Layers3 size={14} /> {t("Board snapshot attached")}
                     <button
                       type="button"
-                      aria-label="Remove board snapshot"
+                      aria-label={t("Remove board snapshot")}
                       onClick={async () => {
                         if (
                           await confirm({
@@ -926,7 +942,7 @@ export function SessionExperience({ id }: { id: string }) {
                   </div>
                 )}
                 <label className="visually-hidden" htmlFor="explanation">
-                  Your explanation to Milo
+                  {t("Your explanation to Milo")}
                 </label>
                 <textarea
                   ref={composer}
@@ -945,7 +961,7 @@ export function SessionExperience({ id }: { id: string }) {
                       2000,
                     );
                   }}
-                  placeholder="Explain it to Milo in your own words…"
+                  placeholder={t("Explain it to Milo in your own words…")}
                   onKeyDown={(e) => {
                     if (
                       e.key === "Enter" &&
@@ -965,29 +981,32 @@ export function SessionExperience({ id }: { id: string }) {
                     onClick={() => action("hint")}
                   >
                     <Lightbulb size={16} />
-                    {session.hintUsed ? "Hint used" : "I’m stuck"}
+                    {session.hintUsed ? t("Hint used") : t("I’m stuck")}
                   </button>
                   <span className="send-shortcut">
-                    ⌘ / Ctrl + Enter to send
+                    {t("⌘ / Ctrl + Enter to send")}
                   </span>
                   <button
                     className="send-button"
                     type="submit"
                     disabled={unavailable}
-                    aria-label="Send explanation"
+                    aria-label={t("Send explanation")}
                   >
                     <ArrowUp size={19} />
                   </button>
                 </div>
               </form>
               <p className="composer-footnote">
-                Your words matter. Examples and “because” are always welcome.
+                {t(
+                  "Your words matter. Examples and “because” are always welcome.",
+                )}
               </p>
             </div>
           </section>
           <aside className="board-sidebar">
             {session.board && (
               <TeachingBoard
+                teachingLanguage={session.lesson.teachingLanguage}
                 board={session.board}
                 onAttach={attach}
                 disabled={unavailable}
@@ -996,19 +1015,21 @@ export function SessionExperience({ id }: { id: string }) {
             <div className="teacher-note">
               <Lightbulb size={18} />
               <p>
-                <strong>A good teacher makes connections.</strong> Try
-                explaining what changes, why it changes, and what stays the
-                same.
+                <strong>{t("A good teacher makes connections.")}</strong>{" "}
+                {t(
+                  "Try explaining what changes, why it changes, and what stays the same.",
+                )}
               </p>
             </div>
           </aside>
           <Modal
             open={boardOpen}
             onClose={() => setBoardOpen(false)}
-            title="Your teaching board"
+            title={t("Your teaching board")}
           >
             {boardOpen && session.board && (
               <TeachingBoard
+                teachingLanguage={session.lesson.teachingLanguage}
                 board={session.board}
                 onAttach={attach}
                 disabled={unavailable}
@@ -1029,31 +1050,31 @@ export function SessionExperience({ id }: { id: string }) {
           <Modal
             open={endOpen}
             onClose={() => setEndOpen(false)}
-            title="Ready to wrap up?"
+            title={t("Ready to wrap up?")}
           >
             <p>
-              You can try the independent check now, or finish with feedback on
-              the explanations you’ve given. Skipped criteria will remain
-              unscored.
+              {t(
+                "You can try the independent check now, or finish with feedback on the explanations you’ve given. Skipped criteria will remain unscored.",
+              )}
             </p>
             <div className="modal-actions">
               <button
                 className="primary-button"
                 onClick={() => action("start_transfer")}
               >
-                Try the independent check
+                {t("Try the independent check")}
               </button>
               <button
                 className="secondary-button"
                 onClick={() => action("end")}
               >
-                End and see my feedback
+                {t("End and see my feedback")}
               </button>
               <button
                 className="quiet-button"
                 onClick={() => setEndOpen(false)}
               >
-                Keep teaching
+                {t("Keep teaching")}
               </button>
             </div>
           </Modal>
@@ -1073,11 +1094,13 @@ function UnderstoodCelebration({
 }: {
   open: boolean;
   busy: boolean;
-  error: string;
+  error: string | Error;
   onDismiss: () => void;
   onStartTransfer: () => void;
   onCloseSession: () => void;
 }) {
+  const { t } = useI18n();
+
   const ref = useRef<HTMLDialogElement>(null);
   const programmaticClose = useRef(false);
   const [pending, setPending] = useState<"transfer" | "end" | null>(null);
@@ -1153,10 +1176,11 @@ function UnderstoodCelebration({
         onClick={(event) => event.stopPropagation()}
       >
         {open && <Milo size={88} state="celebration" />}
-        <h2 id="understood-title">Milo understood.</h2>
+        <h2 id="understood-title">{t("Milo understood.")}</h2>
         <p>
-          Your explanation landed. Take the independent check, close this
-          session for feedback, or stay and keep talking with Milo.
+          {t(
+            "Your explanation landed. Take the independent check, close this session for feedback, or stay and keep talking with Milo.",
+          )}
         </p>
         {error && <ErrorNotice message={error} />}
         <div className="modal-actions">
@@ -1170,10 +1194,10 @@ function UnderstoodCelebration({
             }}
           >
             {pending === "transfer" ? (
-              <Spinner label="Starting the independent check" />
+              <Spinner label={t("Starting the independent check")} />
             ) : (
               <>
-                Take the independent check <ArrowRight size={15} />
+                {t("Take the independent check")} <ArrowRight size={15} />
               </>
             )}
           </button>
@@ -1187,9 +1211,9 @@ function UnderstoodCelebration({
             }}
           >
             {pending === "end" ? (
-              <Spinner label="Closing session" />
+              <Spinner label={t("Closing session")} />
             ) : (
-              "Close session"
+              t("Close session")
             )}
           </button>
           <button
@@ -1198,7 +1222,7 @@ function UnderstoodCelebration({
             disabled={busy}
             onClick={onDismiss}
           >
-            Keep chatting
+            {t("Keep chatting")}
           </button>
         </div>
       </div>

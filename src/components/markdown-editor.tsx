@@ -1,4 +1,8 @@
 "use client";
+
+import { localize } from "@/lib/i18n/messages";
+import type { Locale } from "@/lib/i18n/locales";
+import { useI18n } from "@/components/locale-context";
 import { useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -58,11 +62,12 @@ function applyFormat(
   start: number,
   end: number,
   kind: Format,
+  locale: Locale,
 ): { text: string; start: number; end: number } {
   const wrap = WRAP[kind];
   if (wrap) {
     const [open, close, placeholder] = wrap;
-    const inner = value.slice(start, end) || placeholder;
+    const inner = value.slice(start, end) || localize(locale, placeholder);
     return {
       text: value.slice(0, start) + open + inner + close + value.slice(end),
       start: start + open.length,
@@ -80,10 +85,11 @@ function applyFormat(
       end: lineStart + block.length,
     };
   }
+  const table = localize(locale, TABLE);
   return {
-    text: value.slice(0, end) + TABLE + value.slice(end),
+    text: value.slice(0, end) + table + value.slice(end),
     start: end + 1,
-    end: end + TABLE.length,
+    end: end + table.length,
   };
 }
 
@@ -116,6 +122,8 @@ export function MarkdownEditor({
   onChange: (value: string) => void;
   rows: number;
 }) {
+  const { t, text: localizeText, locale } = useI18n();
+
   const [tab, setTab] = useState<"write" | "preview">("write");
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -127,6 +135,7 @@ export function MarkdownEditor({
       area.selectionStart,
       area.selectionEnd,
       kind,
+      locale,
     );
     onChange(next.text);
     requestAnimationFrame(() => {
@@ -138,16 +147,16 @@ export function MarkdownEditor({
   return (
     <div className="md-editor">
       <div className="md-bar">
-        <div className="md-tabs" role="tablist" aria-label="Editor mode">
-          {(["write", "preview"] as const).map((t) => (
+        <div className="md-tabs" role="tablist" aria-label={t("Editor mode")}>
+          {(["write", "preview"] as const).map((tabId) => (
             <button
-              key={t}
+              key={tabId}
               type="button"
               role="tab"
-              id={`${id}-${t}-tab`}
-              aria-selected={tab === t}
-              aria-controls={`${id}-${t}-panel`}
-              tabIndex={tab === t ? 0 : -1}
+              id={`${id}-${tabId}-tab`}
+              aria-selected={tab === tabId}
+              aria-controls={`${id}-${tabId}-panel`}
+              tabIndex={tab === tabId ? 0 : -1}
               onKeyDown={(event) => {
                 if (
                   !["ArrowLeft", "ArrowRight", "Home", "End"].includes(
@@ -161,15 +170,15 @@ export function MarkdownEditor({
                     ? "write"
                     : event.key === "End"
                       ? "preview"
-                      : t === "write"
+                      : tabId === "write"
                         ? "preview"
                         : "write";
                 setTab(next);
                 document.getElementById(`${id}-${next}-tab`)?.focus();
               }}
-              onClick={() => setTab(t)}
+              onClick={() => setTab(tabId)}
             >
-              {t === "write" ? "Write" : "Preview"}
+              {tabId === "write" ? t("Write") : t("Preview")}
             </button>
           ))}
         </div>
@@ -177,15 +186,15 @@ export function MarkdownEditor({
           <div
             className="md-toolbar"
             role="group"
-            aria-label="Markdown formatting"
+            aria-label={t("Markdown formatting")}
           >
             {TOOLS.map(({ kind, label, icon: Icon }) => (
               <button
                 key={kind}
                 type="button"
                 className="icon-button"
-                aria-label={label}
-                title={label}
+                aria-label={localizeText(label)}
+                title={localizeText(label)}
                 onClick={() => format(kind)}
               >
                 <Icon size={15} />
@@ -228,7 +237,7 @@ export function MarkdownEditor({
               {normaliseMath(value)}
             </ReactMarkdown>
           ) : (
-            <p className="muted">Nothing to preview.</p>
+            <p className="muted">{t("Nothing to preview.")}</p>
           )}
         </div>
       )}

@@ -1,4 +1,7 @@
 "use client";
+
+import { formatDate } from "@/lib/i18n/locales";
+import { useI18n } from "@/components/locale-context";
 import { useConfirmation } from "./confirmation";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -28,6 +31,8 @@ const PHASE_LABELS: Record<string, { label: string; badgeClass: string }> = {
 };
 
 export function SessionHistoryModal() {
+  const { t, text: localizeText, locale } = useI18n();
+
   const confirm = useConfirmation();
   const { sessionModalOpen, closeSessionModal, user, openAuthModal } =
     useAuth();
@@ -37,7 +42,7 @@ export function SessionHistoryModal() {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string>();
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | Error>("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const requests = useRef<{
     generation: number;
@@ -81,7 +86,7 @@ export function SessionHistoryModal() {
       setNextCursor(res.nextCursor);
     } catch (err) {
       if (requests.current.generation !== generation) return;
-      setError(err instanceof Error ? err.message : "Failed to load sessions.");
+      setError(err instanceof Error ? err : "Failed to load sessions.");
     } finally {
       if (requests.current.generation === generation) {
         requests.current.pending = false;
@@ -139,9 +144,7 @@ export function SessionHistoryModal() {
       setSessions((prev) => prev.filter((s) => s.id !== id));
     } catch (err) {
       if (requests.current.generation !== generation) return;
-      setError(
-        err instanceof Error ? err.message : "Failed to delete session.",
-      );
+      setError(err instanceof Error ? err : "Failed to delete session.");
     } finally {
       if (requests.current.generation === generation) setDeletingId(null);
     }
@@ -151,16 +154,17 @@ export function SessionHistoryModal() {
     <Modal
       open={sessionModalOpen && !!user}
       onClose={closeSessionModal}
-      title="My Learning Sessions"
+      title={t("My Learning Sessions")}
     >
       <div className="session-history-content">
         {!user ? (
           <div className="signin-history-banner">
             <div>
-              <strong>Sign in to see your sessions.</strong>
+              <strong>{t("Sign in to see your sessions.")}</strong>
               <p>
-                Your learning sessions are saved to your account and sync across
-                all your devices.
+                {t(
+                  "Your learning sessions are saved to your account and sync across all your devices.",
+                )}
               </p>
             </div>
             <button
@@ -171,7 +175,7 @@ export function SessionHistoryModal() {
                 openAuthModal("signup");
               }}
             >
-              Sign In / Sign Up
+              {t("Sign In / Sign Up")}
             </button>
           </div>
         ) : (
@@ -185,17 +189,18 @@ export function SessionHistoryModal() {
 
             {loading ? (
               <div className="history-loading">
-                <Spinner label="Loading your sessions…" />
+                <Spinner label={t("Loading your sessions…")} />
               </div>
             ) : sessions.length === 0 && !nextCursor && !error ? (
               <div className="history-empty">
                 <div className="history-empty-icon">
                   <BookOpen size={36} />
                 </div>
-                <h3>No sessions found</h3>
+                <h3>{t("No sessions found")}</h3>
                 <p>
-                  Bring a document or paste your notes to start teaching Milo
-                  and test your understanding.
+                  {t(
+                    "Bring a document or paste your notes to start teaching Milo and test your understanding.",
+                  )}
                 </p>
                 <button
                   type="button"
@@ -205,12 +210,16 @@ export function SessionHistoryModal() {
                     router.push("/");
                   }}
                 >
-                  Start a New Lesson <ArrowRight size={17} />
+                  {t("Start a New Lesson")} <ArrowRight size={17} />
                 </button>
               </div>
             ) : (
               <div className="sessions-list">
                 {sessions.map((item) => {
+                  const title =
+                    item.title === "Untitled Lesson"
+                      ? t("Untitled Lesson")
+                      : item.title;
                   const phaseInfo = PHASE_LABELS[item.phase] || {
                     label: item.phase,
                     badgeClass: "phase-badge-neutral",
@@ -218,14 +227,16 @@ export function SessionHistoryModal() {
                   const supportedCount = item.progress.filter(
                     (p) => p.status === "supported",
                   ).length;
-                  const dateStr = new Date(
+                  const dateStr = formatDate(
+                    locale,
                     item.updatedAt || item.createdAt,
-                  ).toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  });
+                    {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    },
+                  );
 
                   const completed = item.phase === "report";
                   return (
@@ -235,14 +246,18 @@ export function SessionHistoryModal() {
                           <span
                             className={`phase-badge ${phaseInfo.badgeClass}`}
                           >
-                            {phaseInfo.label}
+                            {localizeText(phaseInfo.label)}
                           </span>
-                          <span className="level-badge">{item.level}</span>
+                          <span className="level-badge">
+                            {localizeText(item.level)}
+                          </span>
                         </div>
                         <button
                           type="button"
                           className="icon-button delete-session-button"
-                          aria-label={`Delete session: ${item.title}`}
+                          aria-label={t("Delete session: {title}", {
+                            title,
+                          })}
                           onClick={(e) => handleDelete(item.id, e)}
                           disabled={deletingId === item.id}
                         >
@@ -256,7 +271,7 @@ export function SessionHistoryModal() {
                           href={`/session/${item.id}${completed ? "/report" : ""}`}
                           onClick={closeSessionModal}
                         >
-                          {item.title}
+                          {title}
                         </Link>
                       </h3>
                       {item.scope && (
@@ -272,12 +287,13 @@ export function SessionHistoryModal() {
                           {item.progress.length > 0 && (
                             <span className="session-progress-pill">
                               <CheckCircle2 size={13} />
-                              {supportedCount}/{item.progress.length} objectives
+                              {supportedCount}/{item.progress.length}{" "}
+                              {t("objectives")}
                             </span>
                           )}
                         </div>
                         <span className="resume-indicator">
-                          {completed ? "View report" : "Resume"}{" "}
+                          {completed ? t("View report") : t("Resume")}{" "}
                           <ArrowRight size={14} />
                         </span>
                       </div>
@@ -288,7 +304,9 @@ export function SessionHistoryModal() {
             )}
             {!loading && (sessions.length > 0 || nextCursor) && (
               <div className="history-pagination">
-                <p role="status">{sessions.length} sessions shown</p>
+                <p role="status">
+                  {sessions.length} {t("sessions shown")}
+                </p>
                 {nextCursor && (
                   <button
                     type="button"
@@ -297,9 +315,9 @@ export function SessionHistoryModal() {
                     onClick={() => loadSessions(nextCursor)}
                   >
                     {loadingMore ? (
-                      <Spinner label="Loading more sessions…" />
+                      <Spinner label={t("Loading more sessions…")} />
                     ) : (
-                      "Load more"
+                      t("Load more")
                     )}
                   </button>
                 )}

@@ -1,3 +1,4 @@
+import type { Locale } from "@/lib/i18n/locales";
 // Keeps the learner's unsent material across a sign-in redirect (e.g. Google OAuth).
 // Text fields live in sessionStorage; the chosen file is kept in IndexedDB.
 export type MaterialDraft = {
@@ -5,6 +6,7 @@ export type MaterialDraft = {
   notes: string;
   topic: string;
   level: string;
+  teachingLanguage?: Locale;
 };
 
 const KEY = "teachback:material-draft";

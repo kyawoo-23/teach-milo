@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { Lesson, PrepareSchema, publicLesson } from "@/lib/contracts";
 import {
   assertOrigin,
@@ -8,7 +7,7 @@ import {
   route,
 } from "@/server/http";
 import { readOwned } from "@/server/db";
-import { prepareLesson } from "@/server/lessons";
+import { prepareLesson, prepareOperationPayload } from "@/server/lessons";
 import { ownerOperation } from "@/server/operations";
 import { callContext } from "@/server/usage";
 export const runtime = "nodejs";
@@ -21,7 +20,7 @@ export async function POST(request: Request) {
     const id = await ownerOperation(
       ownerId,
       input.operationId,
-      { type: "prepare", ...input },
+      prepareOperationPayload(input),
       () =>
         prepareLesson(input.operationId, input, callContext(ownerId, request)),
     );

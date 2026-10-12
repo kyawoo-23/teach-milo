@@ -1,3 +1,5 @@
+import { lessonLanguage, type Locale } from "./i18n/locales";
+import { translate } from "./i18n/messages";
 import {
   Board,
   BoardOutput,
@@ -7,12 +9,14 @@ import {
 import { convolution } from "./cnn";
 import { AppError } from "./errors";
 
-export const textBoard = (): Board => ({
+export const textBoard = (language?: Locale): Board => ({
   kind: "text",
   version: 1,
-  title: "Make it concrete",
-  instruction:
+  title: translate(lessonLanguage(language), "Make it concrete"),
+  instruction: translate(
+    lessonLanguage(language),
     "Teach Milo using a worked example, analogy, or step-by-step demonstration.",
+  ),
   assumptions: "",
   controls: [],
   metrics: [],

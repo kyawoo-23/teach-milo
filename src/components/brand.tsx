@@ -1,11 +1,16 @@
+"use client";
+
+import { useI18n } from "@/components/locale-context";
 import Image from "next/image";
 import Link from "next/link";
 
 const BRAND_ICON = "/brand/teachback-icon-64.png";
 
 export function Brand() {
+  const { t } = useI18n();
+
   return (
-    <Link className="brand" href="/" aria-label="TeachBack AI home">
+    <Link className="brand" href="/" aria-label={t("TeachBack AI home")}>
       <span className="brand-mark">
         <Image
           src={BRAND_ICON}
