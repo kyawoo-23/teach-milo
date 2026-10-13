@@ -7,7 +7,7 @@ import {
   Material,
   PrepareSchema,
 } from "@/lib/contracts";
-import { validateBoardConfiguration, textBoard } from "@/lib/boards";
+import { validateBoardConfiguration, exampleBoard } from "@/lib/boards";
 import { validateCalculation } from "@/lib/custom-code";
 import { AppError } from "@/lib/errors";
 import {
@@ -26,7 +26,7 @@ import {
   readOwned,
 } from "./db";
 import { gemini, Model } from "./model";
-import { CallContext } from "./usage";
+import { CallContext, event } from "./usage";
 
 // English keeps the canonical pre-i18n payload so retries from older clients
 // still match saved operations. Non-English choices participate in the hash.
@@ -114,9 +114,14 @@ export async function prepareLesson(
   } else {
     result.transfer.arithmetic = "none";
     if (result.board.kind === "cnn")
-      result.board = textBoard(input.teachingLanguage);
+      result.board = exampleBoard(result.title, input.teachingLanguage);
   }
+  let boardOutcome = "generated";
   const checkBoard = () => {
+    if (result.board.kind === "text" || (result.board.kind === "cnn" && !cnn)) {
+      result.board = exampleBoard(result.title, input.teachingLanguage);
+      boardOutcome = "fallback";
+    }
     validateBoardConfiguration(result.board);
     if (result.board.kind === "custom")
       validateCalculation(
@@ -137,9 +142,11 @@ export async function prepareLesson(
         { board: result.board, concept: result.title },
         ctx,
       );
+      boardOutcome = "repaired";
       checkBoard();
     } catch {
-      result.board = textBoard(input.teachingLanguage);
+      result.board = exampleBoard(result.title, input.teachingLanguage);
+      boardOutcome = "fallback";
     }
   }
   // OCR warnings are surfaced for learner review; unresolved factual concerns remain private grading constraints.
@@ -156,5 +163,6 @@ export async function prepareLesson(
     expiresAt: expiresAt(),
   };
   await database().collection("lessons").doc(id).create(encode(lesson));
+  await event(id, `board_prepared_${result.board.kind}_${boardOutcome}`, id);
   return id;
 }

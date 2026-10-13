@@ -1,6 +1,11 @@
 import { z } from "zod";
-import { locales, lessonLanguage, type Locale } from "./i18n/locales";
-export const TeachingLanguageSchema = z.enum(locales);
+import {
+  teachingLanguages,
+  lessonLanguage,
+  type TeachingLanguage,
+} from "./i18n/locales";
+import { ToolStateSchema, BOARD_PNG_BYTES } from "./board-tools";
+export const TeachingLanguageSchema = z.enum(teachingLanguages);
 
 export const Id = z.string().uuid();
 export const Level = z.enum(["introductory", "intermediate", "advanced"]);
@@ -53,6 +58,9 @@ export const BoardSchema = z.object({
     "comparison",
     "custom",
     "text",
+    "concept_map",
+    "matching",
+    "table",
   ]),
   version: z.literal(1),
   title: z.string().max(100),
@@ -73,7 +81,7 @@ export const BoardSchema = z.object({
   code: z.string().max(12_000),
 });
 export type Board = z.infer<typeof BoardSchema>;
-export const BoardSubmissionSchema = z
+export const LegacyBoardSubmissionSchema = z
   .object({
     version: z.literal(1),
     inputs: z
@@ -88,6 +96,27 @@ export const BoardSubmissionSchema = z
       .refine((v) => Object.keys(v).length <= 20),
   })
   .strict();
+export type BoardInputs = z.infer<typeof LegacyBoardSubmissionSchema>["inputs"];
+export const WorkspaceSubmissionSchema = z
+  .object({
+    version: z.literal(2),
+    inputs: z.record(z.string(), z.never()),
+    state: ToolStateSchema,
+    png: z
+      .string()
+      .max(Math.ceil(BOARD_PNG_BYTES / 3) * 4)
+      .regex(/^[A-Za-z0-9+/]+={0,2}$/)
+      .optional(),
+  })
+  .strict()
+  .refine(
+    (s) => !s.png || s.state.kind === "sketch",
+    "Only sketches can include an image.",
+  );
+export const BoardSubmissionSchema = z.discriminatedUnion("version", [
+  LegacyBoardSubmissionSchema,
+  WorkspaceSubmissionSchema,
+]);
 export type BoardSubmission = z.infer<typeof BoardSubmissionSchema>;
 export const BoardOutputSchema = z
   .object({
@@ -102,9 +131,11 @@ export const BoardOutputSchema = z
   .strict();
 export type BoardOutput = z.infer<typeof BoardOutputSchema>;
 export type BoardSnapshot = BoardSubmission & {
-  kind: Board["kind"];
+  kind: Board["kind"] | "sketch";
   verified: boolean;
   metrics?: Record<string, number>;
+  imageUrl?: string;
+  display?: { label: string; value: string }[];
 };
 
 export const LessonGeneratedSchema = z.object({
@@ -149,7 +180,7 @@ export type Lesson = LessonGenerated & {
   ownerId: string;
   materialId: string;
   level: z.infer<typeof Level>;
-  teachingLanguage?: Locale;
+  teachingLanguage?: TeachingLanguage;
   sources: Source[];
   expiresAt: string;
   createdAt: string;
@@ -167,6 +198,7 @@ export type Message = {
   sequence: number;
   board?: BoardSnapshot;
   kind?: "teaching" | "transfer" | "hint";
+  move?: "request_demo";
 };
 export const EvidenceSchema = z.object({
   objectiveId: z.string(),

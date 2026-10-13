@@ -357,7 +357,7 @@ test("materials-to-report golden path — scripted walkthrough", async ({
   ).toBeVisible();
   await checkpoint();
   await teachingBoard
-    .getByRole("button", { name: "Use this to explain it" })
+    .getByRole("button", { name: "Attach to explanation" })
     .click();
   await page
     .getByLabel("Your explanation to Milo")
@@ -755,7 +755,7 @@ for (const viewport of [
     await teachingBoard.getByRole("button", { name: "64 × 64" }).click();
     await assertFits();
     await teachingBoard
-      .getByRole("button", { name: "Use this to explain it" })
+      .getByRole("button", { name: "Attach to explanation" })
       .click();
     await page
       .getByLabel("Your explanation to Milo")
@@ -1753,7 +1753,7 @@ test("confirmation modals guard board resets, snapshot replacement and removal",
     teachingBoard.getByRole("button", { name: "32 × 32", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await teachingBoard
-    .getByRole("button", { name: "Use this to explain it" })
+    .getByRole("button", { name: "Attach to explanation" })
     .click();
   await expect(page.locator(".attachment-chip")).toBeVisible();
   teachingBoard = await openBoard();
@@ -1761,14 +1761,14 @@ test("confirmation modals guard board resets, snapshot replacement and removal",
     .getByRole("button", { name: "64 × 64", exact: true })
     .click();
   await teachingBoard
-    .getByRole("button", { name: "Use this to explain it" })
+    .getByRole("button", { name: "Attach to explanation" })
     .click();
   const replace = page.getByRole("alertdialog", {
     name: "Replace board snapshot?",
   });
   await replace.getByRole("button", { name: "Cancel", exact: true }).click();
   await teachingBoard
-    .getByRole("button", { name: "Use this to explain it" })
+    .getByRole("button", { name: "Attach to explanation" })
     .click();
   await replace
     .getByRole("button", { name: "Replace snapshot", exact: true })

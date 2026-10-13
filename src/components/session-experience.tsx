@@ -4,6 +4,8 @@ import { useI18n } from "@/components/locale-context";
 import { useConfirmation } from "./confirmation";
 import Link from "next/link";
 import { notFound, usePathname, useRouter } from "next/navigation";
+import { ExplanationFormSchema, transferFormSchema } from "@/lib/form-schemas";
+import { FieldError, useSchemaForm } from "./schema-form";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -34,6 +36,9 @@ import { Brand } from "./brand";
 import { UserProfileMenu } from "./user-profile-menu";
 import { Milo } from "./milo";
 import { TeachingBoard } from "./teaching-board";
+import { useBoardWorkspace } from "./use-board-workspace";
+import { BoardPreview } from "./board-preview";
+import { clearBoardDrafts } from "@/lib/board-drafts";
 import { CompletedSessionView } from "./completed-session-view";
 import { ConversationMessage } from "./conversation-message";
 import {
@@ -64,7 +69,12 @@ export function SessionExperience({ id }: { id: string }) {
   const [session, setSession] = useState<SessionPublic | null>(null);
   const [error, setError] = useState<string | Error>("");
   const [busy, setBusy] = useState(false);
-  const [text, setText] = useState("");
+  const explanationForm = useSchemaForm(
+    ExplanationFormSchema,
+    { text: "" },
+    { mode: "onSubmit" },
+  );
+  const [text, setText] = explanationForm.state("text");
   const [listening, setListening] = useState(false);
   const [replyKey, setReplyKey] = useState<string | undefined>();
   const lastStudent = useRef<{ sessionKey: string; messageId?: string } | null>(
@@ -76,6 +86,29 @@ export function SessionExperience({ id }: { id: string }) {
   );
   const [board, setBoard] = useState<BoardSubmission | undefined>();
   const [boardOpen, setBoardOpen] = useState(false);
+  const boardWorkspace = useBoardWorkspace({
+    board: session?.board,
+    ownerId: userId,
+    sessionId: id,
+    expiresAt: session?.expiresAt,
+    phase: session?.phase,
+    language: session?.lesson.teachingLanguage,
+    attachment: board ?? pendingSend.current?.board,
+    explanation: pendingSend.current?.text ?? text,
+    restore: (attachment, explanation) => {
+      if (
+        session?.messages.some(
+          (m) => m.id === draftStorage.getItem(`pending-turn:${id}`),
+        )
+      ) {
+        setBoard(undefined);
+        setText("");
+      } else {
+        setBoard(attachment);
+        setText(explanation);
+      }
+    },
+  });
   const [classroomDetailsOpen, setClassroomDetailsOpen] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 960px), (max-height: 860px)");
@@ -90,9 +123,13 @@ export function SessionExperience({ id }: { id: string }) {
   const [celebrationDismissed, setCelebrationDismissed] = useState(false);
   const [older, setOlder] = useState<Message[]>([]);
   const [draftsLoaded, setDraftsLoaded] = useState(false);
-  const [small, setSmall] = useState("");
-  const [large, setLarge] = useState("");
-  const [answer, setAnswer] = useState("");
+  const transferForm = useSchemaForm(
+    transferFormSchema(!!session?.numericalCheck),
+    { small: "", large: "", answer: "" },
+  );
+  const [small, setSmall] = transferForm.state("small");
+  const [large, setLarge] = transferForm.state("large");
+  const [answer, setAnswer] = transferForm.state("answer");
   const messagesRef = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
   const sessionRef = useRef(session);
@@ -182,6 +219,7 @@ export function SessionExperience({ id }: { id: string }) {
             e instanceof ApiError &&
             ["NOT_FOUND", "EXPIRED"].includes(e.code)
           ) {
+            clearBoardDrafts(userId, id);
             notFound();
           }
           if (e instanceof ApiError && e.code === "AUTH_REQUIRED") {
@@ -402,8 +440,8 @@ export function SessionExperience({ id }: { id: string }) {
     }
     return ok;
   }
-  async function send(event: React.FormEvent) {
-    event.preventDefault();
+  async function send({ text }: typeof explanationForm.values) {
+    if (busyRef.current) return;
     const body = text.trim();
     if (!body || !session) return;
     const payload = { text: body, ...(board ? { board } : {}) };
@@ -415,6 +453,18 @@ export function SessionExperience({ id }: { id: string }) {
       createdAt: new Date().toISOString(),
       sequence: Number.MAX_SAFE_INTEGER,
       kind: "teaching",
+      ...(payload.board
+        ? {
+            board: {
+              ...structuredClone(payload.board),
+              kind:
+                payload.board.version === 2
+                  ? payload.board.state.kind
+                  : session.board!.kind,
+              verified: false,
+            },
+          }
+        : {}),
     });
     setText("");
     setBoard(undefined);
@@ -450,7 +500,7 @@ export function SessionExperience({ id }: { id: string }) {
       }))
     )
       return false;
-    setBoard(snapshot);
+    setBoard(structuredClone(snapshot));
     setBoardOpen(false);
     composer.current?.focus();
   }
@@ -582,21 +632,23 @@ export function SessionExperience({ id }: { id: string }) {
               {session.transferQuestion}
             </div>
             <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                await mutate("transfer", {
-                  answer,
-                  skip: false,
-                  ...(session.numericalCheck
-                    ? {
-                        parameters: {
-                          small: Number(small),
-                          large: Number(large),
-                        },
-                      }
-                    : {}),
-                });
-              }}
+              noValidate
+              onSubmit={transferForm.handleSubmit(
+                async ({ answer, small, large }) => {
+                  await mutate("transfer", {
+                    answer,
+                    skip: false,
+                    ...(session.numericalCheck
+                      ? {
+                          parameters: {
+                            small: Number(small),
+                            large: Number(large),
+                          },
+                        }
+                      : {}),
+                  });
+                },
+              )}
             >
               {session.numericalCheck && (
                 <div className="number-fields">
@@ -609,8 +661,14 @@ export function SessionExperience({ id }: { id: string }) {
                       min="0"
                       step="1"
                       required
-                      value={small}
-                      onChange={(e) => setSmall(e.target.value)}
+                      disabled={unavailable}
+                      id="transfer-small"
+                      {...transferForm.register("small")}
+                      {...transferForm.a11y("small", "transfer-small")}
+                    />
+                    <FieldError
+                      id="transfer-small"
+                      message={transferForm.formState.errors.small?.message}
                     />
                   </label>
                   <label>
@@ -622,8 +680,14 @@ export function SessionExperience({ id }: { id: string }) {
                       min="0"
                       step="1"
                       required
-                      value={large}
-                      onChange={(e) => setLarge(e.target.value)}
+                      disabled={unavailable}
+                      id="transfer-large"
+                      {...transferForm.register("large")}
+                      {...transferForm.a11y("large", "transfer-large")}
+                    />
+                    <FieldError
+                      id="transfer-large"
+                      message={transferForm.formState.errors.large?.message}
                     />
                   </label>
                 </div>
@@ -635,11 +699,15 @@ export function SessionExperience({ id }: { id: string }) {
                 id="transfer-answer"
                 rows={7}
                 maxLength={4000}
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
+                {...transferForm.register("answer")}
+                {...transferForm.a11y("answer", "transfer-answer")}
                 required
                 placeholder={t("Here’s what I think happens, and why…")}
                 disabled={unavailable}
+              />
+              <FieldError
+                id="transfer-answer"
+                message={transferForm.formState.errors.answer?.message}
               />
               {error && <ErrorNotice message={error} />}
               <button
@@ -729,7 +797,7 @@ export function SessionExperience({ id }: { id: string }) {
                     </button>
                   </h1>
                   <button
-                    className="icon-button mobile-board-button"
+                    className="icon-button mobile-board-button labeled-board-button"
                     aria-label={t("Open teaching board")}
                     onClick={() => {
                       setBoardOpen(true);
@@ -739,6 +807,7 @@ export function SessionExperience({ id }: { id: string }) {
                     }}
                   >
                     <Layers3 size={21} />
+                    <span>{t("Teaching board")}</span>
                   </button>
                 </div>
                 <p
@@ -901,6 +970,43 @@ export function SessionExperience({ id }: { id: string }) {
                   : ""}
             </div>
             <div className="composer-area">
+              {session.messages.some(
+                (m) => m.role === "student" && m.move === "request_demo",
+              ) &&
+                boardWorkspace.workspace &&
+                !boardWorkspace.workspace.invited && (
+                  <div className="board-invitation">
+                    <span>
+                      {t(
+                        "Make your explanation visible with an activity or sketch.",
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        boardWorkspace.update({
+                          ...boardWorkspace.workspace!,
+                          invited: true,
+                        });
+                        setBoardOpen(true);
+                      }}
+                    >
+                      {t("Open teaching board")}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={t("Dismiss board suggestion")}
+                      onClick={() =>
+                        boardWorkspace.update({
+                          ...boardWorkspace.workspace!,
+                          invited: true,
+                        })
+                      }
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
               {error && (
                 <ErrorNotice
                   message={error}
@@ -911,37 +1017,48 @@ export function SessionExperience({ id }: { id: string }) {
                   }
                 />
               )}
-              <form className="composer" onSubmit={send}>
+              <form
+                noValidate
+                className="composer"
+                onSubmit={explanationForm.handleSubmit(send)}
+              >
                 {board && (
-                  <div className="attachment-chip">
-                    <Layers3 size={14} /> {t("Board snapshot attached")}
-                    <button
-                      type="button"
-                      aria-label={t("Remove board snapshot")}
-                      onClick={async () => {
-                        if (
-                          await confirm({
-                            title: "Remove board snapshot?",
-                            description:
-                              "This snapshot will be removed from your unsent explanation.",
-                            confirmLabel: "Remove snapshot",
-                            destructive: true,
-                          })
-                        )
-                          setBoard(undefined);
-                      }}
-                    >
-                      <X size={14} />
-                    </button>
+                  <div className="board-attachment">
+                    <div className="attachment-chip">
+                      <Layers3 size={14} /> {t("Board snapshot attached")}
+                      <button
+                        type="button"
+                        aria-label={t("Remove board snapshot")}
+                        onClick={async () => {
+                          if (
+                            await confirm({
+                              title: "Remove board snapshot?",
+                              description:
+                                "This snapshot will be removed from your unsent explanation.",
+                              confirmLabel: "Remove snapshot",
+                              destructive: true,
+                            })
+                          )
+                            setBoard(undefined);
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <BoardPreview snapshot={board} definition={session.board} />
                   </div>
                 )}
                 <label className="visually-hidden" htmlFor="explanation">
                   {t("Your explanation to Milo")}
                 </label>
                 <textarea
-                  ref={composer}
+                  {...explanationForm.register("text")}
+                  {...explanationForm.a11y("text", "explanation")}
+                  ref={(node) => {
+                    composer.current = node;
+                    explanationForm.register("text").ref(node);
+                  }}
                   id="explanation"
-                  value={text}
                   rows={2}
                   maxLength={2000}
                   disabled={unavailable}
@@ -952,7 +1069,10 @@ export function SessionExperience({ id }: { id: string }) {
                   onFocus={(e) =>
                     setListening(e.currentTarget.value.trim().length > 0)
                   }
-                  onBlur={() => setListening(false)}
+                  onBlur={(event) => {
+                    setListening(false);
+                    void explanationForm.register("text").onBlur(event);
+                  }}
                   placeholder={t("Explain it to Milo in your own words…")}
                   onKeyDown={(e) => {
                     if (
@@ -964,6 +1084,10 @@ export function SessionExperience({ id }: { id: string }) {
                       e.currentTarget.form?.requestSubmit();
                     }
                   }}
+                />
+                <FieldError
+                  id="explanation"
+                  message={explanationForm.formState.errors.text?.message}
                 />
                 <div className="composer-actions">
                   <button
@@ -981,7 +1105,7 @@ export function SessionExperience({ id }: { id: string }) {
                   <button
                     className="send-button"
                     type="submit"
-                    disabled={unavailable}
+                    disabled={unavailable || !text.trim()}
                     aria-label={t("Send explanation")}
                   >
                     <ArrowUp size={19} />
@@ -996,12 +1120,17 @@ export function SessionExperience({ id }: { id: string }) {
             </div>
           </section>
           <aside className="board-sidebar">
-            {session.board && (
+            {session.board && boardWorkspace.workspace && (
               <TeachingBoard
                 teachingLanguage={session.lesson.teachingLanguage}
                 board={session.board}
                 onAttach={attach}
                 disabled={unavailable}
+                workspace={boardWorkspace.workspace}
+                onChange={boardWorkspace.update}
+                sessionId={id}
+                storageUnavailable={boardWorkspace.storageUnavailable}
+                onExpand={() => setBoardOpen(true)}
               />
             )}
             <div className="teacher-note">
@@ -1018,13 +1147,18 @@ export function SessionExperience({ id }: { id: string }) {
             open={boardOpen}
             onClose={() => setBoardOpen(false)}
             title={t("Your teaching board")}
+            className="board-expanded-modal"
           >
-            {boardOpen && session.board && (
+            {boardOpen && session.board && boardWorkspace.workspace && (
               <TeachingBoard
                 teachingLanguage={session.lesson.teachingLanguage}
                 board={session.board}
                 onAttach={attach}
                 disabled={unavailable}
+                workspace={boardWorkspace.workspace}
+                onChange={boardWorkspace.update}
+                sessionId={id}
+                storageUnavailable={boardWorkspace.storageUnavailable}
               />
             )}
           </Modal>

@@ -1,6 +1,6 @@
 import "server-only";
 import { lessonLanguage } from "@/lib/i18n/locales";
-import { localize } from "@/lib/i18n/messages";
+import { translateTeaching } from "@/lib/i18n/messages";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
@@ -26,6 +26,7 @@ import {
   validateStudent,
 } from "@/lib/controller";
 import { validateBoardInputs } from "@/lib/boards";
+import { modelMessages, publicMessages, validatePng } from "./board-media";
 import { finalizeReport } from "@/lib/assessment";
 import { AppError } from "@/lib/errors";
 import {
@@ -127,7 +128,7 @@ export async function readMessagePage(id: string, before?: number) {
   const page = await readMessages(id, 31, before);
   const messages = page.slice(-30);
   return {
-    messages,
+    messages: publicMessages(id, messages),
     ...(page.length > 30 ? { nextCursor: messages[0].sequence } : {}),
   };
 }
@@ -310,9 +311,17 @@ export async function submitTurn(
         sequence: session.nextSequence,
         kind: "teaching",
         ...(input.board
-          ? { board: validateBoardInputs(lesson.board, input.board) }
+          ? {
+              board: validateBoardInputs(
+                lesson.board,
+                input.board,
+                lesson.teachingLanguage,
+              ),
+            }
           : {}),
       };
+      if (learner.board?.version === 2 && learner.board.png)
+        validatePng(learner.board.png);
       await database()
         .collection("sessions")
         .doc(id)
@@ -323,6 +332,19 @@ export async function submitTurn(
         ...(await evidenceMessages(session, await readMessages(id, 12))),
         learner,
       ];
+      const newestSketch = [...messages]
+        .reverse()
+        .find((m) => m.board?.version === 2 && m.board.png);
+      const media =
+        newestSketch?.board?.version === 2 && newestSketch.board.png
+          ? [
+              {
+                mimeType: "image/png" as const,
+                data: validatePng(newestSketch.board.png),
+                messageId: newestSketch.id,
+              },
+            ]
+          : [];
       const response = await model.generate(
         StudentReplySchema,
         STUDENT_PROMPT + languageInstruction(lesson.teachingLanguage),
@@ -335,9 +357,16 @@ export async function submitTurn(
             ? lesson.misconception
             : undefined,
           ledger: session.ledger,
-          messages,
+          messages: modelMessages(messages),
+          teachingBoard: {
+            kind: lesson.board.kind,
+            title: lesson.board.title,
+            instruction: lesson.board.instruction,
+            tools: ["sketch", "concept_map", "matching", "table"],
+          },
         },
         ctx,
+        media,
       );
       const replyData = normalizeStudentReply(
         response,
@@ -367,21 +396,33 @@ export async function submitTurn(
           replyData.move === "surface_misconception"
             ? lesson.misconception
             : next.phase === "ready_for_check"
-              ? localize(
-                  lessonLanguage(lesson.teachingLanguage),
+              ? translateTeaching(
+                  lesson.teachingLanguage,
                   "Your explanation has helped me connect the key ideas. Would you like to try a new example on your own, or keep teaching me?",
                 )
               : replyData.studentMessage,
         createdAt: new Date().toISOString(),
         sequence: session.nextSequence + 1,
         kind: "teaching",
+        ...(replyData.move === "request_demo"
+          ? { move: "request_demo" as const }
+          : {}),
       };
       return { session: next, messages: [learner, reply] };
     },
   );
   await Promise.all([
     event(id, "turn_submitted", input.operationId),
-    ...(input.board ? [event(id, "board_shared", input.operationId)] : []),
+    ...(input.board
+      ? [
+          event(id, "board_shared", input.operationId),
+          event(
+            id,
+            `board_shared_${input.board.version === 2 ? input.board.state.kind : "activity"}`,
+            input.operationId,
+          ),
+        ]
+      : []),
   ]);
   return { session: committed, lesson: responseLesson };
 }
@@ -404,7 +445,7 @@ async function evaluate(
       concerns: lesson.concerns,
       misconceptionCorrection: lesson.misconceptionCorrection,
       transfer: lesson.transfer,
-      messages,
+      messages: modelMessages(messages),
       ledger: session.ledger,
       skipped,
       arithmetic:
@@ -473,8 +514,8 @@ export async function sessionAction(
             {
               id: randomUUID(),
               role: "student",
-              text: localize(
-                lessonLanguage(lesson.teachingLanguage),
+              text: translateTeaching(
+                lesson.teachingLanguage,
                 "Could you pick one small example, walk me through what happens, and explain why each step follows? Start with the part you feel most sure about.",
               ),
               createdAt: new Date().toISOString(),

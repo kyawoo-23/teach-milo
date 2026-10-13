@@ -1,4 +1,4 @@
-import { lessonLanguage } from "./i18n/locales";
+import { dictionaryLocale } from "./i18n/locales";
 import { translate, localize } from "./i18n/messages";
 import {
   dimensions,
@@ -17,7 +17,7 @@ export function finalizeReport(
   skipped: boolean,
   arithmetic?: { small: number; large: number },
 ): SessionReport {
-  const locale = lessonLanguage(lesson.teachingLanguage);
+  const locale = dictionaryLocale(lesson.teachingLanguage);
   const report = structuredClone(raw);
   for (const name of dimensions) {
     const item = report.scores[name];

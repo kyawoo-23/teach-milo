@@ -17,6 +17,7 @@ import {
 import { SessionHistoryPage, SessionSummary } from "@/lib/contracts";
 import { useAuth } from "./auth-context";
 import { api, ErrorNotice, Modal, Spinner } from "./ui";
+import { clearBoardDrafts } from "@/lib/board-drafts";
 
 const PHASE_LABELS: Record<string, { label: string; badgeClass: string }> = {
   preparing: { label: "Preparing", badgeClass: "phase-badge-neutral" },
@@ -139,6 +140,7 @@ export function SessionHistoryModal() {
     setDeletingId(id);
     try {
       await api(`/api/sessions/${id}`, {}, "DELETE");
+      clearBoardDrafts(undefined, id);
       if (requests.current.generation !== generation) return;
       deletedIds.current.add(id);
       setSessions((prev) => prev.filter((s) => s.id !== id));
