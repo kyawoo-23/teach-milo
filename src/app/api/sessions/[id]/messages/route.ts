@@ -3,6 +3,7 @@ import { AppError } from "@/lib/errors";
 import { database, decode, readOwned } from "@/server/db";
 import { requireUserId, respond, route } from "@/server/http";
 import { readMessagePage } from "@/server/sessions";
+import { publicMessages } from "@/server/board-media";
 export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> },
@@ -34,7 +35,9 @@ export async function GET(
           "This evidence message is unavailable.",
           404,
         );
-      return respond({ messages: [decode<Message>(doc.data())] });
+      return respond({
+        messages: publicMessages(id, [decode<Message>(doc.data())]),
+      });
     }
     const before = query.has("before")
       ? Number(query.get("before"))

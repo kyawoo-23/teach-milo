@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { convolution } from "@/lib/cnn";
 import { finalizeReport } from "@/lib/assessment";
 import {
   allowedMoves,
@@ -8,7 +7,6 @@ import {
   readyForCheck,
   validateStudent,
 } from "@/lib/controller";
-import { validateBoardInputs } from "@/lib/boards";
 import { validateCalculation } from "@/lib/custom-code";
 import { StudentReplySchema, LessonGeneratedSchema } from "@/lib/contracts";
 import { z } from "zod";
@@ -20,51 +18,6 @@ import {
   sessionFixture,
 } from "./fixtures";
 
-describe("deterministic boards and arithmetic", () => {
-  it("keeps weights fixed while spatial work grows", () => {
-    expect(convolution(32)).toEqual({
-      outputSize: 30,
-      weights: 216,
-      parameters: 224,
-      multiplications: 194400,
-    });
-    expect(convolution(64)).toEqual({
-      outputSize: 62,
-      weights: 216,
-      parameters: 224,
-      multiplications: 830304,
-    });
-  });
-  it("verifies unseen CNN arithmetic", () => {
-    expect(convolution(20, 5, 2, 4)).toEqual({
-      outputSize: 16,
-      weights: 200,
-      parameters: 204,
-      multiplications: 51200,
-    });
-    expect(convolution(40, 5, 2, 4)).toEqual({
-      outputSize: 36,
-      weights: 200,
-      parameters: 204,
-      multiplications: 259200,
-    });
-  });
-  it("rejects invalid snapshots and derives its own metrics", () => {
-    const lesson = lessonFixture();
-    expect(() =>
-      validateBoardInputs(lesson.board, {
-        version: 1,
-        inputs: { inputSize: 99 },
-      }),
-    ).toThrow();
-    expect(
-      validateBoardInputs(lesson.board, {
-        version: 1,
-        inputs: { inputSize: 64 },
-      }).metrics?.parameters,
-    ).toBe(224);
-  });
-});
 describe("server-owned readiness", () => {
   it("requires an interpreted demonstration and complete objective evidence", () => {
     const l = lessonFixture();
@@ -149,8 +102,8 @@ describe("Milo's opening greeting", () => {
     );
   });
   it("adds Hi! to an opening without a greeting", () => {
-    expect(greetLearner("Can you teach me about weight sharing?")).toBe(
-      "Hi! Can you teach me about weight sharing?",
+    expect(greetLearner("Can you teach me about constant speed?")).toBe(
+      "Hi! Can you teach me about constant speed?",
     );
     expect(greetLearner("Highways fascinate me. How do they drain?")).toBe(
       "Hi! Highways fascinate me. How do they drain?",
@@ -164,13 +117,12 @@ describe("evidence-based assessment", () => {
     const m = messageFixture();
     const t = {
       ...messageFixture(
-        "There are 204 parameters in both cases because the same kernel coefficients are reused.",
+        "6 × 25 is 150 m, and twice the time doubles it because distance is proportional to time.",
       ),
       kind: "transfer" as const,
     };
     const r = finalizeReport(reportFixture(m, t), l, [m, t], false, {
-      small: 204,
-      large: 204,
+      distance: 150.2,
     });
     expect(r.total).toBe(10);
     expect(r.overallLabel).toBe("strong_evidence");
@@ -187,25 +139,43 @@ describe("evidence-based assessment", () => {
     const l = lessonFixture();
     const m = messageFixture();
     const r = finalizeReport(reportFixture(m, m), l, [m], false, {
-      small: 204,
-      large: 204,
+      distance: 150,
     });
     expect(r.scores.transfer.score).toBeNull();
   });
-  it("caps incorrect verified arithmetic and flags size-dependent counts", () => {
+  it("caps answers outside the verified tolerance and explains them", () => {
     const l = lessonFixture();
     const m = messageFixture();
     const t = {
-      ...messageFixture("A bigger image learns twice as many parameters."),
+      ...messageFixture("Going twice as long means four times as far."),
       kind: "transfer" as const,
     };
     const r = finalizeReport(reportFixture(m, t), l, [m, t], false, {
-      small: 204,
-      large: 408,
+      distance: 300,
     });
     expect(r.scores.transfer.score).toBe(1);
-    expect(r.criticalMisconception).toBe(true);
+    expect(r.scores.transfer.explanation).toContain(
+      "Distance: you entered 300 m; the expected value is 150 m.",
+    );
     expect(r.overallLabel).not.toBe("strong_evidence");
+  });
+  it("withholds transfer scoring when verified fields are missing", () => {
+    const l = lessonFixture();
+    const m = messageFixture();
+    const t = { ...messageFixture("About 150 m."), kind: "transfer" as const };
+    const r = finalizeReport(reportFixture(m, t), l, [m, t], false);
+    expect(r.scores.transfer.score).toBeNull();
+    expect(r.scores.transfer.status).toBe("insufficient_evidence");
+  });
+  it("leaves transfer to the model when the lesson has no numeric key", () => {
+    const l = lessonFixture();
+    l.transfer.numeric = { fields: [], inputs: [], code: "" };
+    const m = messageFixture();
+    const t = { ...messageFixture("About 150 m."), kind: "transfer" as const };
+    expect(
+      finalizeReport(reportFixture(m, t), l, [m, t], false).scores.transfer
+        .score,
+    ).toBe(2);
   });
   it("withholds factual scores for unresolved source concerns", () => {
     const l = lessonFixture();
@@ -239,14 +209,14 @@ describe("calculation language", () => {
   it("exports usable JSON schemas for structured model responses", () => {
     const lesson = z.toJSONSchema(LessonGeneratedSchema);
     expect(lesson.type).toBe("object");
-    const controlMin = (
+    const stateMin = (
       lesson.properties as {
         board: {
-          properties: { controls: { items: { properties: { min: object } } } };
+          properties: { state: { items: { properties: { min: object } } } };
         };
       }
-    ).board.properties.controls.items.properties.min;
-    expect(controlMin).not.toHaveProperty("minimum");
+    ).board.properties.state.items.properties.min;
+    expect(stateMin).not.toHaveProperty("minimum");
     expect(z.toJSONSchema(StudentReplySchema).type).toBe("object");
   });
 });

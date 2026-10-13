@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@google/genai": "2.28.0",
+    "@hookform/resolvers": "5.9.1",
     "@tailwindcss/postcss": "4.3.3",
     "acorn": "8.19.0",
     "busboy": "1.6.0",
@@ -39,6 +40,7 @@
     "pdfjs-dist": "6.4.299",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "react-hook-form": "7.90.0",
     "react-markdown": "10.1.0",
     "rehype-katex": "7.0.1",
     "remark-gfm": "4.0.1",

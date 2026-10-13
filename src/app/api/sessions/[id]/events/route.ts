@@ -24,7 +24,18 @@ export async function POST(
     );
     const input = await json(
       request,
-      z.object({ name: z.literal("board_opened") }),
+      z
+        .object({
+          name: z.enum([
+            "board_opened",
+            "board_tool_sketch",
+            "board_tool_concept_map",
+            "board_tool_matching",
+            "board_tool_table",
+            "board_tool_suggested",
+          ]),
+        })
+        .strict(),
     );
     await event(id, input.name);
     return respond({ ok: true });

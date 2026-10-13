@@ -3,7 +3,7 @@
 import { localize } from "@/lib/i18n/messages";
 import type { Locale } from "@/lib/i18n/locales";
 import { useI18n } from "@/components/locale-context";
-import { useRef, useState } from "react";
+import { useRef, useState, type RefCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -116,11 +116,21 @@ export function MarkdownEditor({
   value,
   onChange,
   rows,
+  onBlur,
+  inputRef,
+  name,
+  invalid,
+  describedBy,
 }: {
   id: string;
   value: string;
   onChange: (value: string) => void;
   rows: number;
+  onBlur?: () => void;
+  inputRef?: RefCallback<HTMLTextAreaElement>;
+  name?: string;
+  invalid?: boolean;
+  describedBy?: string;
 }) {
   const { t, text: localizeText, locale } = useI18n();
 
@@ -210,7 +220,15 @@ export function MarkdownEditor({
           aria-labelledby={`${id}-write-tab`}
         >
           <textarea
-            ref={ref}
+            ref={(node) => {
+              ref.current = node;
+              inputRef?.(node);
+            }}
+            name={name}
+            onBlur={onBlur}
+            aria-invalid={invalid}
+            aria-describedby={describedBy}
+            maxLength={50000}
             id={id}
             value={value}
             rows={rows}

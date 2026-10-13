@@ -15,8 +15,10 @@ import {
   Trash2,
 } from "lucide-react";
 import { SessionHistoryPage, SessionSummary } from "@/lib/contracts";
+import { LevelIcon } from "./level-icon";
 import { useAuth } from "./auth-context";
 import { api, ErrorNotice, Modal, Spinner } from "./ui";
+import { clearBoardDrafts } from "@/lib/board-drafts";
 
 const PHASE_LABELS: Record<string, { label: string; badgeClass: string }> = {
   preparing: { label: "Preparing", badgeClass: "phase-badge-neutral" },
@@ -139,6 +141,7 @@ export function SessionHistoryModal() {
     setDeletingId(id);
     try {
       await api(`/api/sessions/${id}`, {}, "DELETE");
+      clearBoardDrafts(undefined, id);
       if (requests.current.generation !== generation) return;
       deletedIds.current.add(id);
       setSessions((prev) => prev.filter((s) => s.id !== id));
@@ -155,6 +158,7 @@ export function SessionHistoryModal() {
       open={sessionModalOpen && !!user}
       onClose={closeSessionModal}
       title={t("My Learning Sessions")}
+      className="session-history-modal"
     >
       <div className="session-history-content">
         {!user ? (
@@ -249,6 +253,7 @@ export function SessionHistoryModal() {
                             {localizeText(phaseInfo.label)}
                           </span>
                           <span className="level-badge">
+                            <LevelIcon level={item.level} size={14} />
                             {localizeText(item.level)}
                           </span>
                         </div>

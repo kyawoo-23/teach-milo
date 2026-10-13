@@ -1,7 +1,7 @@
 "use client";
 
 import { useI18n } from "@/components/locale-context";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   AlertCircle,
@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "./auth-context";
 import { Modal, Spinner } from "./ui";
+import { authFormSchema } from "@/lib/form-schemas";
+import { FieldError, useSchemaForm } from "./schema-form";
 
 export function AuthModal() {
   return (
@@ -36,23 +38,28 @@ function AuthModalContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const form = useSchemaForm(authFormSchema(authMode === "signup"), {
+    email: "",
+    password: "",
+    name: "",
+    confirmPassword: "",
+  });
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = form;
+  useEffect(() => {
+    form.clearErrors();
+  }, [authMode, form.clearErrors]);
   const [showPassword, setShowPassword] = useState(false);
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | Error>("");
 
   const urlAuthError = searchParams.get("authError");
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (authMode === "signup" && password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
+  async function submit({ email, password, name }: typeof form.values) {
     setBusy(true);
     setError("");
     try {
@@ -61,6 +68,8 @@ function AuthModalContent() {
       } else {
         await signup(email, password, name);
       }
+      form.setValue("password", "");
+      form.setValue("confirmPassword", "");
     } catch (err) {
       setError(err instanceof Error ? err : "Authentication failed.");
     } finally {
@@ -79,7 +88,9 @@ function AuthModalContent() {
       onClose={() => {
         setShowPassword(false);
         setShowConfirmPassword(false);
-        setConfirmPassword("");
+        form.setValue("confirmPassword", "");
+        form.setValue("password", "");
+        form.clearErrors();
         setError("");
         closeAuthModal();
         if (urlAuthError) {
@@ -175,7 +186,7 @@ function AuthModalContent() {
           <span>{t("or with email")}</span>
         </div>
 
-        <form onSubmit={handleSubmit} className="auth-form">
+        <form noValidate onSubmit={handleSubmit(submit)} className="auth-form">
           {authMode === "signup" && (
             <div className="form-group">
               <label htmlFor="auth-name">{t("Your Name")}</label>
@@ -183,16 +194,16 @@ function AuthModalContent() {
                 <UserIcon size={16} className="input-icon" />
                 <input
                   id="auth-name"
-                  name="name"
+                  {...register("name")}
+                  {...form.a11y("name", "auth-name")}
                   autoComplete="name"
                   type="text"
                   required
                   placeholder={t("e.g. Marie Curie")}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
                   disabled={busy}
                 />
               </div>
+              <FieldError id="auth-name" message={errors.name?.message} />
             </div>
           )}
 
@@ -202,17 +213,17 @@ function AuthModalContent() {
               <Mail size={16} className="input-icon" />
               <input
                 id="auth-email"
-                name="email"
+                {...register("email")}
+                {...form.a11y("email", "auth-email")}
                 spellCheck={false}
                 type="email"
                 required
                 autoComplete="email"
                 placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 disabled={busy}
               />
             </div>
+            <FieldError id="auth-email" message={errors.email?.message} />
           </div>
 
           <div className="form-group">
@@ -221,7 +232,8 @@ function AuthModalContent() {
               <Lock size={16} className="input-icon" />
               <input
                 id="auth-password"
-                name="password"
+                {...register("password")}
+                {...form.a11y("password", "auth-password")}
                 type={showPassword ? "text" : "password"}
                 className="password-input"
                 spellCheck={false}
@@ -236,8 +248,6 @@ function AuthModalContent() {
                     ? t("At least 8 characters")
                     : "••••••••"
                 }
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
                 disabled={busy}
               />
               <button
@@ -257,6 +267,7 @@ function AuthModalContent() {
                 )}
               </button>
             </div>
+            <FieldError id="auth-password" message={errors.password?.message} />
           </div>
 
           {authMode === "signup" && (
@@ -268,7 +279,8 @@ function AuthModalContent() {
                 <Lock size={16} className="input-icon" />
                 <input
                   id="auth-confirm-password"
-                  name="confirmPassword"
+                  {...register("confirmPassword")}
+                  {...form.a11y("confirmPassword", "auth-confirm-password")}
                   type={showConfirmPassword ? "text" : "password"}
                   className="password-input"
                   spellCheck={false}
@@ -276,8 +288,6 @@ function AuthModalContent() {
                   autoComplete="new-password"
                   required
                   placeholder={t("Re-enter your password")}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={busy}
                 />
                 <button
@@ -299,6 +309,10 @@ function AuthModalContent() {
                   )}
                 </button>
               </div>
+              <FieldError
+                id="auth-confirm-password"
+                message={errors.confirmPassword?.message}
+              />
             </div>
           )}
 

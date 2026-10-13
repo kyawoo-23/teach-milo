@@ -25,7 +25,7 @@ export function MiloArtwork({
     style: {
       transformBox: "view-box" as const,
       transformOrigin: MILO_ORIGINS[name],
-      transform: MILO_STATIC_POSES[state]?.[name],
+      transform: MILO_STATIC_POSES[state]?.[name] ?? "translate(0px, 0px)",
     },
   });
   return (
@@ -86,17 +86,23 @@ export function MiloArtwork({
               </g>
             </g>
             <g {...part("mouth")}>
-              <path
-                d={
-                  state === "celebration"
-                    ? "M54 70q7 10 14 0"
-                    : "M55 71q6 6 12 0"
-                }
-                fill="none"
-                stroke="#6b69ad"
-                strokeWidth="3"
-                strokeLinecap="round"
-              />
+              {state === "reply" ? (
+                <ellipse cx="61" cy="73" rx="6" ry="5" fill="#6b69ad" />
+              ) : (
+                <path
+                  d={
+                    state === "celebration"
+                      ? "M54 70q7 10 14 0"
+                      : state === "thinking"
+                        ? "M57 72q4 4 8 0"
+                        : "M55 71q6 6 12 0"
+                  }
+                  fill="none"
+                  stroke="#6b69ad"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                />
+              )}
             </g>
           </g>
           <g {...part("feet")}>

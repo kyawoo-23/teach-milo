@@ -1,6 +1,15 @@
 import { z } from "zod";
-import { locales, lessonLanguage, type Locale } from "./i18n/locales";
-export const TeachingLanguageSchema = z.enum(locales);
+import {
+  teachingLanguages,
+  lessonLanguage,
+  type TeachingLanguage,
+} from "./i18n/locales";
+import {
+  ToolStateSchema,
+  BOARD_PNG_BYTES,
+  type ToolKind,
+} from "./board-tools";
+export const TeachingLanguageSchema = z.enum(teachingLanguages);
 
 export const Id = z.string().uuid();
 export const Level = z.enum(["introductory", "intermediate", "advanced"]);
@@ -25,87 +34,130 @@ export const SourceSchema = z.object({
   warnings: z.array(z.string().max(400)).max(20),
 });
 export type Source = z.infer<typeof SourceSchema>;
-export const ControlSchema = z.object({
-  id: z.string().regex(/^[a-z][a-z0-9_]{0,30}$/),
-  label: z.string().max(80),
-  // Gemini structured output rejects minimum/maximum on these fields in large schemas.
-  min: z.number(),
-  max: z.number(),
-  step: z.number().positive(),
-  initial: z.number(),
-  unit: z.string().max(20),
+const Ref = z.string().regex(/^[a-z][a-z0-9_]{0,30}$/);
+const BoardItemSchema = z.object({
+  id: z.string().max(40),
+  label: z.string().max(100),
+  detail: z.string().max(300),
 });
-const MetricSchema = z.object({
-  id: z.string().regex(/^[a-z][a-z0-9_]{0,30}$/),
+export type BoardItem = z.infer<typeof BoardItemSchema>;
+// Gemini structured output rejects minimum/maximum on numeric fields in large
+// schemas, so bounds and steps are validated by compileBoard instead.
+export const BoardStateSchema = z.object({
+  id: Ref,
   label: z.string().max(80),
   unit: z.string().max(30),
-  base: z.number(),
-  factors: z
-    .array(z.object({ controlId: z.string(), coefficient: z.number() }))
-    .max(6),
+  type: z.enum(["number", "boolean", "choice"]),
+  initial: z.number(),
+  min: z.number(),
+  max: z.number(),
+  step: z.number(),
+  options: z.array(z.string().max(60)).max(8),
 });
-export const BoardSchema = z.object({
-  kind: z.enum([
-    "cnn",
-    "causal",
-    "sequence",
-    "classification",
-    "comparison",
-    "custom",
-    "text",
-  ]),
-  version: z.literal(1),
+export type BoardState = z.infer<typeof BoardStateSchema>;
+export const BoardNodeSchema = z.object({
+  id: z.string().max(40),
+  parentId: z.string().max(40),
+  component: z.string().max(40),
+  props: z
+    .array(z.object({ key: z.string().max(40), value: z.string().max(300) }))
+    .max(12),
+  items: z.array(BoardItemSchema).max(10),
+});
+export type BoardNode = z.infer<typeof BoardNodeSchema>;
+// The model-facing shape omits version: Gemini structured output lacks const.
+export const BoardGeneratedSchema = z.object({
   title: z.string().max(100),
   instruction: z.string().max(350),
   assumptions: z.string().max(500),
-  controls: z.array(ControlSchema).max(6),
-  metrics: z.array(MetricSchema).max(6),
-  items: z
+  state: z.array(BoardStateSchema).max(8),
+  derived: z
     .array(
-      z.object({
-        id: z.string().max(40),
-        label: z.string().max(100),
-        detail: z.string().max(300),
-      }),
+      z.object({ id: Ref, label: z.string().max(80), unit: z.string().max(30) }),
     )
-    .max(10),
-  groups: z.array(z.string().max(60)).max(5),
+    .max(8),
   code: z.string().max(12_000),
+  nodes: z.array(BoardNodeSchema).max(40),
+  suggestedTool: z.object({
+    kind: z.enum(["none", "sketch", "concept_map", "matching", "table"]),
+    items: z.array(BoardItemSchema).max(10),
+    columns: z.array(z.string().max(60)).max(5),
+  }),
+});
+export type BoardGenerated = z.infer<typeof BoardGeneratedSchema>;
+export const BoardSchema = BoardGeneratedSchema.extend({
+  version: z.literal(2),
 });
 export type Board = z.infer<typeof BoardSchema>;
-export const BoardSubmissionSchema = z
+export const BoardCompositeValueSchema = z.union([
+  z.array(z.string().max(40)).max(10),
+  z.record(z.string().max(40), z.string().max(60)),
+  z.string().max(40),
+]);
+export type BoardCompositeValue = z.infer<typeof BoardCompositeValueSchema>;
+export const BoardStateSubmissionSchema = z
   .object({
-    version: z.literal(1),
-    inputs: z
-      .record(
-        z.string().max(40),
-        z.union([
-          z.number().finite(),
-          z.string().max(100),
-          z.array(z.string().max(40)).max(10),
-        ]),
-      )
-      .refine((v) => Object.keys(v).length <= 20),
+    version: z.literal(3),
+    state: z
+      .record(z.string().max(40), z.number().finite())
+      .refine((v) => Object.keys(v).length <= 8),
+    composites: z
+      .record(z.string().max(40), BoardCompositeValueSchema)
+      .refine((v) => Object.keys(v).length <= 10),
   })
   .strict();
+export type BoardStateSubmission = z.infer<typeof BoardStateSubmissionSchema>;
+export const WorkspaceSubmissionSchema = z
+  .object({
+    version: z.literal(2),
+    inputs: z.record(z.string(), z.never()),
+    state: ToolStateSchema,
+    png: z
+      .string()
+      .max(Math.ceil(BOARD_PNG_BYTES / 3) * 4)
+      .regex(/^[A-Za-z0-9+/]+={0,2}$/)
+      .optional(),
+  })
+  .strict()
+  .refine(
+    (s) => !s.png || s.state.kind === "sketch",
+    "Only sketches can include an image.",
+  );
+export const BoardSubmissionSchema = z.discriminatedUnion("version", [
+  WorkspaceSubmissionSchema,
+  BoardStateSubmissionSchema,
+]);
 export type BoardSubmission = z.infer<typeof BoardSubmissionSchema>;
 export const BoardOutputSchema = z
   .object({
     metrics: z
       .record(z.string().max(40), z.number().finite())
       .refine((v) => Object.keys(v).length <= 10),
-    series: z
-      .array(z.object({ x: z.number().finite(), y: z.number().finite() }))
-      .max(200)
-      .optional(),
   })
   .strict();
 export type BoardOutput = z.infer<typeof BoardOutputSchema>;
+export type BoardDisplay = { label: string; value: string; unit?: string }[];
 export type BoardSnapshot = BoardSubmission & {
-  kind: Board["kind"];
+  kind: "board" | ToolKind;
   verified: boolean;
   metrics?: Record<string, number>;
+  imageUrl?: string;
+  display?: BoardDisplay;
 };
+export const NumericFieldSchema = z.object({
+  id: Ref,
+  label: z.string().max(80),
+  unit: z.string().max(30),
+  expected: z.number(),
+  tolerance: z.number(),
+});
+export type NumericField = z.infer<typeof NumericFieldSchema>;
+export const NumericTransferSchema = z.object({
+  fields: z.array(NumericFieldSchema).max(4),
+  inputs: z.array(z.object({ id: Ref, value: z.number() })).max(8),
+  code: z.string().max(12_000),
+});
+export type NumericTransfer = z.infer<typeof NumericTransferSchema>;
 
 export const LessonGeneratedSchema = z.object({
   title: z.string().min(3).max(100),
@@ -130,9 +182,9 @@ export const LessonGeneratedSchema = z.object({
     question: z.string().min(10).max(1200),
     expected: z.string().min(10).max(2200),
     criteria: z.array(z.string().max(500)).min(1).max(5),
-    arithmetic: z.enum(["cnn", "none"]),
+    numeric: NumericTransferSchema,
   }),
-  board: BoardSchema,
+  board: BoardGeneratedSchema,
 });
 export type LessonGenerated = z.infer<typeof LessonGeneratedSchema>;
 export type Material = {
@@ -144,12 +196,13 @@ export type Material = {
   expiresAt: string;
   createdAt: string;
 };
-export type Lesson = LessonGenerated & {
+export type Lesson = Omit<LessonGenerated, "board"> & {
+  board: Board;
   id: string;
   ownerId: string;
   materialId: string;
   level: z.infer<typeof Level>;
-  teachingLanguage?: Locale;
+  teachingLanguage?: TeachingLanguage;
   sources: Source[];
   expiresAt: string;
   createdAt: string;
@@ -167,6 +220,7 @@ export type Message = {
   sequence: number;
   board?: BoardSnapshot;
   kind?: "teaching" | "transfer" | "hint";
+  move?: "request_demo";
 };
 export const EvidenceSchema = z.object({
   objectiveId: z.string(),
@@ -278,7 +332,7 @@ export type SessionPublic = Pick<
   }[];
   board?: Board;
   transferQuestion?: string;
-  numericalCheck?: boolean;
+  numericFields?: Pick<NumericField, "id" | "label" | "unit">[];
   report?: SessionReport;
   pending: boolean;
 };
@@ -326,11 +380,9 @@ export const TransferSchema = z
     revision: z.number().int().nonnegative(),
     answer: z.string().trim().max(4000),
     skip: z.boolean(),
-    parameters: z
-      .object({
-        small: z.number().int().nonnegative(),
-        large: z.number().int().nonnegative(),
-      })
+    answers: z
+      .record(z.string().max(40), z.number().finite())
+      .refine((v) => Object.keys(v).length <= 4)
       .optional(),
   })
   .strict();

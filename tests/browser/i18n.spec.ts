@@ -4,6 +4,8 @@ import { dictionaries, translate } from "../../src/lib/i18n/messages";
 import {
   LOCALE_COOKIE,
   localeNames,
+  locales,
+  teachingLanguages,
   type Locale,
 } from "../../src/lib/i18n/locales";
 
@@ -47,16 +49,15 @@ async function setup(page: Page) {
     ],
     progress: [{ id: "o1", label: "解释权重共享", status: "missing" }],
     board: {
-      kind: "text",
-      version: 1,
+      version: 2,
       title: "用例子解释",
       instruction: "请选择一个例子。",
       assumptions: "",
-      controls: [],
-      metrics: [],
-      items: [],
-      groups: [],
+      state: [],
+      derived: [],
       code: "",
+      nodes: [] as unknown[],
+      suggestedTool: { kind: "none", items: [], columns: [] },
     },
     pending: false,
   };
@@ -90,7 +91,7 @@ async function setup(page: Page) {
   });
   return state;
 }
-for (const locale of ["en", "zh-CN", "ja"] as const) {
+for (const locale of locales) {
   test(`website locale ${locale} renders on the server and persists without losing draft`, async ({
     page,
     context,
@@ -113,7 +114,7 @@ for (const locale of ["en", "zh-CN", "ja"] as const) {
     await page.locator("#notes").fill(notes);
     await page.locator("#topic").fill("光");
     await expect(
-      page.getByLabel(translate(locale, "AI teaching language")),
+      page.getByLabel(translate(locale, "What language should Milo use?")),
     ).toHaveAttribute("data-value", locale);
     const next: Locale = locale === "ja" ? "zh-CN" : "ja";
     await chooseLanguage(page, translate(locale, "Website language"), next);
@@ -121,7 +122,7 @@ for (const locale of ["en", "zh-CN", "ja"] as const) {
     await expect(page.locator("#notes")).toHaveValue(notes);
     await expect(page.locator("#topic")).toHaveValue("光");
     await expect(
-      page.getByLabel(translate(next, "AI teaching language")),
+      page.getByLabel(translate(next, "What language should Milo use?")),
     ).toHaveAttribute("data-value", next);
     const cookies = await context.cookies();
     const preference = cookies.find((cookie) => cookie.name === LOCALE_COOKIE)!;
@@ -145,7 +146,11 @@ test("teaching language stays independent through preparation and classroom UI c
   const state = await setup(page);
   await page.goto("/");
   await chooseLanguage(page, "Website language", "ja");
-  await chooseLanguage(page, translate("ja", "AI teaching language"), "zh-CN");
+  await chooseLanguage(
+    page,
+    translate("ja", "What language should Milo use?"),
+    "zh-CN",
+  );
   await page
     .getByRole("button", { name: translate("ja", "Paste notes"), exact: true })
     .click();
@@ -160,7 +165,7 @@ test("teaching language stays independent through preparation and classroom UI c
     }),
   ).toBeVisible();
   await expect(
-    page.getByLabel(translate("ja", "AI teaching language")),
+    page.getByLabel(translate("ja", "What language should Milo use?")),
   ).toHaveAttribute("data-value", "zh-CN");
   const preparation = page.waitForRequest(
     (request) => new URL(request.url()).pathname === "/api/lessons",
@@ -179,7 +184,7 @@ test("teaching language stays independent through preparation and classroom UI c
     ),
   ).toBeVisible();
   await expect(
-    page.getByLabel(translate("ja", "AI teaching language")),
+    page.getByLabel(translate("ja", "What language should Milo use?")),
   ).toHaveCount(0);
   await page
     .getByRole("button", { name: translate("ja", "Let’s teach Milo") })
@@ -197,7 +202,9 @@ test("teaching language stays independent through preparation and classroom UI c
   await expect(
     page.locator(".message-text").filter({ hasText: state.messages[0].text }),
   ).toBeVisible();
-  await expect(page.getByLabel("AI teaching language")).toHaveCount(0);
+  await expect(page.getByLabel("What language should Milo use?")).toHaveCount(
+    0,
+  );
   await page.reload();
   await expect(page.getByLabel("Your explanation to Milo")).toHaveValue(
     "我用自己的话解释。",
@@ -243,7 +250,7 @@ test("the selected teaching language survives a sign-in redirect", async ({
   await page.getByRole("button", { name: "Paste notes", exact: true }).click();
   await page.locator("#notes").fill(notes);
   await page.locator("#topic").fill("光");
-  await chooseLanguage(page, "AI teaching language", "ja");
+  await chooseLanguage(page, "What language should Milo use?", "ja");
   await page.getByRole("button", { name: "Prepare my lesson" }).click();
   await expect(
     page.getByRole("dialog", { name: "Sign In to TeachBack" }),
@@ -260,10 +267,9 @@ test("the selected teaching language survives a sign-in redirect", async ({
   await expect(
     page.getByRole("heading", { name: "Does this look right?" }),
   ).toBeVisible();
-  await expect(page.getByLabel("AI teaching language")).toHaveAttribute(
-    "data-value",
-    "ja",
-  );
+  await expect(
+    page.getByLabel("What language should Milo use?"),
+  ).toHaveAttribute("data-value", "ja");
   const preparation = page.waitForRequest(
     (request) => new URL(request.url()).pathname === "/api/lessons",
   );
@@ -279,7 +285,7 @@ test("custom language menus support keyboard selection, cancellation and typeahe
   await setup(page);
   await page.goto("/");
   const language = page.getByRole("combobox", {
-    name: "AI teaching language",
+    name: "What language should Milo use?",
     exact: true,
   });
   await language.focus();
@@ -302,7 +308,10 @@ test("custom language menus support keyboard selection, cancellation and typeahe
   await expect(language).toBeFocused();
   await language.press("End");
   await language.press("Enter");
-  await expect(language).toHaveAttribute("data-value", "ja");
+  await expect(language).toHaveAttribute(
+    "data-value",
+    teachingLanguages.at(-1)!,
+  );
   await language.press("Home");
   await language.press("Tab");
   await expect(language).toHaveAttribute("data-value", "en");
@@ -360,14 +369,21 @@ test("classification menus select groups in the teaching board and its mobile di
 }, testInfo) => {
   const state = await setup(page);
   Object.assign(state.board, {
-    kind: "classification",
     title: "Sort the examples",
     instruction: "Choose the matching group.",
-    items: [
-      { id: "a", label: "Shared weights", detail: "One filter is reused." },
-      { id: "b", label: "Image width", detail: "The image size changes." },
+    nodes: [
+      { id: "main", parentId: "", component: "Stack", props: [], items: [] },
+      {
+        id: "sort",
+        parentId: "main",
+        component: "Buckets",
+        props: [{ key: "groups", value: "Parameters|Computation" }],
+        items: [
+          { id: "a", label: "Shared weights", detail: "One filter is reused." },
+          { id: "b", label: "Image width", detail: "The image size changes." },
+        ],
+      },
     ],
-    groups: ["Parameters", "Computation"],
   });
   await page.goto(`/session/${sessionId}`);
   const mobile = testInfo.project.name === "mobile";
@@ -398,6 +414,6 @@ test("classification menus select groups in the teaching board and its mobile di
     .getByRole("combobox", { name: "Image width", exact: true })
     .click();
   await page.getByRole("option", { name: "Computation", exact: true }).click();
-  await board.getByRole("button", { name: "Use this to explain it" }).click();
+  await board.getByRole("button", { name: "Attach to explanation" }).click();
   await expect(page.locator(".attachment-chip")).toBeVisible();
 });

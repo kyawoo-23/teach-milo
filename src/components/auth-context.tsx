@@ -11,6 +11,7 @@ import {
 } from "react";
 import { UserPublic } from "@/lib/contracts";
 import { api } from "./ui";
+import { clearBoardDrafts } from "@/lib/board-drafts";
 
 type AuthContextType = {
   user: UserPublic | null;
@@ -119,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     const generation = beginAuthChange();
     await api("/api/auth/logout", {});
+    clearBoardDrafts(user?.id);
     if (generation !== authGeneration.current) return;
     setLoading(false);
     setSessionModalOpen(false);
