@@ -1,11 +1,12 @@
 "use client";
 
-import { lessonLanguage, type Locale } from "@/lib/i18n/locales";
+import { lessonLanguage, type TeachingLanguage } from "@/lib/i18n/locales";
 import { useI18n } from "@/components/locale-context";
 import { memo, useEffect, useState } from "react";
 import { Check, Copy, Layers3 } from "lucide-react";
 import type { Message, UserPublic } from "@/lib/contracts";
 import { Milo } from "./milo";
+import { BoardPreview } from "./board-preview";
 
 export const ConversationMessage = memo(function ConversationMessage({
   message,
@@ -13,7 +14,7 @@ export const ConversationMessage = memo(function ConversationMessage({
   teachingLanguage,
 }: {
   message: Message;
-  teachingLanguage?: Locale;
+  teachingLanguage?: TeachingLanguage;
   user: UserPublic | null;
 }) {
   const { t } = useI18n();
@@ -53,14 +54,17 @@ export const ConversationMessage = memo(function ConversationMessage({
         </div>
         {message.role === "student" && <CopyButton text={message.text} />}
         {message.board && (
-          <div className="shared-board">
-            <Layers3 size={15} />
-            <span>
-              {t("Demonstration shared")}
-              {message.board.kind === "cnn"
-                ? ` · ${message.board.inputs.inputSize} × ${message.board.inputs.inputSize}`
-                : ""}
-            </span>
+          <div className="shared-board-preview">
+            <div className="shared-board">
+              <Layers3 size={15} />
+              <span>
+                {t("Demonstration shared")}
+                {message.board.kind === "cnn"
+                  ? ` · ${message.board.inputs.inputSize} × ${message.board.inputs.inputSize}`
+                  : ""}
+              </span>
+            </div>
+            <BoardPreview snapshot={message.board} />
           </div>
         )}
       </div>

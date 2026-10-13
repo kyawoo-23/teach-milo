@@ -18,10 +18,12 @@ import {
   submitTurn,
 } from "@/server/sessions";
 import { sessionOperation } from "@/server/operations";
+import { readBoardImage } from "@/server/board-media";
+import { pngFixture, sketchFixture } from "./board-fixtures";
 import { prepareLesson } from "@/server/lessons";
 import { localizedCnnBoard, localizedCnnTransfer } from "@/content/cnn";
 import { translate } from "@/lib/i18n/messages";
-import { textBoard } from "@/lib/boards";
+import { textBoard, exampleBoard } from "@/lib/boards";
 import type { Lesson } from "@/lib/contracts";
 import { saveMaterial } from "@/server/materials";
 import { reserveModelCall } from "@/server/usage";
@@ -50,6 +52,72 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
     await createSession(id, lesson.id, ctx.ownerId);
     return { id, lesson };
   }
+  it("sends one sketch inline, preserves retries, and protects lightweight image history", async () => {
+    const { id } = await setup();
+    const input = {
+      operationId: randomUUID(),
+      revision: 0,
+      text: "The same weights are reused at each position because the filter slides without relearning its coefficients.",
+      board: {
+        version: 2 as const,
+        inputs: {},
+        state: sketchFixture,
+        png: pngFixture().toString("base64"),
+      },
+    };
+    let calls = 0;
+    const model: Model = {
+      async generate(schema, _system, data, _context, media) {
+        calls++;
+        expect(media).toEqual([
+          {
+            mimeType: "image/png",
+            data: pngFixture(),
+            messageId: input.operationId,
+          },
+        ]);
+        expect(JSON.stringify(data)).not.toContain('"png"');
+        const messages = (data as { messages: Message[] }).messages;
+        if (calls === 1)
+          throw new AppError("MODEL_FAILURE", "Please retry.", 502);
+        return schema.parse(replyFixture(messages.at(-1)!));
+      },
+    };
+    await expect(submitTurn(id, input, ctx, model)).rejects.toMatchObject({
+      code: "MODEL_FAILURE",
+    });
+    expect(await readMessages(id)).toHaveLength(1);
+    await submitTurn(id, input, ctx, model);
+    await submitTurn(id, input, ctx, model);
+    expect(calls).toBe(2);
+    const history = await publicSession(id, ctx.ownerId);
+    const shared = history.messages.find((m) => m.id === input.operationId)!;
+    expect(shared.board).not.toHaveProperty("png");
+    expect(shared.board).toHaveProperty(
+      "imageUrl",
+      `/api/sessions/${id}/messages/${input.operationId}/board-image`,
+    );
+    expect(await readBoardImage(id, input.operationId, ctx.ownerId)).toEqual(
+      pngFixture(),
+    );
+    await expect(
+      readBoardImage(id, input.operationId, "another-owner"),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await database()
+      .collection("sessions")
+      .doc(id)
+      .update({ phase: "transfer" });
+    await expect(
+      readBoardImage(id, input.operationId, ctx.ownerId),
+    ).rejects.toMatchObject({ code: "ASSESSMENT_ACTIVE" });
+    await database()
+      .collection("sessions")
+      .doc(id)
+      .update({ expiresAt: Timestamp.fromMillis(0) });
+    await expect(
+      readBoardImage(id, input.operationId, ctx.ownerId),
+    ).rejects.toMatchObject({ code: "EXPIRED" });
+  });
   afterAll(async () => {
     for (const id of cleanup)
       await database().recursiveDelete(
@@ -249,7 +317,7 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
       expect(calls).toBe(2);
       expect(
         (await readOwned<Lesson>("lessons", id, ctx.ownerId)).board,
-      ).toEqual(textBoard(locale));
+      ).toEqual(exampleBoard("A source-grounded concept", locale));
       await expect(
         prepareLesson(
           id,
@@ -980,7 +1048,7 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
         },
       );
       expect(stdout).toContain("user_sessions: removed 101 expired records");
-      expect(stdout).toContain("sessions: removed 1 expired records");
+      expect(stdout).toMatch(/sessions: removed [1-9]\d* expired records/);
       expect((await f.getAll(...expired)).every((doc) => !doc.exists)).toBe(
         true,
       );

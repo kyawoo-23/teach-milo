@@ -50,6 +50,11 @@ describe("website locales", () => {
     expect(resolveLocale(undefined, "zh-Hans-CN")).toBe("zh-CN");
     expect(resolveLocale(undefined, "fr-FR")).toBe("en");
     expect(resolveLocale(undefined, "ja;q=invalid,en;q=0.5")).toBe("en");
+    expect(resolveLocale(undefined, "ko-KR,en;q=0.5")).toBe("ko");
+    expect(resolveLocale("th", "ja")).toBe("th");
+    expect(resolveLocale(undefined, "th-TH,en;q=0.8")).toBe("th");
+    expect(resolveLocale(undefined, "vi-VN,en;q=0.2")).toBe("en");
+    expect(resolveLocale(undefined, "my,id;q=0.9")).toBe("en");
   });
   it("interpolates without interpreting supplied text as markup", () => {
     expect(
@@ -130,6 +135,13 @@ describe("fixed teaching language", () => {
       PrepareSchema.safeParse({ ...input, teachingLanguage: "fr" }).success,
     ).toBe(false);
     expect(
+      PrepareSchema.parse({ ...input, teachingLanguage: "my" })
+        .teachingLanguage,
+    ).toBe("my");
+    expect(
+      PrepareSchema.safeParse({ ...input, teachingLanguage: "zh-TW" }).success,
+    ).toBe(false);
+    expect(
       TurnSchema.safeParse({
         operationId: lesson.id,
         revision: 0,
@@ -175,6 +187,22 @@ describe("fixed teaching language", () => {
       );
     },
   );
+  it("localizes canned teaching copy for languages without a site catalog", () => {
+    expect(languageInstruction("vi")).toContain("Vietnamese");
+    expect(languageInstruction("my")).toContain("Burmese");
+    expect(textBoard("my").title).not.toBe(textBoard("en").title);
+    expect(textBoard("my").instruction).not.toBe(textBoard().instruction);
+    expect(localizedCnnBoard("my").title).not.toBe(
+      localizedCnnBoard("en").title,
+    );
+    expect(localizedCnnTransfer("id").expected).toContain("204");
+    expect(localizedCnnTransfer("vi").question).not.toBe(
+      localizedCnnTransfer("en").question,
+    );
+    expect(
+      greetLearner("မင်္ဂလာပါ! ကွန်ဗိုလူးရှင်းကို သင်ပေးပါ။", "my"),
+    ).toMatch(/^မင်္ဂလာပါ!/);
+  });
   it("adds a single localized greeting", () => {
     expect(greetLearner("こんにちは！光について教えて？", "ja")).toBe(
       "こんにちは！ 光について教えて？",

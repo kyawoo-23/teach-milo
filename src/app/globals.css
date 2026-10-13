@@ -1,5 +1,435 @@
 @import "tailwindcss";
 
+/* Teaching tools share the classroom's visual language and one draft. */
+.board-workspace {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.workspace-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.workspace-heading strong {
+  font-size: 14px;
+}
+.workspace-heading button,
+.workspace-reset {
+  color: var(--purple-dark);
+  background: var(--lavender);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.board-workspace > .tool-field {
+  margin: 14px 16px;
+}
+.tool-field {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.board-workspace :where(input:not([type="range"]), select) {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid #c7cad9;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: white;
+  font-size: 14px;
+  min-height: 40px;
+}
+.board-workspace .teaching-board {
+  border: 0;
+  border-radius: 0;
+}
+.board-workspace .board-heading {
+  display: flex;
+  border: 0;
+  padding: 4px 16px;
+}
+.board-workspace .board-heading > :is(.board-icon, h2) {
+  display: none;
+}
+.workspace-editor {
+  padding: 0 16px 16px;
+}
+.suggested-heading {
+  margin: 6px 0 16px;
+}
+.suggested-heading p {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 6px;
+}
+.tool-hint,
+.board-saving-notice {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 8px 0 12px;
+}
+.board-saving-notice {
+  padding: 0 16px;
+}
+.board-workspace > .error-notice {
+  margin: 12px 16px;
+}
+.workspace-share {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.workspace-share .board-footnote {
+  margin-top: 8px;
+}
+.workspace-reset {
+  margin: 0 16px 16px;
+}
+.sketch-toolbar,
+.tool-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+.board-workspace
+  :where(
+    .sketch-toolbar,
+    .tool-actions,
+    .tool-add-row,
+    .tool-edit-row,
+    .relationship-editor,
+    .pair-editor
+  )
+  button,
+.board-workspace details > button,
+.board-workspace details + button {
+  border-radius: 8px;
+  background: var(--lavender);
+  color: var(--purple-dark);
+  padding: 8px 10px;
+  min-height: 40px;
+  font-size: 12px;
+}
+.sketch-toolbar button[aria-pressed="true"] {
+  background: var(--purple-dark);
+  color: white;
+}
+.sketch-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 12px 0;
+}
+.sketch-settings label {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+}
+.sketch-settings input[type="range"] {
+  width: 100%;
+  accent-color: var(--purple);
+}
+.sketch-board canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 2;
+  background: white;
+  border: 1px solid #c7cad9;
+  border-radius: 8px;
+  touch-action: none;
+  cursor: crosshair;
+  margin-top: 12px;
+}
+.concept-map-scene {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  border: 1px solid #c7cad9;
+  border-radius: 10px;
+  background: #faf9ff;
+  overflow: hidden;
+}
+.concept-map-scene svg {
+  width: 100%;
+  height: 100%;
+}
+.concept-map-scene :is(line, polyline) {
+  stroke: #7f78bf;
+  stroke-width: 4;
+}
+.concept-map-scene text {
+  fill: var(--ink);
+  font-size: 28px;
+  paint-order: stroke;
+  stroke: #faf9ff;
+  stroke-width: 8px;
+  stroke-linejoin: round;
+}
+.concept-node {
+  overflow-wrap: anywhere;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: max-content;
+  max-width: 32%;
+  border: 1px solid #b7b0e6;
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: white;
+  color: var(--purple-dark);
+  font-size: 12px;
+  min-height: 36px;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: grab;
+}
+.tool-empty {
+  padding: 24px 12px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 13px;
+}
+.concept-map-scene .tool-empty {
+  position: absolute;
+  inset: 35% 0 auto;
+}
+.tool-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  margin: 16px 0 10px;
+}
+.tool-add-row label {
+  grid-column: 1 / -1;
+  font-size: 12px;
+}
+.tool-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 7px 0;
+  font-size: 12px;
+}
+.tool-edit-row > input,
+.tool-edit-row > span {
+  flex: 1;
+  min-width: 0;
+}
+.relationship-editor {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  margin: 14px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.relationship-editor legend {
+  font-size: 13px;
+  font-weight: 600;
+}
+.relationship-editor label {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+}
+.matching-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 12px 0;
+}
+.matching-columns > div {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+}
+.matching-columns button {
+  padding: 10px;
+  min-height: 48px;
+  text-align: left;
+  background: #f8f7fe;
+  border: 1px solid #d8d4ed;
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.matching-columns button[aria-pressed="true"] {
+  border-color: var(--purple-dark);
+  box-shadow: inset 0 0 0 1px var(--purple-dark);
+}
+.matching-columns small {
+  display: block;
+  color: var(--muted);
+  margin-top: 5px;
+}
+.tool-progress {
+  font-size: 12px;
+  color: var(--purple-dark);
+}
+.board-workspace details {
+  font-size: 13px;
+}
+.board-workspace summary {
+  padding: 10px 0;
+  cursor: pointer;
+}
+.pair-editor {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.pair-editor label {
+  font-size: 12px;
+}
+.board-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.board-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.board-table th,
+.board-table td {
+  border: 1px solid var(--line);
+  padding: 4px;
+  vertical-align: top;
+}
+.board-table th {
+  background: var(--lavender);
+}
+.board-table th:last-child,
+.board-table td:last-child {
+  width: 28px;
+}
+.board-workspace .board-table th input {
+  padding: 4px;
+  font-size: 12px;
+}
+.board-table textarea {
+  padding: 6px;
+  font-size: 13px;
+  border-radius: 4px;
+  min-height: 85px;
+}
+.board-table button {
+  color: var(--purple-dark);
+  background: transparent;
+  min-height: 28px;
+  min-width: 24px;
+}
+.board-workspace .board-number {
+  width: 110px;
+  margin-top: 6px;
+}
+.classification-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.classification-groups span {
+  padding: 5px 8px;
+  background: var(--lavender);
+  color: var(--purple-dark);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.board-preview {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  padding: 8px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.board-preview img {
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  height: auto;
+  display: block;
+}
+.board-preview dl > div {
+  display: flex;
+  gap: 12px;
+}
+.board-preview dt {
+  color: var(--muted);
+}
+.board-preview dd {
+  margin: 0;
+}
+.board-preview table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.board-preview th,
+.board-preview td {
+  text-align: left;
+  padding: 5px;
+  border: 1px solid var(--line);
+}
+.board-attachment {
+  margin-bottom: 10px;
+}
+.shared-board-preview {
+  margin-top: 8px;
+  max-width: 500px;
+}
+.board-invitation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--lavender);
+  color: var(--purple-dark);
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+.board-invitation button {
+  background: white;
+  border-radius: 6px;
+  padding: 7px 9px;
+  color: var(--purple-dark);
+}
+.modal.board-expanded-modal {
+  width: min(1000px, calc(100vw - 32px));
+  max-width: 1000px;
+}
+.board-expanded-modal .workspace-editor {
+  max-width: 850px;
+  margin: auto;
+}
+.board-expanded-modal .concept-node {
+  font-size: 16px;
+}
+.board-expanded-modal .sketch-board canvas {
+  width: 100%;
+}
+@media (pointer: coarse) {
+  .board-workspace button {
+    min-height: 44px;
+  }
+}
+
 :root {
   --ink: #24283f;
   --muted: #626779;
@@ -4002,9 +4432,9 @@ input[type="range"] {
 .send-button:hover:not(:disabled) {
   background: var(--purple-dark);
 }
-.segmented button:hover:not(:disabled),
-.md-tabs button:hover,
-.auth-tab:hover {
+.segmented button:hover:not(:disabled):not([aria-pressed="true"]),
+.md-tabs button:hover:not([aria-selected="true"]),
+.auth-tab:hover:not(.auth-tab-active) {
   color: var(--purple-dark);
   background: var(--lavender);
 }
@@ -4419,8 +4849,30 @@ html:lang(ja) {
     "Avenir Next", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans CJK JP",
     sans-serif;
 }
+html:lang(ko),
+:lang(ko) {
+  --font-sans:
+    "Avenir Next", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR",
+    "Noto Sans CJK KR", sans-serif;
+}
+html:lang(th),
+:lang(th) {
+  --font-sans:
+    "Avenir Next", "Thonburi", "Leelawadee UI", "Noto Sans Thai", sans-serif;
+}
+:lang(my) {
+  --font-sans:
+    "Avenir Next", "Myanmar Text", "Myanmar MN", "Noto Sans Myanmar", sans-serif;
+}
+:lang(ko),
+:lang(th),
+:lang(my) {
+  font-family: var(--font-sans);
+}
 html:lang(zh-CN) :is(h1, h2, h3, button),
-html:lang(ja) :is(h1, h2, h3, button) {
+html:lang(ja) :is(h1, h2, h3, button),
+html:lang(ko) :is(h1, h2, h3, button),
+html:lang(th) :is(h1, h2, h3, button) {
   letter-spacing: normal;
 }
 :is(.home-intro, .material-card, .review-card, .message-text, .report-main) {
@@ -4611,4 +5063,54 @@ html:lang(ja) :is(h1, h2, h3, button) {
   .custom-select-option[aria-selected="true"] {
     color: Highlight;
   }
+}
+
+.labeled-board-button.labeled-board-button {
+  width: auto;
+  height: auto;
+  padding: 8px 10px;
+  gap: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Schema-backed form feedback uses text and an explicit accessible state. */
+.field-error {
+  color: #a82e43;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 0.4rem 0 0.7rem;
+}
+input[aria-invalid="true"],
+textarea[aria-invalid="true"],
+select[aria-invalid="true"],
+.custom-select-trigger[aria-invalid="true"] {
+  border-color: #a82e43;
+}
+:is(
+    input,
+    textarea,
+    select,
+    .custom-select-trigger
+  )[aria-invalid="true"]:focus-visible {
+  border-color: #a82e43;
+  outline-color: #a82e43;
+}
+.input-with-icon input[aria-invalid="true"]:focus {
+  border-color: #a82e43;
+  box-shadow: 0 0 0 3px #a82e4326;
+}
+.dropzone:has(input[aria-invalid="true"]) {
+  border-color: #a82e43;
+}
+.dropzone:has(input[aria-invalid="true"]):focus-within {
+  outline-color: #a82e43;
+}
+.composer:has(textarea[aria-invalid="true"]):focus-within {
+  border-color: #a82e43;
+  box-shadow: 0 0 0 3px #a82e4340;
+}
+.composer > .field-error {
+  grid-column: 1 / -1;
+  margin: 0.25rem 0.75rem;
 }

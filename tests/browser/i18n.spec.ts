@@ -4,6 +4,8 @@ import { dictionaries, translate } from "../../src/lib/i18n/messages";
 import {
   LOCALE_COOKIE,
   localeNames,
+  locales,
+  teachingLanguages,
   type Locale,
 } from "../../src/lib/i18n/locales";
 
@@ -90,7 +92,7 @@ async function setup(page: Page) {
   });
   return state;
 }
-for (const locale of ["en", "zh-CN", "ja"] as const) {
+for (const locale of locales) {
   test(`website locale ${locale} renders on the server and persists without losing draft`, async ({
     page,
     context,
@@ -307,7 +309,10 @@ test("custom language menus support keyboard selection, cancellation and typeahe
   await expect(language).toBeFocused();
   await language.press("End");
   await language.press("Enter");
-  await expect(language).toHaveAttribute("data-value", "ja");
+  await expect(language).toHaveAttribute(
+    "data-value",
+    teachingLanguages.at(-1)!,
+  );
   await language.press("Home");
   await language.press("Tab");
   await expect(language).toHaveAttribute("data-value", "en");
@@ -403,6 +408,6 @@ test("classification menus select groups in the teaching board and its mobile di
     .getByRole("combobox", { name: "Image width", exact: true })
     .click();
   await page.getByRole("option", { name: "Computation", exact: true }).click();
-  await board.getByRole("button", { name: "Use this to explain it" }).click();
+  await board.getByRole("button", { name: "Attach to explanation" }).click();
   await expect(page.locator(".attachment-chip")).toBeVisible();
 });

@@ -1,5 +1,5 @@
-import { lessonLanguage, type Locale } from "./i18n/locales";
-import { translate } from "./i18n/messages";
+import { lessonLanguage, type TeachingLanguage } from "./i18n/locales";
+import { translateTeaching } from "./i18n/messages";
 import {
   Citation,
   Ledger,
@@ -44,24 +44,24 @@ export function allowedMoves(session: Session) {
   return moves;
 }
 // Keep greeting and reply limits consistent across spaced and unspaced languages.
-export function greetLearner(opening: string, language?: Locale) {
+export function greetLearner(opening: string, language?: TeachingLanguage) {
   const body = opening
     .replace(
-      /^\s*(?:(?:hi|hello|hey|greetings)\b[^.!?,\n]{0,40}[.!?,]|(?:你好|您好|嗨|こんにちは|こんばんは|おはようございます)[！!。,.，、]?)[\s]*/i,
+      /^\s*(?:(?:xin chào|hello|helo|halo|greetings|hey|hai|hi|chào)\b[^.!?,\n]{0,40}[.!?,]|(?:你好|您好|嗨|こんにちは|こんばんは|おはようございます|안녕하세요|안녕|สวัสดี|မင်္ဂလာပါ)[！!。,.，、]?)[\s]*/i,
       "",
     )
     .trim();
   const locale = lessonLanguage(language);
-  return `${translate(locale, "Hi!")} ${locale === "en" ? body.charAt(0).toUpperCase() + body.slice(1) : body}`;
+  return `${translateTeaching(locale, "Hi!")} ${locale === "en" ? body.charAt(0).toUpperCase() + body.slice(1) : body}`;
 }
-export function replyWords(text: string, language?: Locale) {
+export function replyWords(text: string, language?: TeachingLanguage) {
   return [
     ...new Intl.Segmenter(lessonLanguage(language), {
       granularity: "word",
     }).segment(text),
   ].filter((s) => s.isWordLike);
 }
-function limitReply(text: string, language?: Locale) {
+function limitReply(text: string, language?: TeachingLanguage) {
   const words = replyWords(text, language);
   return words.length > 65 ? text.slice(0, words[65].index).trim() : text;
 }
@@ -79,6 +79,11 @@ export function normalizeStudentReply(
     .replace(/\bmastered\b/gi, "understood")
     .replace(/完全掌握|精通/g, "理解")
     .replace(/完全に習得/g, "理解")
+    .replace(/완전히\s*마스터|완전\s*숙달|완전히\s*습득/g, "이해")
+    .replace(/เชี่ยวชาญอย่างสมบูรณ์|เข้าใจอย่างสมบูรณ์/g, "เข้าใจ")
+    .replace(/thành thạo hoàn toàn|nắm vững hoàn toàn/gi, "hiểu")
+    .replace(/menguasai sepenuhnya/gi, "memahami")
+    .replace(/လုံးဝကျွမ်းကျင်/g, "နားလည်")
     .replace(/\d+\s*\/\s*10/gi, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -108,8 +113,8 @@ export function normalizeStudentReply(
     move,
     studentMessage:
       studentMessage ||
-      translate(
-        lessonLanguage(lesson.teachingLanguage),
+      translateTeaching(
+        lesson.teachingLanguage,
         "Can you say a bit more about that?",
       ),
     mechanism,

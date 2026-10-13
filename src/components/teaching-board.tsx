@@ -1,6 +1,13 @@
 "use client";
 
-import { lessonLanguage, formatNumber, type Locale } from "@/lib/i18n/locales";
+import {
+  lessonLanguage,
+  formatNumber,
+  type TeachingLanguage,
+} from "@/lib/i18n/locales";
+import { Controller, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { BoardNumberField } from "./schema-form";
 import { CustomSelect } from "./custom-select";
 import { useI18n } from "@/components/locale-context";
 import { useConfirmation } from "./confirmation";
@@ -19,8 +26,24 @@ import {
   BoardOutput,
   BoardOutputSchema,
   BoardSubmission,
+  BoardInputs,
+  LegacyBoardSubmissionSchema,
 } from "@/lib/contracts";
-import { calculateTemplate, initialBoardInputs } from "@/lib/boards";
+import {
+  calculateTemplate,
+  initialBoardInputs,
+  validateBoardInputs,
+} from "@/lib/boards";
+import type { Workspace } from "./use-board-workspace";
+import {
+  ConceptMap,
+  MatchingBoard,
+  ComparisonTable,
+} from "./board-tool-editors";
+import { SketchBoard } from "./sketch-board";
+import { sketchPng } from "@/lib/sketch";
+import type { ToolState } from "@/lib/board-tools";
+import { api, ErrorNotice } from "./ui";
 import { convolution } from "@/lib/cnn";
 import { validateCalculation } from "@/lib/custom-code";
 import { calculationSandbox } from "@/lib/sandbox";
@@ -30,21 +53,237 @@ export function TeachingBoard({
   teachingLanguage,
   onAttach,
   disabled = false,
+  workspace,
+  onChange,
+  onExpand,
+  sessionId,
+  storageUnavailable,
 }: {
   board: Board;
-  teachingLanguage?: Locale;
+  teachingLanguage?: TeachingLanguage;
   onAttach: (
     snapshot: BoardSubmission,
   ) => void | boolean | Promise<void | boolean>;
   disabled?: boolean;
+  workspace: Workspace;
+  onChange: (value: Workspace) => void;
+  onExpand?: () => void;
+  sessionId: string;
+  storageUnavailable: boolean;
+}) {
+  const { t } = useI18n();
+  const toolId = useId();
+  const [error, setError] = useState<string | Error>("");
+  const [attaching, setAttaching] = useState(false);
+  const confirm = useConfirmation();
+  const state = workspace.tools[workspace.active];
+  const updateTool = (value: ToolState) =>
+    onChange({
+      ...workspace,
+      tools: { ...workspace.tools, [workspace.active]: value },
+    });
+  const attach = async (snapshot: BoardSubmission) => {
+    setError("");
+    try {
+      return await onAttach(structuredClone(snapshot));
+    } catch (e) {
+      setError(e as Error);
+      return false;
+    }
+  };
+  return (
+    <div className="board-workspace">
+      <div className="workspace-heading">
+        <strong>{t("Teaching board")}</strong>
+        {onExpand && (
+          <button type="button" onClick={onExpand}>
+            {t("Expand board")}
+          </button>
+        )}
+      </div>
+      <div className="tool-field">
+        <label htmlFor={toolId}>{t("Board tool")}</label>
+        <CustomSelect
+          id={toolId}
+          label={t("Board tool")}
+          disabled={disabled || attaching}
+          value={workspace.active}
+          options={[
+            { value: "suggested", label: t("Suggested activity") },
+            { value: "sketch", label: t("Sketch and diagram") },
+            { value: "concept_map", label: t("Concept map") },
+            { value: "matching", label: t("Matching pairs") },
+            { value: "table", label: t("Comparison table") },
+          ]}
+          onChange={(value) => {
+            const active = value as Workspace["active"];
+            setError("");
+            onChange({ ...workspace, active });
+            void api(`/api/sessions/${sessionId}/events`, {
+              name: `board_tool_${active}`,
+            }).catch(() => {});
+          }}
+        />
+      </div>
+      {storageUnavailable && (
+        <p className="board-saving-notice" role="status">
+          {t(
+            "Browser saving is unavailable. Keep this page open to preserve your board.",
+          )}
+        </p>
+      )}
+      {error && <ErrorNotice message={error} />}
+      {state ? (
+        <div className="workspace-editor">
+          {workspace.active === "suggested" && (
+            <div
+              className="suggested-heading"
+              lang={lessonLanguage(teachingLanguage)}
+            >
+              <h3>{board.title}</h3>
+              <p>{board.instruction}</p>
+            </div>
+          )}
+          {state.kind === "sketch" && (
+            <SketchBoard
+              state={state}
+              disabled={disabled || attaching}
+              history={workspace.sketchHistory ?? { past: [], future: [] }}
+              onChange={(s, h) =>
+                onChange({
+                  ...workspace,
+                  sketchHistory: h,
+                  tools: { ...workspace.tools, [workspace.active]: s },
+                })
+              }
+            />
+          )}
+          {state.kind === "concept_map" && (
+            <ConceptMap
+              state={state}
+              onChange={updateTool}
+              disabled={disabled || attaching}
+            />
+          )}
+          {state.kind === "matching" && (
+            <MatchingBoard
+              state={state}
+              onChange={updateTool}
+              disabled={disabled || attaching}
+            />
+          )}
+          {state.kind === "table" && (
+            <ComparisonTable
+              state={state}
+              onChange={updateTool}
+              disabled={disabled || attaching}
+            />
+          )}
+          <div className="workspace-share">
+            <button
+              className="secondary-button full-width"
+              type="button"
+              disabled={disabled || attaching}
+              onClick={async () => {
+                setAttaching(true);
+                setError("");
+                try {
+                  const snapshot: BoardSubmission = {
+                    version: 2,
+                    inputs: {},
+                    state: structuredClone(state),
+                    ...(state.kind === "sketch"
+                      ? { png: sketchPng(state) }
+                      : {}),
+                  };
+                  validateBoardInputs(board, snapshot);
+                  await attach(snapshot);
+                } catch (e) {
+                  setError(e as Error);
+                } finally {
+                  setAttaching(false);
+                }
+              }}
+            >
+              {t("Attach to explanation")}
+            </button>
+            <p className="board-footnote">
+              {t("Add your own explanation when you send.")}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <LegacyTeachingBoard
+          board={board}
+          teachingLanguage={teachingLanguage}
+          onAttach={attach}
+          disabled={disabled}
+          inputs={workspace.inputs}
+          onInputsChange={(inputs) => onChange({ ...workspace, inputs })}
+        />
+      )}
+      {state && workspace.active !== "sketch" && (
+        <button
+          className="workspace-reset"
+          type="button"
+          disabled={disabled}
+          onClick={async () => {
+            if (
+              await confirm({
+                title: "Reset this board?",
+                description:
+                  "Your current board settings will be lost and the initial settings restored.",
+                confirmLabel: "Reset board",
+                destructive: true,
+              })
+            ) {
+              const { initialWorkspace } =
+                await import("./use-board-workspace");
+              const initial = initialWorkspace(board, teachingLanguage);
+              onChange({
+                ...workspace,
+                tools: {
+                  ...workspace.tools,
+                  [workspace.active]: initial.tools[workspace.active],
+                },
+              });
+            }
+          }}
+        >
+          {t("Reset board")}
+        </button>
+      )}
+    </div>
+  );
+}
+function LegacyTeachingBoard({
+  board,
+  teachingLanguage,
+  onAttach,
+  disabled = false,
+  inputs,
+  onInputsChange,
+}: {
+  board: Board;
+  teachingLanguage?: TeachingLanguage;
+  onAttach: (
+    snapshot: BoardSubmission,
+  ) => void | boolean | Promise<void | boolean>;
+  disabled?: boolean;
+  inputs: BoardInputs;
+  onInputsChange: (inputs: BoardInputs) => void;
 }) {
   const { t, locale } = useI18n();
 
   const confirm = useConfirmation();
   const boardId = useId();
-  const [inputs, setInputs] = useState<BoardSubmission["inputs"]>(() =>
-    initialBoardInputs(board),
-  );
+  const fields = useForm<BoardInputs>({
+    resolver: zodResolver(LegacyBoardSubmissionSchema.shape.inputs),
+    values: inputs,
+  });
+  const setInputs = (
+    value: BoardInputs | ((old: BoardInputs) => BoardInputs),
+  ) => onInputsChange(typeof value === "function" ? value(inputs) : value);
   const [customOutput, setCustomOutput] = useState<BoardOutput | null>(null);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -111,7 +350,8 @@ export function TeachingBoard({
       window.removeEventListener("message", receive);
     };
   }, [board, inputs, loaded, validCode, repairNonce]);
-  const update = (key: string, value: BoardSubmission["inputs"][string]) => {
+  const update = (key: string, value: BoardInputs[string]) => {
+    fields.setValue(key, value, { shouldDirty: true });
     setInputs((old) => ({ ...old, [key]: value }));
     setAttached(false);
   };
@@ -243,6 +483,7 @@ export function TeachingBoard({
                     key={size}
                     type="button"
                     aria-pressed={inputs.inputSize === size}
+                    disabled={disabled}
                     onClick={() => update("inputSize", size)}
                   >
                     {size} × {size}
@@ -287,14 +528,26 @@ export function TeachingBoard({
                       {inputs[c.id]} {c.unit}
                     </output>
                   </div>
-                  <input
+                  <BoardNumberField
                     id={`${boardId}-control-${c.id}`}
                     type="range"
+                    disabled={disabled}
                     min={c.min}
                     max={c.max}
                     step={c.step}
                     value={Number(inputs[c.id])}
-                    onChange={(e) => update(c.id, Number(e.target.value))}
+                    onChange={(value) => update(c.id, value)}
+                  />
+                  <BoardNumberField
+                    className="board-number"
+                    type="number"
+                    aria-label={`${c.label} (${t("Numeric value")})`}
+                    min={c.min}
+                    max={c.max}
+                    step={c.step}
+                    value={Number(inputs[c.id])}
+                    disabled={disabled}
+                    onChange={(value) => update(c.id, value)}
                   />
                   <div className="range-ends">
                     <span>{c.min}</span>
@@ -323,7 +576,26 @@ export function TeachingBoard({
         {!unavailable && board.kind === "sequence" && (
           <ol className="sequence-items">
             {(inputs.order as string[]).map((id, index, all) => (
-              <li key={id}>
+              <li
+                key={id}
+                draggable={!disabled}
+                onDragStart={(e) => e.dataTransfer.setData("text/plain", id)}
+                onDragOver={(e) => {
+                  if (!disabled) e.preventDefault();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (disabled) return;
+                  const order = [...(inputs.order as string[])];
+                  const from = order.indexOf(
+                    e.dataTransfer.getData("text/plain"),
+                  );
+                  if (from < 0) return;
+                  order.splice(from, 1);
+                  order.splice(index, 0, e.dataTransfer.getData("text/plain"));
+                  update("order", order);
+                }}
+              >
                 <Grip size={16} />
                 <span>
                   <strong>{board.items.find((i) => i.id === id)?.label}</strong>
@@ -335,7 +607,7 @@ export function TeachingBoard({
                     aria-label={t("Move {item} up", {
                       item: board.items.find((i) => i.id === id)?.label ?? "",
                     })}
-                    disabled={index === 0}
+                    disabled={disabled || index === 0}
                     onClick={() => reorder(index, -1)}
                   >
                     <ArrowUp size={15} />
@@ -345,7 +617,7 @@ export function TeachingBoard({
                     aria-label={t("Move {item} down", {
                       item: board.items.find((i) => i.id === id)?.label ?? "",
                     })}
-                    disabled={index === all.length - 1}
+                    disabled={disabled || index === all.length - 1}
                     onClick={() => reorder(index, 1)}
                   >
                     <ArrowDown size={15} />
@@ -357,24 +629,42 @@ export function TeachingBoard({
         )}
         {!unavailable && board.kind === "classification" && (
           <div className="classification-items">
+            <div className="classification-groups">
+              {board.groups.map((group) => (
+                <span key={group}>
+                  {group} (
+                  {Object.values(inputs).filter((v) => v === group).length})
+                </span>
+              ))}
+            </div>
             {board.items.map((item) => (
               <div key={item.id}>
                 <label htmlFor={`${boardId}-class-${item.id}`}>
                   {item.label}
                 </label>
                 <p>{item.detail}</p>
-                <CustomSelect
-                  id={`${boardId}-class-${item.id}`}
-                  label={item.label}
-                  disabled={disabled}
-                  value={String(inputs[item.id] || "")}
-                  placeholder={t("Choose a group")}
-                  options={board.groups.map((group) => ({
-                    value: group,
-                    label: group,
-                    lang: lessonLanguage(teachingLanguage),
-                  }))}
-                  onChange={(value) => update(item.id, value)}
+                <Controller
+                  control={fields.control}
+                  name={item.id}
+                  defaultValue=""
+                  render={({ field }) => (
+                    <CustomSelect
+                      id={`${boardId}-class-${item.id}`}
+                      label={item.label}
+                      disabled={disabled}
+                      value={String(field.value || "")}
+                      inputRef={field.ref}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                      placeholder={t("Choose a group")}
+                      options={board.groups.map((group) => ({
+                        value: group,
+                        label: group,
+                        lang: lessonLanguage(teachingLanguage),
+                      }))}
+                      onChange={(value) => update(item.id, value)}
+                    />
+                  )}
                 />
               </div>
             ))}
@@ -387,6 +677,7 @@ export function TeachingBoard({
                 className={inputs.selected === item.id ? "selected" : ""}
                 key={item.id}
                 aria-pressed={inputs.selected === item.id}
+                disabled={disabled}
                 onClick={() => update("selected", item.id)}
               >
                 <strong>{item.label}</strong>
@@ -404,6 +695,7 @@ export function TeachingBoard({
               className="secondary-button full-width"
               disabled={disabled || (board.kind === "custom" && !customOutput)}
               onClick={async () => {
+                if (!(await fields.trigger())) return;
                 const accepted = await onAttach({ version: 1, inputs });
                 if (accepted !== false) setAttached(true);
               }}
@@ -414,7 +706,7 @@ export function TeachingBoard({
                 </>
               ) : (
                 <>
-                  {t("Use this to explain it")} <ArrowUpRight size={17} />
+                  {t("Attach to explanation")} <ArrowUpRight size={17} />
                 </>
               )}
             </button>

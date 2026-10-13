@@ -63,6 +63,8 @@ Browser tests use intercepted API responses to exercise the complete UI. Integra
 - `src/content`: private prompts and the vetted CNN reference.
 - `scripts/extract-worker.mjs`: memory/time-bounded document parsing worker.
 
+Client data entry uses React Hook Form with Zod resolvers: account access, material preparation and source review, chat explanations, independent checks, and board editors. Client schemas in `src/lib/form-schemas.ts` reuse the API contracts; server validation remains authoritative. `schema-form.tsx` provides localized, linked field errors and controlled board fields. Board gestures and shared workspace drafts stay separate from form interaction state, so edits and failed submissions remain recoverable.
+
 The backend owns phases: `preparing → baseline → teaching → ready_for_check → transfer → report`. `preparing` is represented by durable lesson-preparation operations before a session is created. Teaching tracks objective evidence rather than counting turns. An offer to take the check requires supported objectives, mechanism and demonstration evidence, correction of any introduced misconception, and no unresolved source or conceptual error. Learners can continue or end manually. A hint is available once.
 
 Preparation freezes the source snapshot, private knowledge card, objective criteria, misconception, and novel transfer task. Student calls receive no transfer answer. The controller validates allowed moves and exact learner citations. Recent history plus a bounded evidence ledger keeps requests bounded during long conversations. Reports use stored quoted evidence and a separate model call. Unassessable dimensions remain null; a `/10` total appears only when all dimensions are assessable.
@@ -75,9 +77,13 @@ DOCX archives undergo streamed ZIP preflight (500 entries / 25 MB decompressed m
 
 ### Boards
 
-Trusted templates cover causal sliders, sequencing, classification, and comparison. Generated calculations use a deliberately small JavaScript language: arithmetic, approved Math functions, locals, and conditionals. Imports, loops, recursion, constructors, arbitrary property access, and globals are rejected by AST validation. A generated board gets one configuration repair attempt before textual fallback.
+Each lesson suggests one interactive activity. Templates cover causal sliders, sequencing, classification, comparison, concept maps, matching, and editable tables. Generated calculations use a deliberately small JavaScript language: arithmetic, approved Math functions, locals, and conditionals. Imports, loops, recursion, constructors, arbitrary property access, and globals are rejected by AST validation. A generated board gets one configuration repair attempt before falling back to an editable example table.
 
 Generated code executes only in a worker created by an app-owned bootstrap in an opaque sandboxed frame. CSP disables network access; code receives board inputs only. The worker is terminated after 500 ms, messages are validated, and a failed runtime calculation gets one retry before text fallback. Trusted React components render all controls and output. Generated outputs remain illustrative; they are not arithmetic assessment keys.
+
+The board tool selector always offers a sketchpad, concept map, matching pairs, and comparison table. The fixed sketch canvas supports pen, eraser, labels, arrows, shapes, selection, movement, and undo/redo. Desktop, expanded, and mobile views share one workspace. Unfinished tools and pending attachments are saved in this browser by account and session; expiry, deletion, sign-out, and leaving teaching clear them. Storage failures preserve in-memory work and display a notice.
+
+Attaching freezes the current state; an explanation is required to send it. Version-2 snapshots accept up to 48 KiB of structured state and a 128 KiB PNG. The newest relevant sketch is sent inline with the existing Gemini teaching call, while base64 is excluded from model JSON and public chat/history. PNG previews use an ownership-checked endpoint and the message's existing retention. Drawings contextualize explanations; readiness and assessment still require exact learner quotes. Existing version-1 snapshots remain supported.
 
 The CNN specialization uses deterministic server-recomputed snapshots (224 parameters for both image sizes; 194,400 / 830,304 multiplications). Its transfer check verifies submitted parameter counts against 204; the model evaluates semantic reasoning separately.
 
