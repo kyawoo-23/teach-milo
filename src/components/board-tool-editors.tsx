@@ -1,7 +1,8 @@
 "use client";
 import { Controller } from "react-hook-form";
 import { CustomSelect } from "./custom-select";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { Check, Pencil, Plus, Trash2 } from "lucide-react";
 import { ConceptFormSchema, relationshipFormSchema } from "@/lib/form-schemas";
 import { BoardTextField, FieldError, useSchemaForm } from "./schema-form";
 import { useI18n } from "./locale-context";
@@ -383,12 +384,23 @@ export function MatchingBoard({
   const id = useId();
   const [selected, setSelected] = useState("");
   const [editing, setEditing] = useState(state.pairs.length === 0);
+  // The card being edited in place, as "<pairId>-term" or "<pairId>-description".
+  const [active, setActive] = useState("");
+  const refocus = useRef("");
+  useEffect(() => {
+    if (active) document.getElementById(`${id}-${active}`)?.focus();
+    else if (refocus.current) {
+      document.getElementById(`${id}-${refocus.current}-button`)?.focus();
+      refocus.current = "";
+    }
+  }, [active, id]);
   const descriptions = [...state.pairs].sort((a, b) => hash(a.id) - hash(b.id));
   if (
     descriptions.length > 1 &&
     descriptions.every((p, n) => p.id === state.pairs[n].id)
   )
     descriptions.push(descriptions.shift()!);
+  const numbers = new Map(state.pairs.map((p, n) => [p.id, n + 1]));
   const match = (term: string, description: string) => {
     if (!state.pairs.some((p) => p.id === term)) return;
     onChange({
@@ -404,66 +416,210 @@ export function MatchingBoard({
     });
     setSelected("");
   };
+  const editable = (
+    p: MatchingState["pairs"][number],
+    side: "term" | "description",
+  ) => {
+    const key = `${p.id}-${side}`;
+    const label = t(
+      side === "term" ? "Term {number}" : "Description {number}",
+      {
+        number: numbers.get(p.id)!,
+      },
+    );
+    if (active === key)
+      return (
+        <div
+          className="matching-field"
+          onKeyDown={(e) => {
+            // Enter or Escape finishes editing; Shift+Enter adds a line break.
+            if (e.key === "Escape" || (e.key === "Enter" && !e.shiftKey)) {
+              e.preventDefault();
+              refocus.current = key;
+              setActive("");
+            }
+          }}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget)) setActive("");
+          }}
+        >
+          <BoardTextField
+            id={`${id}-${key}`}
+            aria-label={label}
+            multiline
+            rows={side === "term" ? 2 : 3}
+            maxLength={300}
+            disabled={disabled}
+            value={p[side]}
+            onChange={(value) =>
+              onChange({
+                ...state,
+                pairs: state.pairs.map((a) =>
+                  a.id === p.id ? { ...a, [side]: value } : a,
+                ),
+              })
+            }
+          />
+        </div>
+      );
+    return (
+      <button
+        type="button"
+        id={`${id}-${key}-button`}
+        className={`matching-editable${p[side] ? "" : " matching-placeholder"}`}
+        disabled={disabled}
+        onClick={() => setActive(key)}
+      >
+        {p[side] ? (
+          <>
+            <span className="visually-hidden">{label}: </span>
+            {side === "term" ? <strong>{p.term}</strong> : p.description}
+          </>
+        ) : (
+          label
+        )}
+      </button>
+    );
+  };
   return (
     <div>
-      <p className="tool-hint">
-        {t(
-          "Choose a term, then its description. Explain why your choices belong together.",
-        )}
-      </p>
+      <div className="matching-toolbar">
+        <p className="tool-hint">
+          {editing
+            ? t("Select a term or description to edit it.")
+            : t(
+                "Choose a term, then its description. Explain why your choices belong together.",
+              )}
+        </p>
+        <div className="matching-actions">
+          <button
+            type="button"
+            aria-label={t("Add pair")}
+            disabled={disabled || state.pairs.length >= 10}
+            onClick={() => {
+              const pairId = crypto.randomUUID();
+              onChange({
+                ...state,
+                pairs: [
+                  ...state.pairs,
+                  { id: pairId, term: "", description: "" },
+                ],
+              });
+              setEditing(true);
+              setSelected("");
+              setActive(`${pairId}-term`);
+            }}
+          >
+            <Plus size={14} />
+            {t("Add")}
+          </button>
+          <button
+            type="button"
+            className={editing ? "matching-done" : undefined}
+            disabled={disabled}
+            onClick={() => {
+              setEditing(!editing);
+              setActive("");
+              setSelected("");
+            }}
+          >
+            {editing ? <Check size={14} /> : <Pencil size={14} />}
+            {editing ? t("Done") : t("Edit")}
+          </button>
+        </div>
+      </div>
       <p className="tool-progress">
         {t("{count} of {total} connected", {
           count: Object.keys(state.matches).length,
           total: state.pairs.length,
         })}
       </p>
-      <div className="matching-columns">
+      <div
+        className={`matching-columns${editing ? " matching-columns-editing" : ""}`}
+      >
         <div>
-          {state.pairs.map((p) => (
-            <button
-              type="button"
-              key={p.id}
-              draggable={!disabled}
-              disabled={disabled}
-              aria-pressed={selected === p.id}
-              onClick={() => setSelected(p.id)}
-              onDragStart={(e) => {
-                e.dataTransfer.setData("text/plain", p.id);
-                setSelected(p.id);
-              }}
-            >
-              <strong>{p.term || t("Term")}</strong>
-              {state.matches[p.id] && (
-                <small>
-                  {
-                    state.pairs.find((a) => a.id === state.matches[p.id])
-                      ?.description
+          {state.pairs.length > 0 && (
+            <p className="matching-column-label">{t("Terms")}</p>
+          )}
+          {state.pairs.map((p) =>
+            editing ? (
+              <div className="matching-term-row" key={p.id}>
+                {editable(p, "term")}
+                <button
+                  type="button"
+                  className="icon-button matching-delete"
+                  disabled={disabled}
+                  aria-label={t("Delete pair {number}", {
+                    number: numbers.get(p.id)!,
+                  })}
+                  onClick={() =>
+                    onChange({
+                      ...state,
+                      pairs: state.pairs.filter((a) => a.id !== p.id),
+                      matches: Object.fromEntries(
+                        Object.entries(state.matches).filter(
+                          ([k, v]) => k !== p.id && v !== p.id,
+                        ),
+                      ),
+                    })
                   }
-                </small>
-              )}
-            </button>
-          ))}
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                key={p.id}
+                draggable={!disabled}
+                disabled={disabled}
+                aria-pressed={selected === p.id}
+                onClick={() => setSelected(p.id)}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("text/plain", p.id);
+                  setSelected(p.id);
+                }}
+              >
+                <strong>{p.term || t("Term")}</strong>
+                {state.matches[p.id] && (
+                  <small>
+                    {
+                      state.pairs.find((a) => a.id === state.matches[p.id])
+                        ?.description
+                    }
+                  </small>
+                )}
+              </button>
+            ),
+          )}
         </div>
         <div>
-          {descriptions.map((p) => (
-            <button
-              type="button"
-              key={p.id}
-              disabled={disabled}
-              aria-pressed={Object.values(state.matches).includes(p.id)}
-              onClick={() => selected && match(selected, p.id)}
-              onDragOver={(e) => {
-                if (!disabled) e.preventDefault();
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (!disabled)
-                  match(e.dataTransfer.getData("text/plain"), p.id);
-              }}
-            >
-              {p.description || t("Description")}
-            </button>
-          ))}
+          {state.pairs.length > 0 && (
+            <p className="matching-column-label">{t("Descriptions")}</p>
+          )}
+          {descriptions.map((p) =>
+            editing ? (
+              <div key={p.id}>{editable(p, "description")}</div>
+            ) : (
+              <button
+                type="button"
+                key={p.id}
+                disabled={disabled}
+                aria-pressed={Object.values(state.matches).includes(p.id)}
+                onClick={() => selected && match(selected, p.id)}
+                onDragOver={(e) => {
+                  if (!disabled) e.preventDefault();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (!disabled)
+                    match(e.dataTransfer.getData("text/plain"), p.id);
+                }}
+              >
+                {p.description || t("Description")}
+              </button>
+            ),
+          )}
         </div>
       </div>
       {!state.pairs.length && (
@@ -471,90 +627,17 @@ export function MatchingBoard({
           {t("Add terms and descriptions to create a matching activity.")}
         </p>
       )}
-      <details
-        open={editing}
-        onToggle={(e) => setEditing(e.currentTarget.open)}
-      >
-        <summary>{t("Edit terms and descriptions")}</summary>
-        {state.pairs.map((p, index) => (
-          <div className="pair-editor" key={p.id}>
-            <label htmlFor={`${id}-term-${p.id}`}>
-              {t("Term {number}", { number: index + 1 })}
-            </label>
-            <BoardTextField
-              id={`${id}-term-${p.id}`}
-              maxLength={300}
-              disabled={disabled}
-              value={p.term}
-              onChange={(value) =>
-                onChange({
-                  ...state,
-                  pairs: state.pairs.map((a) =>
-                    a.id === p.id ? { ...a, term: value } : a,
-                  ),
-                })
-              }
-            />
-            <label htmlFor={`${id}-description-${p.id}`}>
-              {t("Description {number}", { number: index + 1 })}
-            </label>
-            <BoardTextField
-              id={`${id}-description-${p.id}`}
-              maxLength={300}
-              disabled={disabled}
-              value={p.description}
-              onChange={(value) =>
-                onChange({
-                  ...state,
-                  pairs: state.pairs.map((a) =>
-                    a.id === p.id ? { ...a, description: value } : a,
-                  ),
-                })
-              }
-            />
-            <button
-              type="button"
-              disabled={disabled}
-              aria-label={t("Delete pair {number}", { number: index + 1 })}
-              onClick={() =>
-                onChange({
-                  ...state,
-                  pairs: state.pairs.filter((a) => a.id !== p.id),
-                  matches: Object.fromEntries(
-                    Object.entries(state.matches).filter(
-                      ([k, v]) => k !== p.id && v !== p.id,
-                    ),
-                  ),
-                })
-              }
-            >
-              {t("Delete")}
-            </button>
-          </div>
-        ))}
-        <button
-          type="button"
-          disabled={disabled || state.pairs.length >= 10}
-          onClick={() =>
-            onChange({
-              ...state,
-              pairs: [
-                ...state.pairs,
-                { id: crypto.randomUUID(), term: "", description: "" },
-              ],
-            })
-          }
-        >
-          {t("Add pair")}
-        </button>
-      </details>
-      <button
-        type="button"
-        disabled={disabled || !Object.keys(state.matches).length}
-        onClick={() => onChange({ ...state, matches: {} })}
-      >
-        {t("Reset connections")}
-      </button>
+      {!editing && (
+        <div className="tool-actions">
+          <button
+            type="button"
+            disabled={disabled || !Object.keys(state.matches).length}
+            onClick={() => onChange({ ...state, matches: {} })}
+          >
+            {t("Reset connections")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

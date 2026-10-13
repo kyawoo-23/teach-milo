@@ -270,6 +270,19 @@ it("preserves conflicting lesson detection on a session retry", async () => {
   expect(readOwned).not.toHaveBeenCalled();
 });
 
+it("rejects a session retry that asks for a different start mode", async () => {
+  const { document } = mockDatabase();
+  const lesson = lessonFixture();
+  const session = { ...sessionFixture(lesson), mode: "teach" as const };
+  document.get.mockResolvedValue({ exists: true, data: () => encode(session) });
+  await expect(
+    createSession(session.id, lesson.id, ctx.ownerId, "correct"),
+  ).rejects.toMatchObject({ code: "OPERATION_CONFLICT" });
+  await expect(
+    createSession(session.id, lesson.id, ctx.ownerId, "teach"),
+  ).resolves.toBe(session.id);
+});
+
 describe("Bounded session reads", () => {
   it("checks an unchanged revision with one owned read and no lesson or message query", async () => {
     const { query } = mockDatabase();
