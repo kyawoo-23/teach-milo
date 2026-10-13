@@ -84,23 +84,26 @@ export const LessonReviewFormSchema = PrepareSchema.pick({
     });
 });
 export const ExplanationFormSchema = TurnSchema.pick({ text: true });
-const parameter = z
-  .string()
-  .trim()
-  .refine(
-    (value) =>
-      value !== "" && Number.isSafeInteger(Number(value)) && Number(value) >= 0,
-    "Enter a whole number of zero or more.",
-  );
-export const transferFormSchema = (numerical: boolean) =>
-  z.object({
-    answer: TransferSchema.shape.answer.refine(
-      (value) => value.length > 0,
-      "Explain your thinking before submitting.",
-    ),
-    small: numerical ? parameter : z.string(),
-    large: numerical ? parameter : z.string(),
-  });
+export const transferFormSchema = (fieldIds: string[]) =>
+  z
+    .object({
+      answer: TransferSchema.shape.answer.refine(
+        (value) => value.length > 0,
+        "Explain your thinking before submitting.",
+      ),
+      numbers: z.record(z.string(), z.string()),
+    })
+    .superRefine(({ numbers }, ctx) => {
+      for (const id of fieldIds) {
+        const value = (numbers[id] ?? "").trim();
+        if (!value || !Number.isFinite(Number(value)))
+          ctx.addIssue({
+            code: "custom",
+            path: ["numbers", id],
+            message: "Enter a number.",
+          });
+      }
+    });
 export const ConceptFormSchema = z.object({
   name: z.string().trim().min(1, "Enter a concept.").max(100),
 });
