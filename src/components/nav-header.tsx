@@ -2,8 +2,7 @@
 
 import { useI18n } from "@/components/locale-context";
 import { History, LogIn } from "lucide-react";
-import { LanguageSelector } from "./language-selector";
-import { ThemeSelector } from "./theme-selector";
+import { HeaderPreferences } from "./header-preferences";
 import { Brand } from "./brand";
 import { useAuth } from "./auth-context";
 import { UserProfileMenu } from "./user-profile-menu";
@@ -23,8 +22,7 @@ export function NavHeader({
         <Brand />
 
         <nav className="header-actions" aria-label={t("Main")}>
-          <LanguageSelector />
-          <ThemeSelector />
+          <HeaderPreferences showTheme={!user} />
           {extraActions}
           {user && (
             <button

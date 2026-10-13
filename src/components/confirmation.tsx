@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Modal } from "./ui";
+import { Modal, ModalFooter } from "./ui";
 
 type ConfirmationOptions = {
   title: string;
@@ -96,25 +96,27 @@ export function ConfirmationProvider({
           onClose={() => finish(request.id, false)}
         >
           <p id={descriptionId}>{localizeText(request.description)}</p>
-          <div className="modal-actions confirmation-actions">
-            <button
-              ref={cancelButton}
-              type="button"
-              className="secondary-button"
-              onClick={() => finish(request.id, false)}
-            >
-              {request.cancelLabel ?? t("Cancel")}
-            </button>
-            <button
-              type="button"
-              className={
-                request.destructive ? "danger-button" : "primary-button"
-              }
-              onClick={() => finish(request.id, true)}
-            >
-              {localizeText(request.confirmLabel)}
-            </button>
-          </div>
+          <ModalFooter>
+            <div className="modal-actions confirmation-actions">
+              <button
+                ref={cancelButton}
+                type="button"
+                className="secondary-button"
+                onClick={() => finish(request.id, false)}
+              >
+                {request.cancelLabel ?? t("Cancel")}
+              </button>
+              <button
+                type="button"
+                className={
+                  request.destructive ? "danger-button" : "primary-button"
+                }
+                onClick={() => finish(request.id, true)}
+              >
+                {localizeText(request.confirmLabel)}
+              </button>
+            </div>
+          </ModalFooter>
         </Modal>
       )}
     </ConfirmationContext.Provider>

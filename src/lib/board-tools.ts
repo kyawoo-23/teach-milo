@@ -20,6 +20,8 @@ export const SketchObjectSchema = z
     width: z.number().finite().min(1).max(24),
     points: z.array(point).min(1).max(3000),
     text: z.string().max(200),
+    rotation: z.number().finite().min(-360).max(360).optional(),
+    scale: z.number().finite().min(0.25).max(4).optional(),
   })
   .strict();
 export const SketchStateSchema = z
@@ -125,6 +127,51 @@ export const toolKinds: ToolKind[] = [
   "matching",
   "table",
 ];
+export function conceptPairKey(from: string, to: string) {
+  return from < to ? `${from}\0${to}` : `${to}\0${from}`;
+}
+export function uniqueConceptLinks<T extends { from: string; to: string }>(
+  links: T[],
+) {
+  const seen = new Set<string>();
+  return links.filter((link) => {
+    const pair = conceptPairKey(link.from, link.to);
+    if (seen.has(pair)) return false;
+    seen.add(pair);
+    return true;
+  });
+}
+export function conceptPairsAvailable(
+  nodes: { id: string }[],
+  links: { from: string; to: string }[],
+) {
+  if (nodes.length < 2 || links.length >= 20) return false;
+  const taken = new Set(
+    links.map((link) => conceptPairKey(link.from, link.to)),
+  );
+  return nodes.some((from, index) =>
+    nodes.some(
+      (to, other) =>
+        other > index && !taken.has(conceptPairKey(from.id, to.id)),
+    ),
+  );
+}
+export function conceptHasOpenPair(
+  nodeId: string,
+  nodes: { id: string }[],
+  links: { from: string; to: string }[],
+) {
+  if (links.length >= 20) return false;
+  return nodes.some(
+    (node) =>
+      node.id !== nodeId &&
+      !links.some(
+        (link) =>
+          conceptPairKey(link.from, link.to) ===
+          conceptPairKey(nodeId, node.id),
+      ),
+  );
+}
 export function emptyTool(kind: ToolKind): ToolState {
   if (kind === "sketch") return { kind, objects: [] };
   if (kind === "concept_map") return { kind, nodes: [], links: [] };
