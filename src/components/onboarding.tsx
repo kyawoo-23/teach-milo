@@ -205,10 +205,6 @@ export function Onboarding() {
   async function submitMaterial() {
     if (busyRef.current || loading) return;
     if (!user) {
-      if (mode === "upload" && !file) {
-        setError("Choose a learning document first.");
-        return;
-      }
       setError("");
       await saveDraft({ mode, notes, topic, level, teachingLanguage }, file);
       setResume(true);
@@ -363,7 +359,12 @@ export function Onboarding() {
               </div>
               <form
                 noValidate
-                onSubmit={materialForm.handleSubmit(submitMaterial)}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (busyRef.current || loading) return;
+                  if (!user) void submitMaterial();
+                  else void materialForm.handleSubmit(submitMaterial)(event);
+                }}
               >
                 <div
                   className="segmented"

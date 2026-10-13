@@ -21,6 +21,17 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "extraction_cache",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }]
+    },
+    {
+      "collectionGroup": "extraction_cache",
+      "fieldPath": "sources",
+      "indexes": []
+    },
+    {
       "collectionGroup": "sessions",
       "fieldPath": "expiresAt",
       "ttl": true,
