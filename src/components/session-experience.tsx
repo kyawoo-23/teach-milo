@@ -32,10 +32,12 @@ import {
 import { useAuth } from "./auth-context";
 import { lessonLanguage } from "@/lib/i18n/locales";
 import { LanguageSelector } from "./language-selector";
+import { ThemeSelector } from "./theme-selector";
 import { Brand } from "./brand";
 import { UserProfileMenu } from "./user-profile-menu";
 import { Milo } from "./milo";
 import { TeachingBoard } from "./teaching-board";
+import { BoardResizer } from "./board-resizer";
 import { useBoardWorkspace } from "./use-board-workspace";
 import { BoardPreview } from "./board-preview";
 import { clearBoardDrafts } from "@/lib/board-drafts";
@@ -548,6 +550,7 @@ export function SessionExperience({ id }: { id: string }) {
           </div>
           <nav className="session-header-actions" aria-label={t("Session")}>
             <LanguageSelector />
+            <ThemeSelector />
             {isTeaching && (
               <button
                 className="quiet-button"
@@ -1116,6 +1119,7 @@ export function SessionExperience({ id }: { id: string }) {
               </p>
             </div>
           </section>
+          <BoardResizer />
           <aside className="board-sidebar">
             {session.board && boardWorkspace.workspace && (
               <TeachingBoard
