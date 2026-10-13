@@ -2,6 +2,7 @@
 
 import { lessonLanguage } from "@/lib/i18n/locales";
 import { useI18n } from "@/components/locale-context";
+import { clearBoardDrafts } from "@/lib/board-drafts";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -482,6 +483,7 @@ export function ReportView({
               setDeleting(true);
               try {
                 await api(`/api/sessions/${session.id}`, {}, "DELETE");
+                clearBoardDrafts(undefined, session.id);
                 window.location.assign("/");
               } catch (e) {
                 setError(e instanceof Error ? e : "Please try again.");

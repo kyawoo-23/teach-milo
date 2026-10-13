@@ -3,18 +3,18 @@ export const calculationSandbox = `<!doctype html><html><head><meta http-equiv="
 let worker, timer;
 window.addEventListener('message', event => {
   if (event.source !== parent || !event.data || event.data.type !== 'calculate') return;
-  const { channel, requestId, code, inputs } = event.data;
-  if (typeof channel !== 'string' || typeof code !== 'string' || code.length > 12000) return;
+  const { channel, requestId, code, batch } = event.data;
+  if (typeof channel !== 'string' || typeof code !== 'string' || code.length > 12000 || !Array.isArray(batch) || batch.length > 64) return;
   if (worker) worker.terminate(); clearTimeout(timer);
   const reply = payload => parent.postMessage({ channel, requestId, ...payload }, '*');
-  const source = '"use strict";\\n' + code + '\\nself.onmessage = event => { try { self.postMessage({result:calculate(event.data)}); } catch (_) { self.postMessage({error:true}); } };';
+  const source = '"use strict";\\n' + code + '\\nself.onmessage = event => { try { self.postMessage({results:event.data.map(inputs => calculate(Object.freeze(inputs)))}); } catch (_) { self.postMessage({error:true}); } };';
   const url = URL.createObjectURL(new Blob([source], {type:'text/javascript'}));
   try {
     worker = new Worker(url); URL.revokeObjectURL(url);
     timer = setTimeout(() => { worker.terminate(); reply({error:'Calculation timed out'}); }, 500);
     worker.onmessage = e => { clearTimeout(timer); worker.terminate(); reply(e.data); };
     worker.onerror = () => { clearTimeout(timer); worker.terminate(); reply({error:'Calculation unavailable'}); };
-    worker.postMessage(inputs);
+    worker.postMessage(batch);
   } catch (_) { URL.revokeObjectURL(url); reply({error:'Calculation unavailable'}); }
 });
 </script></body></html>`;

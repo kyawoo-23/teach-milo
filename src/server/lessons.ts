@@ -1,21 +1,19 @@
 import "server-only";
 import { z } from "zod";
 import {
-  BoardSchema,
+  Board,
+  BoardGenerated,
+  BoardGeneratedSchema,
   Lesson,
   LessonGeneratedSchema,
   Material,
   PrepareSchema,
 } from "@/lib/contracts";
-import { validateBoardConfiguration, textBoard } from "@/lib/boards";
-import { validateCalculation } from "@/lib/custom-code";
+import { exampleBoard } from "@/lib/boards";
+import { compileBoard } from "@/lib/board-catalog";
 import { AppError } from "@/lib/errors";
-import {
-  localizedCnnBoard,
-  CNN_CARD,
-  localizedCnnTransfer,
-} from "@/content/cnn";
-import { lessonLanguage } from "@/lib/i18n/locales";
+import { lessonLanguage, type TeachingLanguage } from "@/lib/i18n/locales";
+import { verifyNumericTransfer } from "./calculation";
 import { PREPARE_PROMPT, languageInstruction } from "@/content/prompts";
 import {
   assertOwned,
@@ -26,7 +24,7 @@ import {
   readOwned,
 } from "./db";
 import { gemini, Model } from "./model";
-import { CallContext } from "./usage";
+import { CallContext, event } from "./usage";
 
 // English keeps the canonical pre-i18n payload so retries from older clients
 // still match saved operations. Non-English choices participate in the hash.
@@ -100,51 +98,19 @@ export async function prepareLesson(
       "The lesson could not be linked to your material. Please retry.",
       502,
     );
-  const cnn =
-    /(?:cnn|convolution|卷积|畳み込み)/i.test(
-      input.topic + " " + result.title,
-    ) &&
-    /(?:weight\s*sharing|权重共享|重み(?:の)?共有)/i.test(
-      result.title + " " + input.topic,
-    );
-  if (cnn) {
-    result.knowledge += "\nVetted reference: " + CNN_CARD;
-    result.board = localizedCnnBoard(input.teachingLanguage);
-    result.transfer = localizedCnnTransfer(input.teachingLanguage);
-  } else {
-    result.transfer.arithmetic = "none";
-    if (result.board.kind === "cnn")
-      result.board = textBoard(input.teachingLanguage);
-  }
-  const checkBoard = () => {
-    validateBoardConfiguration(result.board);
-    if (result.board.kind === "custom")
-      validateCalculation(
-        result.board.code,
-        result.board.controls.map((c) => c.id),
-        result.board.metrics.map((m) => m.id),
-      );
-  };
-  try {
-    checkBoard();
-  } catch {
-    try {
-      result.board = await model.generate(
-        BoardSchema,
-        PREPARE_PROMPT +
-          languageInstruction(input.teachingLanguage) +
-          "\nRepair the supplied board to satisfy the constraints. Return only the board schema.",
-        { board: result.board, concept: result.title },
-        ctx,
-      );
-      checkBoard();
-    } catch {
-      result.board = textBoard(input.teachingLanguage);
-    }
-  }
+  const numeric = await verifyNumericTransfer(result.transfer.numeric);
+  const { board, outcome: boardOutcome } = await prepareBoard(
+    result.board,
+    result.title,
+    input.teachingLanguage,
+    ctx,
+    model,
+  );
   // OCR warnings are surfaced for learner review; unresolved factual concerns remain private grading constraints.
   const lesson: Lesson = {
     ...result,
+    transfer: { ...result.transfer, numeric: numeric.numeric },
+    board,
     id,
     ownerId: ctx.ownerId,
     materialId: material.id,
@@ -156,5 +122,40 @@ export async function prepareLesson(
     expiresAt: expiresAt(),
   };
   await database().collection("lessons").doc(id).create(encode(lesson));
+  await Promise.all([
+    event(id, `board_prepared_${boardOutcome}`, id),
+    ...(numeric.outcome === "none"
+      ? []
+      : [event(id, `transfer_numeric_${numeric.outcome}`, id)]),
+  ]);
   return id;
+}
+
+// Fatal compile problems get one repair call with the diagnostics; a board that
+// still fails becomes the example table so lesson prep never blocks on the board.
+async function prepareBoard(
+  generated: BoardGenerated,
+  title: string,
+  language: TeachingLanguage,
+  ctx: CallContext,
+  model: Model,
+): Promise<{ board: Board; outcome: "generated" | "repaired" | "fallback" }> {
+  const first = compileBoard({ ...generated, version: 2 });
+  if (!first.fatal) return { board: first.board, outcome: "generated" };
+  const second = await model
+    .generate(
+      BoardGeneratedSchema,
+      PREPARE_PROMPT +
+        languageInstruction(language) +
+        "\nRepair the supplied board to satisfy the constraints and fix every diagnostic. Return only the board schema.",
+      { board: generated, diagnostics: first.diagnostics, concept: title },
+      ctx,
+    )
+    .then(
+      (repaired) => compileBoard({ ...repaired, version: 2 }),
+      () => undefined,
+    );
+  return second && !second.fatal
+    ? { board: second.board, outcome: "repaired" }
+    : { board: exampleBoard(title, language), outcome: "fallback" };
 }

@@ -29,7 +29,9 @@ export async function readUpload(
           files: 1,
           fields: 1,
           fieldSize: 100,
-          parts: 2,
+          // Busboy emits partsLimit when the count reaches this value.
+          // Allow the file and operationId; reject a third part.
+          parts: 3,
         },
       });
     } catch {

@@ -16,8 +16,7 @@ import {
   validateStudent,
 } from "@/lib/controller";
 import { finalizeReport } from "@/lib/assessment";
-import { localizedCnnBoard, localizedCnnTransfer } from "@/content/cnn";
-import { textBoard } from "@/lib/boards";
+import { exampleBoard, formatBoardValue } from "@/lib/boards";
 import { languageInstruction } from "@/content/prompts";
 import { AppError } from "@/lib/errors";
 import {
@@ -50,6 +49,11 @@ describe("website locales", () => {
     expect(resolveLocale(undefined, "zh-Hans-CN")).toBe("zh-CN");
     expect(resolveLocale(undefined, "fr-FR")).toBe("en");
     expect(resolveLocale(undefined, "ja;q=invalid,en;q=0.5")).toBe("en");
+    expect(resolveLocale(undefined, "ko-KR,en;q=0.5")).toBe("ko");
+    expect(resolveLocale("th", "ja")).toBe("th");
+    expect(resolveLocale(undefined, "th-TH,en;q=0.8")).toBe("th");
+    expect(resolveLocale(undefined, "vi-VN,en;q=0.2")).toBe("en");
+    expect(resolveLocale(undefined, "my,id;q=0.9")).toBe("en");
   });
   it("interpolates without interpreting supplied text as markup", () => {
     expect(
@@ -130,6 +134,13 @@ describe("fixed teaching language", () => {
       PrepareSchema.safeParse({ ...input, teachingLanguage: "fr" }).success,
     ).toBe(false);
     expect(
+      PrepareSchema.parse({ ...input, teachingLanguage: "my" })
+        .teachingLanguage,
+    ).toBe("my");
+    expect(
+      PrepareSchema.safeParse({ ...input, teachingLanguage: "zh-TW" }).success,
+    ).toBe(false);
+    expect(
       TurnSchema.safeParse({
         operationId: lesson.id,
         revision: 0,
@@ -139,7 +150,7 @@ describe("fixed teaching language", () => {
     ).toBe(false);
   });
   it.each(["zh-CN", "ja"] as const)(
-    "localizes deterministic content in %s without changing arithmetic",
+    "localizes deterministic content in %s without changing numeric keys",
     (locale) => {
       const lesson = { ...lessonFixture(), teachingLanguage: locale };
       const message = messageFixture(
@@ -147,15 +158,10 @@ describe("fixed teaching language", () => {
           ? "同じ重みを各位置で使います。"
           : "每个位置重复使用相同权重。",
       );
-      const transfer = localizedCnnTransfer(locale);
-      expect(transfer.arithmetic).toBe("cnn");
-      expect(transfer.expected).toContain("204");
-      expect(transfer.question).not.toBe(localizedCnnTransfer("en").question);
-      expect(localizedCnnBoard(locale).title).not.toBe(
-        localizedCnnBoard("en").title,
+      expect(exampleBoard("x", locale).instruction).not.toBe(
+        exampleBoard("x").instruction,
       );
-      expect(textBoard(locale).instruction).not.toBe(textBoard().instruction);
-      lesson.transfer = transfer;
+      expect(lesson.transfer.numeric.fields[0].expected).toBe(150);
       const report = finalizeReport(
         reportFixture(message),
         lesson,
@@ -168,19 +174,51 @@ describe("fixed teaching language", () => {
           "The independent check was skipped, so there is no unaided transfer evidence.",
         ),
       );
-      expect(report.expectedTransferExplanation).toBe(transfer.expected);
+      expect(report.expectedTransferExplanation).toBe(lesson.transfer.expected);
       expect(report.scores.accuracy.citations[0].quote).toBe(message.text);
       expect(languageInstruction(locale)).toContain(
         locale === "ja" ? "Japanese" : "Simplified Chinese",
       );
     },
   );
+  it("localizes canned teaching copy for languages without a site catalog", () => {
+    expect(languageInstruction("vi")).toContain("Vietnamese");
+    expect(languageInstruction("my")).toContain("Burmese");
+    expect(exampleBoard("x", "my").instruction).not.toBe(
+      exampleBoard("x").instruction,
+    );
+    expect(exampleBoard("x", "vi").suggestedTool.columns).not.toEqual(
+      exampleBoard("x").suggestedTool.columns,
+    );
+    const toggle = {
+      ...exampleBoard("x"),
+      state: [
+        {
+          id: "on",
+          label: "Light",
+          unit: "",
+          type: "boolean" as const,
+          initial: 1,
+          min: 0,
+          max: 1,
+          step: 1,
+          options: [],
+        },
+      ],
+    };
+    const values = { state: { on: 1 }, composites: {} };
+    expect(formatBoardValue(toggle, "on", values, {}, "id")).toBe("Aktif");
+    expect(formatBoardValue(toggle, "on", values, {}, "ja")).toBe("オン");
+    expect(
+      greetLearner("မင်္ဂလာပါ! အမြန်နှုန်းကို သင်ပေးပါ။", "my"),
+    ).toMatch(/^မင်္ဂလာပါ!/);
+  });
   it("adds a single localized greeting", () => {
     expect(greetLearner("こんにちは！光について教えて？", "ja")).toBe(
       "こんにちは！ 光について教えて？",
     );
-    expect(greetLearner("你好！能教我卷积吗？", "zh-CN")).toBe(
-      "你好！ 能教我卷积吗？",
+    expect(greetLearner("你好！能教我速度吗？", "zh-CN")).toBe(
+      "你好！ 能教我速度吗？",
     );
   });
   it.each(["zh-CN", "ja"] as const)(

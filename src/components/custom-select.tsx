@@ -8,6 +8,7 @@ import {
   type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
+  type RefCallback,
 } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
@@ -32,6 +33,10 @@ export function CustomSelect({
   compact = false,
   icon,
   name,
+  onBlur,
+  inputRef,
+  invalid,
+  describedBy,
 }: {
   id: string;
   label: string;
@@ -44,6 +49,10 @@ export function CustomSelect({
   compact?: boolean;
   icon?: ReactNode;
   name?: string;
+  onBlur?: () => void;
+  inputRef?: RefCallback<HTMLButtonElement>;
+  invalid?: boolean;
+  describedBy?: string;
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -237,7 +246,10 @@ export function CustomSelect({
         <input type="hidden" name={name} value={value} disabled={disabled} />
       )}
       <button
-        ref={trigger}
+        ref={(node) => {
+          trigger.current = node;
+          inputRef?.(node);
+        }}
         id={id}
         type="button"
         role="combobox"
@@ -246,13 +258,18 @@ export function CustomSelect({
         aria-label={labelledBy ? undefined : label}
         aria-labelledby={labelledBy}
         aria-haspopup="listbox"
+        aria-invalid={invalid}
+        aria-describedby={describedBy}
         aria-controls={expanded ? panelId : undefined}
         aria-expanded={expanded}
         aria-activedescendant={expanded ? `${panelId}-${active}` : undefined}
         data-value={value}
         onKeyDown={handleKey}
         onClick={() => (expanded ? setOpen(false) : show())}
-        onBlur={() => setOpen(false)}
+        onBlur={() => {
+          setOpen(false);
+          onBlur?.();
+        }}
       >
         {icon && (
           <span className="custom-select-icon" aria-hidden="true">

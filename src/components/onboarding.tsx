@@ -1,13 +1,20 @@
 "use client";
 
 import { useI18n } from "@/components/locale-context";
+import { Controller } from "react-hook-form";
+import {
+  materialFormSchema,
+  LessonReviewFormSchema,
+  LearningFileSchema,
+} from "@/lib/form-schemas";
+import { FieldError, useSchemaForm } from "./schema-form";
 import { LanguageSelector } from "./language-selector";
 import {
-  isLocale,
-  localeNames,
+  isTeachingLanguage,
+  teachingLanguageNames,
   lessonLanguage,
   formatNumber,
-  type Locale,
+  type TeachingLanguage,
 } from "@/lib/i18n/locales";
 import { useConfirmation } from "./confirmation";
 import { useEffect, useRef, useState } from "react";
@@ -25,6 +32,7 @@ import {
   UploadCloud,
   X,
 } from "lucide-react";
+import { LevelIcon } from "./level-icon";
 import { LessonPublic, SessionPublic, Source } from "@/lib/contracts";
 import { useAuth } from "./auth-context";
 import { MarkdownEditor } from "./markdown-editor";
@@ -53,16 +61,27 @@ export function Onboarding() {
   const [step, setStep] = useState<"material" | "review" | "lesson">(
     "material",
   );
-  const [file, setFile] = useState<File | null>(null);
-  const [notes, setNotes] = useState("");
-  const [topic, setTopic] = useState("");
-  const [chosenTeachingLanguage, setTeachingLanguage] = useState<Locale | null>(
-    null,
-  );
-  const teachingLanguage = chosenTeachingLanguage ?? locale;
-  const [level, setLevel] = useState("introductory");
+  const materialForm = useSchemaForm(materialFormSchema(mode === "upload"), {
+    file: null as File | null,
+    notes: "",
+    topic: "",
+    level: "introductory" as const,
+    teachingLanguage: locale,
+  });
+  const [file, setFile] = materialForm.state("file");
+  const [notes, setNotes] = materialForm.state("notes");
+  const [topic, setTopic] = materialForm.state("topic");
+  const [level, setLevel] = materialForm.state("level");
+  const [teachingLanguage, setTeachingLanguage] =
+    materialForm.state("teachingLanguage");
+  const languageChosen = useRef(false);
+  useEffect(() => {
+    if (!languageChosen.current)
+      materialForm.setValue("teachingLanguage", locale);
+  }, [locale, materialForm.setValue]);
   const [material, setMaterial] = useState<MaterialResult | null>(null);
-  const [sources, setSources] = useState<Source[]>([]);
+  const reviewForm = useSchemaForm(LessonReviewFormSchema, { sources: [] });
+  const [sources, setSources] = reviewForm.state("sources");
   const [lesson, setLesson] = useState<LessonPublic | null>(null);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState<string | Error>("");
@@ -92,9 +111,14 @@ export function Onboarding() {
       setMode(saved.draft.mode);
       setNotes(saved.draft.notes);
       setTopic(saved.draft.topic);
-      setLevel(saved.draft.level);
-      if (isLocale(saved.draft.teachingLanguage))
+      if (
+        ["introductory", "intermediate", "advanced"].includes(saved.draft.level)
+      )
+        setLevel(saved.draft.level as typeof level);
+      if (isTeachingLanguage(saved.draft.teachingLanguage)) {
+        languageChosen.current = true;
         setTeachingLanguage(saved.draft.teachingLanguage);
+      }
       setFile(saved.file);
       if (saved.draft.mode === "upload" && !saved.file)
         setError("Choose your file again to continue.");
@@ -153,14 +177,15 @@ export function Onboarding() {
   }
   async function chooseFile(chosen?: File) {
     if (!chosen) return;
-    if (!/\.(pdf|docx|txt)$/i.test(chosen.name)) {
-      setError("Choose a PDF, DOCX, or TXT file.");
+    const checked = LearningFileSchema.safeParse(chosen);
+    if (!checked.success) {
+      materialForm.setError("file", {
+        type: "validate",
+        message: checked.error.issues[0].message,
+      });
       return;
     }
-    if (chosen.size > 10 * 1024 * 1024) {
-      setError("Choose a file smaller than 10 MB.");
-      return;
-    }
+    materialForm.clearErrors("file");
     if (
       file &&
       !(await confirm({
@@ -177,8 +202,7 @@ export function Onboarding() {
     setFile(chosen);
     setError("");
   }
-  async function submitMaterial(event: React.FormEvent) {
-    event.preventDefault();
+  async function submitMaterial() {
     if (busyRef.current || loading) return;
     if (!user) {
       if (mode === "upload" && !file) {
@@ -194,6 +218,7 @@ export function Onboarding() {
     await readMaterial();
   }
   async function readMaterial() {
+    if (!(await materialForm.trigger())) return;
     await run(
       mode === "upload" && file?.name.toLowerCase().endsWith(".pdf")
         ? "Reading your pages, including scanned content…"
@@ -225,6 +250,8 @@ export function Onboarding() {
     );
   }
   async function prepare() {
+    if (!(await materialForm.trigger(["topic", "level", "teachingLanguage"])))
+      return;
     await run(
       "Finding a focused lesson in your material…",
       async (isCurrent) => {
@@ -334,7 +361,10 @@ export function Onboarding() {
                   <p>{t("Start with something you want to understand.")}</p>
                 </div>
               </div>
-              <form onSubmit={submitMaterial}>
+              <form
+                noValidate
+                onSubmit={materialForm.handleSubmit(submitMaterial)}
+              >
                 <div
                   className="segmented"
                   role="group"
@@ -355,143 +385,179 @@ export function Onboarding() {
                     <FileText size={17} /> {t("Paste notes")}
                   </button>
                 </div>
-                {mode === "upload" ? (
+                <div className="material-source">
                   <div
-                    className={`dropzone ${dragging ? "dragging" : ""} ${file ? "has-file" : ""}`}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setDragging(true);
-                    }}
-                    onDragLeave={() => setDragging(false)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setDragging(false);
-                      chooseFile(e.dataTransfer.files[0]);
-                    }}
+                    className={`material-source-panel ${mode === "upload" ? "is-active" : ""}`}
+                    aria-hidden={mode !== "upload"}
+                    inert={mode !== "upload" ? true : undefined}
                   >
-                    <input
-                      ref={inputRef}
-                      id="material-file"
-                      type="file"
-                      className="visually-hidden"
-                      accept=".pdf,.docx,.txt"
-                      onChange={(e) => chooseFile(e.target.files?.[0])}
-                    />
-                    {file ? (
-                      <>
-                        <span className="file-symbol">
-                          <FileText size={26} />
-                        </span>
-                        <strong>{file.name}</strong>
-                        <span>
-                          {(file.size / 1024).toFixed(0)}{" "}
-                          {t("KB · Ready to read")}
-                        </span>
-                        <button
-                          type="button"
-                          className="text-button"
-                          onClick={async () => {
-                            if (
-                              !(await confirm({
-                                title: "Remove selected file?",
-                                description:
-                                  "You’ll need to choose a file again before preparing your lesson.",
-                                confirmLabel: "Remove file",
-                                destructive: true,
-                              }))
-                            )
-                              return;
-                            setFile(null);
-                            if (inputRef.current) inputRef.current.value = "";
-                          }}
-                        >
-                          {t("Choose another file")}
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <span className="upload-symbol">
-                          <UploadCloud size={28} />
-                        </span>
-                        <label htmlFor="material-file" className="file-label">
-                          {t("Choose a file")}{" "}
-                          <span>{t("or drop it here")}</span>
-                        </label>
-                        <span>{t("PDF, DOCX, or TXT · Up to 10 MB")}</span>
-                        <span className="ocr-note">
-                          {t("Scanned PDFs welcome. We’ll read those too.")}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <div className="paste-field">
-                    <label htmlFor="notes" className="visually-hidden">
-                      {t("Your learning notes")}
-                    </label>
-                    <textarea
-                      id="notes"
-                      name="notes"
-                      autoComplete="off"
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      minLength={30}
-                      maxLength={50000}
-                      required
-                      rows={7}
-                      placeholder={t(
-                        "Paste a passage, your class notes, or an explanation you want to understand better…",
+                    <div
+                      className={`dropzone ${dragging ? "dragging" : ""} ${file ? "has-file" : ""}`}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragging(true);
+                      }}
+                      onDragLeave={() => setDragging(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDragging(false);
+                        chooseFile(e.dataTransfer.files[0]);
+                      }}
+                    >
+                      <input
+                        name="file"
+                        ref={(node) => {
+                          inputRef.current = node;
+                          materialForm.register("file").ref(node);
+                        }}
+                        {...materialForm.a11y("file", "material-file")}
+                        id="material-file"
+                        type="file"
+                        className="visually-hidden"
+                        accept=".pdf,.docx,.txt"
+                        onChange={(e) => chooseFile(e.target.files?.[0])}
+                      />
+                      {file ? (
+                        <>
+                          <span className="file-symbol">
+                            <FileText size={26} />
+                          </span>
+                          <strong>{file.name}</strong>
+                          <span>
+                            {(file.size / 1024).toFixed(0)}{" "}
+                            {t("KB · Ready to read")}
+                          </span>
+                          <button
+                            type="button"
+                            className="text-button"
+                            onClick={async () => {
+                              if (
+                                !(await confirm({
+                                  title: "Remove selected file?",
+                                  description:
+                                    "You’ll need to choose a file again before preparing your lesson.",
+                                  confirmLabel: "Remove file",
+                                  destructive: true,
+                                }))
+                              )
+                                return;
+                              setFile(null);
+                              if (inputRef.current) inputRef.current.value = "";
+                            }}
+                          >
+                            {t("Choose another file")}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="upload-symbol">
+                            <UploadCloud size={28} />
+                          </span>
+                          <label htmlFor="material-file" className="file-label">
+                            {t("Choose a file")}{" "}
+                            <span>{t("or drop it here")}</span>
+                          </label>
+                          <span>{t("PDF, DOCX, or TXT · Up to 10 MB")}</span>
+                          <span className="ocr-note">
+                            {t("Scanned PDFs welcome. We’ll read those too.")}
+                          </span>
+                        </>
                       )}
+                    </div>
+                    <FieldError
+                      id="material-file"
+                      message={materialForm.formState.errors.file?.message}
                     />
-                    <span className="character-count">
-                      {formatNumber(locale, notes.length)} / 50,000
-                    </span>
                   </div>
-                )}
+                  <div
+                    className={`material-source-panel ${mode === "paste" ? "is-active" : ""}`}
+                    aria-hidden={mode !== "paste"}
+                    inert={mode !== "paste" ? true : undefined}
+                  >
+                    <div className="paste-field">
+                      <label htmlFor="notes" className="visually-hidden">
+                        {t("Your learning notes")}
+                      </label>
+                      <textarea
+                        id="notes"
+                        {...materialForm.register("notes")}
+                        {...materialForm.a11y("notes", "notes")}
+                        autoComplete="off"
+                        minLength={30}
+                        maxLength={50000}
+                        required
+                        rows={7}
+                        placeholder={t(
+                          "Paste a passage, your class notes, or an explanation you want to understand better…",
+                        )}
+                      />
+                      <span className="character-count">
+                        {formatNumber(locale, notes.length)} / 50,000
+                      </span>
+                    </div>
+                    <FieldError
+                      id="notes"
+                      message={materialForm.formState.errors.notes?.message}
+                    />
+                  </div>
+                </div>
                 <label className="field-label" htmlFor="topic">
                   {t("What would you like to focus on?")}
                 </label>
                 <input
                   id="topic"
-                  name="topic"
+                  {...materialForm.register("topic")}
+                  {...materialForm.a11y("topic", "topic")}
                   autoComplete="off"
                   className="text-input"
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
                   placeholder={t("e.g. How photosynthesis stores energy")}
                   minLength={1}
                   maxLength={200}
                   required
                 />
-                <LanguageSelector
-                  teaching
-                  value={teachingLanguage}
-                  onChange={setTeachingLanguage}
-                  disabled={!!busy}
+                <FieldError
+                  id="topic"
+                  message={materialForm.formState.errors.topic?.message}
+                />
+                <Controller
+                  control={materialForm.control}
+                  name="teachingLanguage"
+                  render={({ field }) => (
+                    <LanguageSelector
+                      teaching
+                      value={field.value}
+                      onChange={(value) => {
+                        languageChosen.current = true;
+                        field.onChange(value);
+                      }}
+                      onBlur={field.onBlur}
+                      disabled={!!busy}
+                    />
+                  )}
                 />
                 <fieldset className="level-field">
-                  <legend>{t("Choose your depth")}</legend>
+                  <legend>{t("How advanced should this lesson be?")}</legend>
                   <div className="level-options">
-                    {[t("introductory"), t("intermediate"), t("advanced")].map(
-                      (l) => (
-                        <label key={l}>
-                          <input
-                            type="radio"
-                            name="level"
-                            value={l}
-                            checked={level === l}
-                            onChange={() => setLevel(l)}
-                          />
-                          <span>
-                            {l === t("introductory")
-                              ? t("Introductory")
-                              : l === t("intermediate")
-                                ? t("Intermediate")
-                                : t("Advanced")}
-                          </span>
-                        </label>
-                      ),
-                    )}
+                    {(
+                      ["introductory", "intermediate", "advanced"] as const
+                    ).map((l) => (
+                      <label key={l}>
+                        <input
+                          type="radio"
+                          {...materialForm.register("level")}
+                          value={l}
+                          checked={level === l}
+                        />
+                        <span>
+                          <LevelIcon level={l} />
+                          {l === "introductory"
+                            ? t("Introductory")
+                            : l === "intermediate"
+                              ? t("Intermediate")
+                              : t("Advanced")}
+                        </span>
+                      </label>
+                    ))}
                   </div>
                 </fieldset>
                 {error && <ErrorNotice message={error} />}
@@ -564,7 +630,7 @@ export function Onboarding() {
               </span>
             </div>
             {step === "review" ? (
-              <>
+              <form noValidate onSubmit={reviewForm.handleSubmit(prepare)}>
                 <h1 className="flow-heading" tabIndex={-1}>
                   {t("Does this look right?")}
                 </h1>
@@ -595,18 +661,35 @@ export function Onboarding() {
                           {localizeText(w)}
                         </p>
                       ))}
-                      <MarkdownEditor
-                        id={`source-${i}`}
-                        value={source.text}
-                        rows={Math.min(
-                          12,
-                          Math.max(4, source.text.split("\n").length),
+                      <Controller
+                        control={reviewForm.control}
+                        name={`sources.${i}.text`}
+                        render={({ field, fieldState }) => (
+                          <>
+                            <MarkdownEditor
+                              id={`source-${i}`}
+                              value={field.value}
+                              onChange={field.onChange}
+                              onBlur={field.onBlur}
+                              inputRef={field.ref}
+                              name={field.name}
+                              invalid={!!fieldState.error}
+                              describedBy={
+                                fieldState.error
+                                  ? `source-${i}-error`
+                                  : undefined
+                              }
+                              rows={Math.min(
+                                12,
+                                Math.max(4, source.text.split("\n").length),
+                              )}
+                            />
+                            <FieldError
+                              id={`source-${i}`}
+                              message={fieldState.error?.message}
+                            />
+                          </>
                         )}
-                        onChange={(text) =>
-                          setSources((prev) =>
-                            prev.map((s, n) => (n === i ? { ...s, text } : s)),
-                          )
-                        }
                       />
                     </div>
                   ))}
@@ -624,16 +707,30 @@ export function Onboarding() {
                   </span>
                 </div>
                 {error && <ErrorNotice message={error} />}
-                <LanguageSelector
-                  teaching
-                  value={teachingLanguage}
-                  onChange={setTeachingLanguage}
-                  disabled={!!busy}
+                <FieldError
+                  id="review-sources"
+                  message={reviewForm.formState.errors.sources?.message}
+                />
+                <Controller
+                  control={materialForm.control}
+                  name="teachingLanguage"
+                  render={({ field }) => (
+                    <LanguageSelector
+                      teaching
+                      value={field.value}
+                      onChange={(value) => {
+                        languageChosen.current = true;
+                        field.onChange(value);
+                      }}
+                      onBlur={field.onBlur}
+                      disabled={!!busy}
+                    />
+                  )}
                 />
                 <button
                   className="primary-button"
                   disabled={!!busy}
-                  onClick={prepare}
+                  type="submit"
                 >
                   {busy ? (
                     <Spinner label={t("Preparing your lesson")} />
@@ -644,7 +741,7 @@ export function Onboarding() {
                     </>
                   )}
                 </button>
-              </>
+              </form>
             ) : (
               lesson && (
                 <>
@@ -671,10 +768,12 @@ export function Onboarding() {
                   </p>
                   <p className="muted">
                     {t("Teaching language: {language}", {
-                      language: localeNames[lesson.teachingLanguage ?? "en"],
+                      language:
+                        teachingLanguageNames[lesson.teachingLanguage ?? "en"],
                     })}
                   </p>
                   <span className="level-chip">
+                    <LevelIcon level={lesson.level} />
                     {localizeText(lesson.level)} {t("depth")}
                   </span>
                   <h2 className="objectives-heading">
