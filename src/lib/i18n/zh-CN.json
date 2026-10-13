@@ -584,5 +584,9 @@
   "Milo’s mix-up wasn’t part of this lesson.": "本次课程不包含 Milo 的误解环节。",
   "Not part of this lesson — you chose to teach without Milo’s mix-up.": "不在本次课程范围内——你选择了不含 Milo 误解的教学方式。",
   "Before you start, here’s what I think:": "开始之前，我是这样理解的：",
-  "Is that right?": "对吗？"
+  "Is that right?": "对吗？",
+  "Theme": "主题",
+  "System": "跟随系统",
+  "Light": "浅色",
+  "Dark": "深色"
 }

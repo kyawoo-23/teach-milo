@@ -32,6 +32,7 @@ import {
 import { useAuth } from "./auth-context";
 import { lessonLanguage } from "@/lib/i18n/locales";
 import { LanguageSelector } from "./language-selector";
+import { ThemeSelector } from "./theme-selector";
 import { Brand } from "./brand";
 import { UserProfileMenu } from "./user-profile-menu";
 import { Milo } from "./milo";
@@ -548,6 +549,7 @@ export function SessionExperience({ id }: { id: string }) {
           </div>
           <nav className="session-header-actions" aria-label={t("Session")}>
             <LanguageSelector />
+            <ThemeSelector />
             {isTeaching && (
               <button
                 className="quiet-button"

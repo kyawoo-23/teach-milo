@@ -584,5 +584,9 @@
   "Milo’s mix-up wasn’t part of this lesson.": "บทเรียนนี้ไม่รวมความเข้าใจผิดของ Milo",
   "Not part of this lesson — you chose to teach without Milo’s mix-up.": "ไม่อยู่ในบทเรียนนี้ — คุณเลือกสอนโดยไม่มีความเข้าใจผิดของ Milo",
   "Before you start, here’s what I think:": "ก่อนเริ่ม ฉันคิดแบบนี้:",
-  "Is that right?": "ถูกไหม?"
+  "Is that right?": "ถูกไหม?",
+  "Theme": "ธีม",
+  "System": "ตามระบบ",
+  "Light": "สว่าง",
+  "Dark": "มืด"
 }
