@@ -584,5 +584,9 @@
   "Milo’s mix-up wasn’t part of this lesson.": "今回のレッスンには Milo の思い違いは含まれていません。",
   "Not part of this lesson — you chose to teach without Milo’s mix-up.": "このレッスンの対象外です。Milo の思い違いなしで教えることを選びました。",
   "Before you start, here’s what I think:": "始める前に、ぼくはこう思っています：",
-  "Is that right?": "合っていますか？"
+  "Is that right?": "合っていますか？",
+  "Theme": "テーマ",
+  "System": "システム設定",
+  "Light": "ライト",
+  "Dark": "ダーク"
 }
