@@ -86,9 +86,13 @@ export function validatePng(base64: string): Buffer {
   }
   return bytes;
 }
-export function modelMessages(messages: Message[]): Message[] {
+export function modelMessages(messages: Message[]) {
   return messages.map((message) => {
-    if (!message.board || message.board.version !== 2) return message;
+    if (!message.board) return message;
+    if (message.board.version !== 2) {
+      const { kind, verified, display = [] } = message.board;
+      return { ...message, board: { kind, verified, display } };
+    }
     const { png: _png, imageUrl: _url, ...board } = message.board;
     return { ...message, board };
   });
