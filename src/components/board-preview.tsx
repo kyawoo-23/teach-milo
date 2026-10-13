@@ -1,6 +1,7 @@
 "use client";
 import type { BoardSubmission, BoardSnapshot, Board } from "@/lib/contracts";
-import { boardDisplay, textBoard } from "@/lib/boards";
+import { compileBoard } from "@/lib/board-catalog";
+import { boardDisplay } from "@/lib/boards";
 import { useI18n } from "./locale-context";
 export function BoardPreview({
   snapshot,
@@ -10,22 +11,35 @@ export function BoardPreview({
   definition?: Board;
 }) {
   const { t, locale } = useI18n();
-  if (snapshot.version === 1)
+  if (snapshot.version !== 2) {
+    const display =
+      "display" in snapshot && snapshot.display
+        ? snapshot.display
+        : snapshot.version === 3 && definition
+          ? boardDisplay(
+              definition,
+              compileBoard(definition),
+              snapshot,
+              {},
+              locale,
+            )
+          : [];
     return (
       <div className="board-preview">
         <dl>
-          {("display" in snapshot && snapshot.display
-            ? snapshot.display
-            : boardDisplay(definition ?? textBoard(), snapshot.inputs, locale)
-          ).map(({ label, value }, index) => (
+          {display.map(({ label, value, unit }, index) => (
             <div key={index}>
               <dt>{label}</dt>
-              <dd>{value}</dd>
+              <dd>
+                {value}
+                {unit ? ` ${unit}` : ""}
+              </dd>
             </div>
           ))}
         </dl>
       </div>
     );
+  }
   const state = snapshot.state;
   const image = snapshot.png
     ? `data:image/png;base64,${snapshot.png}`

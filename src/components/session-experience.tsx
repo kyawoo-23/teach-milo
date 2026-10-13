@@ -123,12 +123,12 @@ export function SessionExperience({ id }: { id: string }) {
   const [celebrationDismissed, setCelebrationDismissed] = useState(false);
   const [older, setOlder] = useState<Message[]>([]);
   const [draftsLoaded, setDraftsLoaded] = useState(false);
+  const numericFields = session?.numericFields ?? [];
   const transferForm = useSchemaForm(
-    transferFormSchema(!!session?.numericalCheck),
-    { small: "", large: "", answer: "" },
+    transferFormSchema(numericFields.map((f) => f.id)),
+    { numbers: {}, answer: "" },
   );
-  const [small, setSmall] = transferForm.state("small");
-  const [large, setLarge] = transferForm.state("large");
+  const [numbers, setNumbers] = transferForm.state("numbers");
   const [answer, setAnswer] = transferForm.state("answer");
   const messagesRef = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
@@ -316,9 +316,16 @@ export function SessionExperience({ id }: { id: string }) {
         draftStorage.getItem(`transfer-draft:${id}`) || "null",
       );
       if (draft) {
-        setAnswer(draft.answer || "");
-        setSmall(draft.small || "");
-        setLarge(draft.large || "");
+        setAnswer(typeof draft.answer === "string" ? draft.answer : "");
+        if (draft.numbers && typeof draft.numbers === "object")
+          setNumbers(
+            Object.fromEntries(
+              Object.entries(draft.numbers).filter(
+                (entry): entry is [string, string] =>
+                  typeof entry[1] === "string",
+              ),
+            ),
+          );
       }
     } catch {
       /* Ignore a damaged local draft. */
@@ -326,12 +333,12 @@ export function SessionExperience({ id }: { id: string }) {
     setDraftsLoaded(true);
   }, [id]);
   useEffect(() => {
-    if (draftsLoaded && (answer || small || large))
+    if (draftsLoaded && (answer || Object.values(numbers ?? {}).some(Boolean)))
       draftStorage.setItem(
         `transfer-draft:${id}`,
-        JSON.stringify({ answer, small, large }),
+        JSON.stringify({ answer, numbers }),
       );
-  }, [id, answer, small, large, draftsLoaded]);
+  }, [id, answer, numbers, draftsLoaded]);
   useEffect(() => {
     if (session?.phase === "report")
       draftStorage.removeItem(`transfer-draft:${id}`);
@@ -460,7 +467,7 @@ export function SessionExperience({ id }: { id: string }) {
               kind:
                 payload.board.version === 2
                   ? payload.board.state.kind
-                  : session.board!.kind,
+                  : "board",
               verified: false,
             },
           }
@@ -634,62 +641,56 @@ export function SessionExperience({ id }: { id: string }) {
             <form
               noValidate
               onSubmit={transferForm.handleSubmit(
-                async ({ answer, small, large }) => {
+                async ({ answer, numbers }) => {
                   await mutate("transfer", {
                     answer,
                     skip: false,
-                    ...(session.numericalCheck
+                    ...(numericFields.length
                       ? {
-                          parameters: {
-                            small: Number(small),
-                            large: Number(large),
-                          },
+                          answers: Object.fromEntries(
+                            numericFields.map((f) => [
+                              f.id,
+                              Number(numbers[f.id]),
+                            ]),
+                          ),
                         }
                       : {}),
                   });
                 },
               )}
             >
-              {session.numericalCheck && (
+              {numericFields.length > 0 && (
                 <div className="number-fields">
-                  <label>
-                    {t("Parameters at 20 × 20")}
-                    <input
-                      className="text-input"
-                      type="number"
-                      inputMode="numeric"
-                      min="0"
-                      step="1"
-                      required
-                      disabled={unavailable}
-                      id="transfer-small"
-                      {...transferForm.register("small")}
-                      {...transferForm.a11y("small", "transfer-small")}
-                    />
-                    <FieldError
-                      id="transfer-small"
-                      message={transferForm.formState.errors.small?.message}
-                    />
-                  </label>
-                  <label>
-                    {t("Parameters at 40 × 40")}
-                    <input
-                      className="text-input"
-                      type="number"
-                      inputMode="numeric"
-                      min="0"
-                      step="1"
-                      required
-                      disabled={unavailable}
-                      id="transfer-large"
-                      {...transferForm.register("large")}
-                      {...transferForm.a11y("large", "transfer-large")}
-                    />
-                    <FieldError
-                      id="transfer-large"
-                      message={transferForm.formState.errors.large?.message}
-                    />
-                  </label>
+                  {numericFields.map((field) => (
+                    <label
+                      key={field.id}
+                      lang={lessonLanguage(session.lesson.teachingLanguage)}
+                    >
+                      {field.label}
+                      {field.unit ? ` (${field.unit})` : ""}
+                      <input
+                        className="text-input"
+                        type="number"
+                        inputMode="decimal"
+                        step="any"
+                        required
+                        disabled={unavailable}
+                        id={`transfer-${field.id}`}
+                        {...transferForm.register(`numbers.${field.id}`)}
+                        {...transferForm.a11y(
+                          `numbers.${field.id}`,
+                          `transfer-${field.id}`,
+                        )}
+                      />
+                      <FieldError
+                        id={`transfer-${field.id}`}
+                        message={
+                          transferForm.formState.errors.numbers?.[field.id]
+                            ?.message
+                        }
+                      />
+                    </label>
+                  ))}
                 </div>
               )}
               <label className="field-label" htmlFor="transfer-answer">
