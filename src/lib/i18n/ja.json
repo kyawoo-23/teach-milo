@@ -398,7 +398,7 @@
   "You earned {earned} of {available} points on the {scored} skill Milo could check.": "評価できた {scored} 個のスキルで {available} 点中 {earned} 点でした。",
   "You earned {earned} of {available} points on the {scored} skills Milo could check.": "評価できた {scored} 個のスキルで {available} 点中 {earned} 点でした。",
   "You know it.": "学んだことを、",
-  "You scored {total} out of 10 across all five skills.": "5 つのスキル全体で 10 点中 {total} 点でした。",
+  "You scored {total} out of {max} across all {count} skills.": "{count} つのスキル全体で {max} 点中 {total} 点でした。",
   "You've reached the end of this conversation.": "この会話はここまでです。",
   "You've used this session's hint. Try an example, or end for feedback.": "このセッションのヒントは使用済みです。例を試すか、終了してフィードバックを確認してください。",
   "Your Name": "名前",
@@ -575,5 +575,14 @@
   "Your password is managed by Google. Change it in your Google account.": "パスワードはGoogleが管理しています。Googleアカウントで変更してください。",
   "Update password": "パスワードを更新",
   "Password updated.": "パスワードを更新しました。",
-  "Saving…": "保存中…"
+  "Saving…": "保存中…",
+  "How do you want to start?": "どのように始めますか？",
+  "Correct Milo’s mix-up first": "まず Milo の思い違いを正す",
+  "Milo starts with a common misunderstanding about this topic. Spot it and set Milo straight, then keep teaching.": "Milo はこのテーマについてよくある誤解から始めます。それを見つけて正してから、教え続けましょう。",
+  "Just start teaching": "すぐに教え始める",
+  "Teach Milo from scratch. Milo won’t bring up a misconception.": "Milo に一から教えます。Milo は誤解を持ち出しません。",
+  "Milo’s mix-up wasn’t part of this lesson.": "今回のレッスンには Milo の思い違いは含まれていません。",
+  "Not part of this lesson — you chose to teach without Milo’s mix-up.": "このレッスンの対象外です。Milo の思い違いなしで教えることを選びました。",
+  "Before you start, here’s what I think:": "始める前に、ぼくはこう思っています：",
+  "Is that right?": "合っていますか？"
 }

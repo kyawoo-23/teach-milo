@@ -234,25 +234,30 @@ export function ReportView({
       </details>
     );
 
-  const items = dimensions.map((name) => ({
-    name,
-    status: statusOf(report.scores[name]),
-    dimension: report.scores[name],
-  }));
+  const excluded = report.excluded ?? [];
+  const items = dimensions
+    .filter((name) => !excluded.includes(name))
+    .map((name) => ({
+      name,
+      status: statusOf(report.scores[name]),
+      dimension: report.scores[name],
+    }));
   const count = (s: Status) => items.filter((i) => i.status === s).length;
   const scored = items.filter((i) => i.dimension.score !== null).length;
   const verdict = verdicts[report.overallLabel];
   const VerdictIcon = statuses[verdict.tone].icon;
   const center =
     report.total !== null
-      ? `${report.total}/10`
+      ? `${report.total}/${report.maxTotal ?? 10}`
       : report.availablePoints
         ? `${report.earnedPoints}/${report.availablePoints}`
         : "—";
   const summary =
     report.total !== null
-      ? t("You scored {total} out of 10 across all five skills.", {
+      ? t("You scored {total} out of {max} across all {count} skills.", {
           total: report.total,
+          max: report.maxTotal ?? 10,
+          count: items.length,
         })
       : scored === 0
         ? t("Milo didn’t see enough evidence to score any skill yet.")
@@ -268,10 +273,10 @@ export function ReportView({
           ) +
           " " +
           t(
-            5 - scored === 1
+            items.length - scored === 1
               ? "{count} skill still needs evidence."
               : "{count} skills still need evidence.",
-            { count: 5 - scored },
+            { count: items.length - scored },
           );
   const transferStatus: Status =
     report.transferCorrect === null
@@ -363,6 +368,11 @@ export function ReportView({
             );
           })}
         </ul>
+        {excluded.includes("misconception") && (
+          <p className="rp-excluded-note">
+            {t("Milo’s mix-up wasn’t part of this lesson.")}
+          </p>
+        )}
         <ul className="rp-legend" aria-label={t("Legend")}>
           {legendOrder.map((s) => (
             <li key={s}>

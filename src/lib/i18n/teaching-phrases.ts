@@ -1,5 +1,8 @@
 export const teachingPhrases = {
   vi: {
+    "Before you start, here’s what I think:":
+      "Trước khi bắt đầu, mình nghĩ thế này:",
+    "Is that right?": "Đúng không?",
     "Hi!": "Chào bạn!",
     "Can you say a bit more about that?": "Bạn nói thêm một chút được không?",
     "Your explanation has helped me connect the key ideas. Would you like to try a new example on your own, or keep teaching me?":
@@ -17,6 +20,9 @@ export const teachingPhrases = {
     Off: "Tắt",
   },
   id: {
+    "Before you start, here’s what I think:":
+      "Sebelum mulai, begini pendapatku:",
+    "Is that right?": "Benar begitu?",
     "Hi!": "Halo!",
     "Can you say a bit more about that?": "Bisa jelaskan sedikit lebih lanjut?",
     "Your explanation has helped me connect the key ideas. Would you like to try a new example on your own, or keep teaching me?":
@@ -34,6 +40,9 @@ export const teachingPhrases = {
     Off: "Nonaktif",
   },
   ms: {
+    "Before you start, here’s what I think:":
+      "Sebelum bermula, inilah yang saya fikir:",
+    "Is that right?": "Betul tak?",
     "Hi!": "Hai!",
     "Can you say a bit more about that?": "Boleh terangkan sedikit lagi?",
     "Your explanation has helped me connect the key ideas. Would you like to try a new example on your own, or keep teaching me?":
@@ -51,6 +60,9 @@ export const teachingPhrases = {
     Off: "Mati",
   },
   my: {
+    "Before you start, here’s what I think:":
+      "မစခင်၊ ကျွန်တော် ဒီလို ထင်ပါတယ်:",
+    "Is that right?": "မှန်ပါသလား?",
     "Hi!": "မင်္ဂလာပါ!",
     "Can you say a bit more about that?": "နည်းနည်း ထပ်ပြောပြပေးနိုင်မလား။",
     "Your explanation has helped me connect the key ideas. Would you like to try a new example on your own, or keep teaching me?":

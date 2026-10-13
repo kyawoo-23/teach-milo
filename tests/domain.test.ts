@@ -48,6 +48,24 @@ describe("server-owned readiness", () => {
     reply.move = "surface_misconception";
     expect(() => validateStudent(reply, s, l, [m])).toThrow();
   });
+  it("never raises the misconception in teach mode", () => {
+    const l = lessonFixture();
+    const s = { ...sessionFixture(l), mode: "teach" as const };
+    const m = messageFixture();
+    s.ledger = validateStudent(replyFixture(m), s, l, [m]);
+    expect(allowedMoves(s)).not.toContain("surface_misconception");
+  });
+  it("requires the opening misconception to be corrected in correct mode", () => {
+    const l = lessonFixture();
+    const s = { ...sessionFixture(l), mode: "correct" as const };
+    s.challengeUsed = true;
+    const m = messageFixture();
+    s.ledger = validateStudent(replyFixture(m, true), s, l, [m]);
+    expect(readyForCheck(s, l)).toBe(true);
+    s.ledger.misconceptionCorrection = [];
+    expect(readyForCheck(s, l)).toBe(false);
+    expect(allowedMoves(s)).not.toContain("surface_misconception");
+  });
   it("rejects invented citations, multiple questions, and invalid moves", () => {
     const l = lessonFixture();
     const s = sessionFixture(l);
@@ -125,6 +143,31 @@ describe("evidence-based assessment", () => {
       distance: 150.2,
     });
     expect(r.total).toBe(10);
+    expect(r.maxTotal).toBe(10);
+    expect(r.overallLabel).toBe("strong_evidence");
+  });
+  it("scores four skills out of 8 when the misconception is excluded", () => {
+    const l = lessonFixture();
+    const m = messageFixture();
+    const t = {
+      ...messageFixture(
+        "6 × 25 is 150 m, and twice the time doubles it because distance is proportional to time.",
+      ),
+      kind: "transfer" as const,
+    };
+    const r = finalizeReport(
+      reportFixture(m, t),
+      l,
+      [m, t],
+      false,
+      { distance: 150.2 },
+      ["misconception"],
+    );
+    expect(r.maxTotal).toBe(8);
+    expect(r.total).toBe(8);
+    expect(r.excluded).toEqual(["misconception"]);
+    expect(r.scores.misconception.score).toBeNull();
+    expect(r.scores.misconception.citations).toEqual([]);
     expect(r.overallLabel).toBe("strong_evidence");
   });
   it("keeps skipped transfer unscored", () => {

@@ -398,7 +398,7 @@
   "You earned {earned} of {available} points on the {scored} skill Milo could check.": "ได้ {earned} จาก {available} คะแนน ใน {scored} ทักษะที่ Milo ตรวจได้",
   "You earned {earned} of {available} points on the {scored} skills Milo could check.": "ได้ {earned} จาก {available} คะแนน ใน {scored} ทักษะที่ Milo ตรวจได้",
   "You know it.": "คุณเรียนเรื่องนี้มาแล้ว",
-  "You scored {total} out of 10 across all five skills.": "ได้ {total} จาก 10 คะแนน รวมทั้งห้าทักษะ",
+  "You scored {total} out of {max} across all {count} skills.": "ได้ {total} จาก {max} คะแนน รวมทั้ง {count} ทักษะ",
   "You've reached the end of this conversation.": "ถึงท้ายบทสนทนานี้แล้ว",
   "You've used this session's hint. Try an example, or end for feedback.": "ใช้คำใบ้ของการเรียนนี้แล้ว ลองตัวอย่าง หรือจบเพื่อดูข้อเสนอแนะ",
   "Your Name": "ชื่อของคุณ",
@@ -575,5 +575,14 @@
   "Your password is managed by Google. Change it in your Google account.": "Google เป็นผู้จัดการรหัสผ่านของคุณ กรุณาเปลี่ยนในบัญชี Google",
   "Update password": "อัปเดตรหัสผ่าน",
   "Password updated.": "อัปเดตรหัสผ่านแล้ว",
-  "Saving…": "กำลังบันทึก…"
+  "Saving…": "กำลังบันทึก…",
+  "How do you want to start?": "คุณอยากเริ่มแบบไหน?",
+  "Correct Milo’s mix-up first": "แก้ความเข้าใจผิดของ Milo ก่อน",
+  "Milo starts with a common misunderstanding about this topic. Spot it and set Milo straight, then keep teaching.": "Milo จะเริ่มด้วยความเข้าใจผิดที่พบบ่อยเกี่ยวกับหัวข้อนี้ หาให้เจอแล้วช่วยแก้ให้ Milo จากนั้นสอนต่อ",
+  "Just start teaching": "เริ่มสอนเลย",
+  "Teach Milo from scratch. Milo won’t bring up a misconception.": "สอน Milo ตั้งแต่ต้น Milo จะไม่ยกความเข้าใจผิดขึ้นมา",
+  "Milo’s mix-up wasn’t part of this lesson.": "บทเรียนนี้ไม่รวมความเข้าใจผิดของ Milo",
+  "Not part of this lesson — you chose to teach without Milo’s mix-up.": "ไม่อยู่ในบทเรียนนี้ — คุณเลือกสอนโดยไม่มีความเข้าใจผิดของ Milo",
+  "Before you start, here’s what I think:": "ก่อนเริ่ม ฉันคิดแบบนี้:",
+  "Is that right?": "ถูกไหม?"
 }
