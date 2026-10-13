@@ -57,12 +57,7 @@ export const ConversationMessage = memo(function ConversationMessage({
           <div className="shared-board-preview">
             <div className="shared-board">
               <Layers3 size={15} />
-              <span>
-                {t("Demonstration shared")}
-                {message.board.kind === "cnn"
-                  ? ` · ${message.board.inputs.inputSize} × ${message.board.inputs.inputSize}`
-                  : ""}
-              </span>
+              <span>{t("Demonstration shared")}</span>
             </div>
             <BoardPreview snapshot={message.board} />
           </div>

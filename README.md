@@ -2,7 +2,7 @@
 
 Learn by teaching Milo, a curious AI student. Bring PDF, DOCX, TXT, or pasted notes; review extraction; confirm a focused lesson; teach with an interactive board; and optionally take an independent application check before receiving evidence-linked feedback.
 
-This implements the revised, general-subject MVP. There is no preset topic catalog or teaching-turn cap. The CNN lesson is a vetted internal specialization and regression case.
+This implements the revised, general-subject MVP. There is no preset topic catalog, topic-specific code path, or teaching-turn cap.
 
 ## Run locally
 
@@ -58,9 +58,9 @@ Browser tests use intercepted API responses to exercise the complete UI. Integra
 
 - `src/app`: Next.js routes and server API handlers.
 - `src/components`: material preparation, chat, boards, transfer, and report interfaces.
-- `src/lib`: shared Zod contracts and pure controller, arithmetic, grading, and board validation.
+- `src/lib`: shared Zod contracts, the board component catalog and compiler, and pure controller, grading, and board validation.
 - `src/server`: account ownership, Firestore, operations, extraction, lesson preparation, Gemini calls, and session orchestration. Imports are protected by `server-only`.
-- `src/content`: private prompts and the vetted CNN reference.
+- `src/content`: private prompts.
 - `scripts/extract-worker.mjs`: memory/time-bounded document parsing worker.
 
 Client data entry uses React Hook Form with Zod resolvers: account access, material preparation and source review, chat explanations, independent checks, and board editors. Client schemas in `src/lib/form-schemas.ts` reuse the API contracts; server validation remains authoritative. `schema-form.tsx` provides localized, linked field errors and controlled board fields. Board gestures and shared workspace drafts stay separate from form interaction state, so edits and failed submissions remain recoverable.
@@ -77,15 +77,19 @@ DOCX archives undergo streamed ZIP preflight (500 entries / 25 MB decompressed m
 
 ### Boards
 
-Each lesson suggests one interactive activity. Templates cover causal sliders, sequencing, classification, comparison, concept maps, matching, and editable tables. Generated calculations use a deliberately small JavaScript language: arithmetic, approved Math functions, locals, and conditionals. Imports, loops, recursion, constructors, arbitrary property access, and globals are rejected by AST validation. A generated board gets one configuration repair attempt before falling back to an editable example table.
+Lesson preparation composes each board, in the same Gemini call, from a catalog of 17 components that TeachBack owns (`src/lib/board-catalog.ts`): layout (Stack, Row, Card), content (Heading, Text, Callout), inputs (Slider, NumberInput, Toggle, Select), displays (Metric, Bar, Grid, LineChart), and composites (SortableList, Buckets, CompareCards). The board section of the prompt is generated from that registry. A board declares named, typed state (up to 8 variables), derived values, and at most one `calculate(inputs)` function; components bind to state and derived ids, never to inline expressions. Boards without interactive components can instead seed a concept map, matching pairs, or a table. The board is frozen with the lesson.
 
-Generated code executes only in a worker created by an app-owned bootstrap in an opaque sandboxed frame. CSP disables network access; code receives board inputs only. The worker is terminated after 500 ms, messages are validated, and a failed runtime calculation gets one retry before text fallback. Trusted React components render all controls and output. Generated outputs remain illustrative; they are not arithmetic assessment keys.
+`compileBoard` validates every node against the catalog. It drops unknown components and invalid props with diagnostics and enforces limits of 40 nodes, 8 state variables, and 4 levels of nesting. A board with a fatal problem gets one repair call that includes the diagnostics, then falls back to an editable example table. Calculations use a deliberately small JavaScript language: arithmetic, approved Math functions, locals, and conditionals. Imports, loops, recursion, strings, constructors, arbitrary property access, and globals are rejected by AST validation.
+
+In the browser, trusted React components render every control and display. Only `calculate` runs, in a worker created by an app-owned bootstrap inside an opaque sandboxed frame; CSP disables network access, and the worker is terminated after 500 ms. Updates are debounced, and a failed update keeps the last good values on screen. When a board is attached, the server re-runs `calculate` in a resource-limited worker thread and stores a verified snapshot. Milo and the evaluator see only labelled `{label, value, unit}` entries. Board values are illustrative, never assessment keys.
+
+### Numeric transfer checks
+
+When the transfer question asks for specific numbers, lesson prep also writes a numeric key: up to 4 fields with expected values and tolerances, the inputs from the question, and a `calculate` function. The server runs that function and keeps the key only if it reproduces every expected value; otherwise the lesson has no numeric check. During the check, the learner enters one value per field. A value outside tolerance caps the transfer score at 1 and is explained in the report; the model evaluates the reasoning separately.
 
 The board tool selector always offers a sketchpad, concept map, matching pairs, and comparison table. The fixed sketch canvas supports pen, eraser, labels, arrows, shapes, selection, movement, and undo/redo. Desktop, expanded, and mobile views share one workspace. Unfinished tools and pending attachments are saved in this browser by account and session; expiry, deletion, sign-out, and leaving teaching clear them. Storage failures preserve in-memory work and display a notice.
 
-Attaching freezes the current state; an explanation is required to send it. Version-2 snapshots accept up to 48 KiB of structured state and a 128 KiB PNG. The newest relevant sketch is sent inline with the existing Gemini teaching call, while base64 is excluded from model JSON and public chat/history. PNG previews use an ownership-checked endpoint and the message's existing retention. Drawings contextualize explanations; readiness and assessment still require exact learner quotes. Existing version-1 snapshots remain supported.
-
-The CNN specialization uses deterministic server-recomputed snapshots (224 parameters for both image sizes; 194,400 / 830,304 multiplications). Its transfer check verifies submitted parameter counts against 204; the model evaluates semantic reasoning separately.
+Attaching freezes the current state; an explanation is required to send it. Version-2 snapshots accept up to 48 KiB of structured state and a 128 KiB PNG. The newest relevant sketch is sent inline with the existing Gemini teaching call, while base64 is excluded from model JSON and public chat/history. PNG previews use an ownership-checked endpoint and the message's existing retention. Drawings contextualize explanations; readiness and assessment still require exact learner quotes. Interactive boards attach as version-3 snapshots of raw state. Lessons whose stored board predates the catalog show the example table instead; they are not migrated.
 
 ### Access, retries, and expiry
 

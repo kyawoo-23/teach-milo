@@ -77,7 +77,7 @@ try {
       {
         operationId: preparationId,
         materialId: material.id,
-        topic: "CNN weight sharing",
+        topic: "Reusing filter weights",
         level: "introductory",
         sources: material.sources,
       },
