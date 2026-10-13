@@ -58,29 +58,58 @@ export const MILO_MOTIONS: Record<MiloState, MiloTimeline> = {
     },
   },
   listening: {
-    duration: 1800,
+    duration: 3600,
     loop: true,
     parts: {
-      body: transforms([
-        "rotate(-2deg) translateY(0px)",
-        "rotate(1deg) translateY(1px)",
-        "rotate(-2deg) translateY(0px)",
-      ]),
-      antennae: transforms(["rotate(-3deg)", "rotate(3deg)", "rotate(-3deg)"]),
-      blink: blink(1800, 1000),
+      // Move the whole figure together and ease each nod to avoid sharp reversals.
+      figure: [
+        {
+          transform: "rotate(0deg) translateY(0px)",
+          offset: 0,
+          easing: "ease-in-out",
+        },
+        {
+          transform: "rotate(-4deg) translateY(0px)",
+          offset: 0.22,
+          easing: "ease-in-out",
+        },
+        {
+          transform: "rotate(-4deg) translateY(3px)",
+          offset: 0.45,
+          easing: "ease-in-out",
+        },
+        {
+          transform: "rotate(-4deg) translateY(0px)",
+          offset: 0.65,
+          easing: "ease-in-out",
+        },
+        { transform: "rotate(0deg) translateY(0px)", offset: 0.85 },
+        { transform: "rotate(0deg) translateY(0px)", offset: 1 },
+      ],
+      blink: blink(3600, 2800),
     },
   },
   thinking: {
     duration: 2400,
     loop: true,
     parts: {
-      body: transforms(["rotate(-2deg)", "rotate(2deg)", "rotate(-2deg)"]),
-      eyes: transforms([
-        "translate(-1px, -2px)",
-        "translate(2px, -2px)",
-        "translate(-1px, -2px)",
-      ]),
-      antennae: transforms(["rotate(-5deg)", "rotate(5deg)", "rotate(-5deg)"]),
+      // Keep the body tilted while the eyes search upward and antennae twitch.
+      body: transforms(["rotate(5deg)", "rotate(7deg)", "rotate(5deg)"]),
+      eyes: [
+        { transform: "translate(-4px, -4px)", offset: 0 },
+        { transform: "translate(-4px, -4px)", offset: 0.35 },
+        { transform: "translate(4px, -4px)", offset: 0.5 },
+        { transform: "translate(4px, -4px)", offset: 0.8 },
+        { transform: "translate(-4px, -4px)", offset: 1 },
+      ],
+      antennae: [
+        { transform: "rotate(0deg)", offset: 0 },
+        { transform: "rotate(0deg)", offset: 0.2 },
+        { transform: "rotate(12deg)", offset: 0.28 },
+        { transform: "rotate(-8deg)", offset: 0.36 },
+        { transform: "rotate(0deg)", offset: 0.44 },
+        { transform: "rotate(0deg)", offset: 1 },
+      ],
       blink: blink(2400, 1500),
     },
   },
@@ -89,12 +118,22 @@ export const MILO_MOTIONS: Record<MiloState, MiloTimeline> = {
     loop: false,
     parts: {
       body: transforms([
-        "translateY(0px) rotate(0deg)",
-        "translateY(2px) rotate(2deg)",
-        "translateY(0px) rotate(0deg)",
+        "translateY(0px) rotate(0deg) scale(1, 1)",
+        "translateY(-5px) rotate(-3deg) scale(0.98, 1.03)",
+        "translateY(1px) rotate(2deg) scale(1.03, 0.97)",
+        "translateY(-3px) rotate(-2deg) scale(0.99, 1.02)",
+        "translateY(0px) rotate(0deg) scale(1, 1)",
       ]),
-      eyes: transforms(["scaleY(1)", "scaleY(0.75)", "scaleY(1)"]),
-      mouth: transforms(["scaleY(1)", "scaleY(1.5)", "scaleY(1)"]),
+      eyes: transforms(["scaleY(1)", "scaleY(0.85)", "scaleY(1)"]),
+      mouth: transforms([
+        "scaleY(0.2)",
+        "scaleY(1)",
+        "scaleY(0.3)",
+        "scaleY(0.85)",
+        "scaleY(0.2)",
+        "scaleY(0.7)",
+        "scaleY(0.2)",
+      ]),
       blink: blink(1200, 500),
     },
   },
@@ -143,8 +182,13 @@ export const MILO_ORIGINS: Record<MiloPart, string> = {
 export const MILO_STATIC_POSES: Partial<
   Record<MiloState, Partial<Record<MiloPart, string>>>
 > = {
-  listening: { body: "rotate(-2deg)" },
-  thinking: { body: "rotate(2deg)", eyes: "translateY(-2px)" },
+  listening: {
+    figure: "rotate(-4deg)",
+    eyes: "scaleY(1.12)",
+    antennae: "rotate(-4deg)",
+  },
+  thinking: { body: "rotate(5deg)", eyes: "translateY(-2px)" },
+  reply: { mouth: "scaleY(0.65)" },
 };
 export function animateMilo(svg: SVGSVGElement, state: MiloState): Animation[] {
   return animateMiloTimeline(svg, MILO_MOTIONS[state]);

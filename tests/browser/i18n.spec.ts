@@ -113,7 +113,7 @@ for (const locale of ["en", "zh-CN", "ja"] as const) {
     await page.locator("#notes").fill(notes);
     await page.locator("#topic").fill("光");
     await expect(
-      page.getByLabel(translate(locale, "AI teaching language")),
+      page.getByLabel(translate(locale, "What language should Milo use?")),
     ).toHaveAttribute("data-value", locale);
     const next: Locale = locale === "ja" ? "zh-CN" : "ja";
     await chooseLanguage(page, translate(locale, "Website language"), next);
@@ -121,7 +121,7 @@ for (const locale of ["en", "zh-CN", "ja"] as const) {
     await expect(page.locator("#notes")).toHaveValue(notes);
     await expect(page.locator("#topic")).toHaveValue("光");
     await expect(
-      page.getByLabel(translate(next, "AI teaching language")),
+      page.getByLabel(translate(next, "What language should Milo use?")),
     ).toHaveAttribute("data-value", next);
     const cookies = await context.cookies();
     const preference = cookies.find((cookie) => cookie.name === LOCALE_COOKIE)!;
@@ -145,7 +145,11 @@ test("teaching language stays independent through preparation and classroom UI c
   const state = await setup(page);
   await page.goto("/");
   await chooseLanguage(page, "Website language", "ja");
-  await chooseLanguage(page, translate("ja", "AI teaching language"), "zh-CN");
+  await chooseLanguage(
+    page,
+    translate("ja", "What language should Milo use?"),
+    "zh-CN",
+  );
   await page
     .getByRole("button", { name: translate("ja", "Paste notes"), exact: true })
     .click();
@@ -160,7 +164,7 @@ test("teaching language stays independent through preparation and classroom UI c
     }),
   ).toBeVisible();
   await expect(
-    page.getByLabel(translate("ja", "AI teaching language")),
+    page.getByLabel(translate("ja", "What language should Milo use?")),
   ).toHaveAttribute("data-value", "zh-CN");
   const preparation = page.waitForRequest(
     (request) => new URL(request.url()).pathname === "/api/lessons",
@@ -179,7 +183,7 @@ test("teaching language stays independent through preparation and classroom UI c
     ),
   ).toBeVisible();
   await expect(
-    page.getByLabel(translate("ja", "AI teaching language")),
+    page.getByLabel(translate("ja", "What language should Milo use?")),
   ).toHaveCount(0);
   await page
     .getByRole("button", { name: translate("ja", "Let’s teach Milo") })
@@ -197,7 +201,9 @@ test("teaching language stays independent through preparation and classroom UI c
   await expect(
     page.locator(".message-text").filter({ hasText: state.messages[0].text }),
   ).toBeVisible();
-  await expect(page.getByLabel("AI teaching language")).toHaveCount(0);
+  await expect(page.getByLabel("What language should Milo use?")).toHaveCount(
+    0,
+  );
   await page.reload();
   await expect(page.getByLabel("Your explanation to Milo")).toHaveValue(
     "我用自己的话解释。",
@@ -243,7 +249,7 @@ test("the selected teaching language survives a sign-in redirect", async ({
   await page.getByRole("button", { name: "Paste notes", exact: true }).click();
   await page.locator("#notes").fill(notes);
   await page.locator("#topic").fill("光");
-  await chooseLanguage(page, "AI teaching language", "ja");
+  await chooseLanguage(page, "What language should Milo use?", "ja");
   await page.getByRole("button", { name: "Prepare my lesson" }).click();
   await expect(
     page.getByRole("dialog", { name: "Sign In to TeachBack" }),
@@ -260,10 +266,9 @@ test("the selected teaching language survives a sign-in redirect", async ({
   await expect(
     page.getByRole("heading", { name: "Does this look right?" }),
   ).toBeVisible();
-  await expect(page.getByLabel("AI teaching language")).toHaveAttribute(
-    "data-value",
-    "ja",
-  );
+  await expect(
+    page.getByLabel("What language should Milo use?"),
+  ).toHaveAttribute("data-value", "ja");
   const preparation = page.waitForRequest(
     (request) => new URL(request.url()).pathname === "/api/lessons",
   );
@@ -279,7 +284,7 @@ test("custom language menus support keyboard selection, cancellation and typeahe
   await setup(page);
   await page.goto("/");
   const language = page.getByRole("combobox", {
-    name: "AI teaching language",
+    name: "What language should Milo use?",
     exact: true,
   });
   await language.focus();

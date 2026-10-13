@@ -68,7 +68,9 @@ export function LanguageSelector({
 }) {
   const { locale, setLocale, t } = useI18n();
   const id = useId();
-  const label = t(teaching ? "AI teaching language" : "Website language");
+  const label = t(
+    teaching ? "What language should Milo use?" : "Website language",
+  );
   return (
     <div className={teaching ? "teaching-language-field" : "language-selector"}>
       <label

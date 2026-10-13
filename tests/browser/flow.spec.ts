@@ -1134,6 +1134,17 @@ test("Milo follows typing, thinking, failed turns and new replies without reacti
   const explanation = page.getByLabel("Your explanation to Milo");
   await explanation.fill("Weights are reused.");
   await expect(milo).toHaveAttribute("data-milo-state", "listening");
+  // A typing pause must not interrupt listening and restart the animation.
+  await page.waitForTimeout(2200);
+  await expect(milo).toHaveAttribute("data-milo-state", "listening");
+  await explanation.press("End");
+  await explanation.press("Space");
+  await expect(milo).toHaveAttribute("data-milo-state", "listening");
+  await explanation.blur();
+  await expect(milo).toHaveAttribute("data-milo-state", "idle");
+  await explanation.focus();
+  await expect(milo).toHaveAttribute("data-milo-state", "listening");
+  await explanation.fill("");
   await expect(milo).toHaveAttribute("data-milo-state", "idle");
   await explanation.fill("The same weights are reused.");
   await page.getByRole("button", { name: "Send explanation" }).click();
