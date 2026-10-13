@@ -943,6 +943,84 @@ test("small-screen account and history dialogs remain accessible", async ({
   ).toBeFocused();
 });
 
+test("session history keeps long titles and actions readable at narrow and wide sizes", async ({
+  page,
+}, testInfo) => {
+  const { state } = await fixtures(page);
+  const titles = [
+    "Understanding how ideas connect",
+    "Explaining and comparing examples with a longer lesson title",
+    "Reviewing the evidence in my explanations",
+    "Applying what I learned to a new example",
+  ];
+  await page.route("**/api/sessions", (route) =>
+    route.fulfill({
+      json: {
+        sessions: titles.map((title, index) => ({
+          ...state,
+          id: `design-${index}`,
+          title,
+          phase: index < 2 ? "baseline" : "report",
+          scope: "Compare the ideas and explain why each example fits.",
+          level: "introductory",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })),
+      },
+    }),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "My Sessions", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "My Learning Sessions" });
+  await expect(dialog.locator(".session-card")).toHaveCount(4);
+  await expect(
+    dialog.getByRole("link", { name: "Resume", exact: true }),
+  ).toHaveCount(2);
+  await expect(
+    dialog.getByRole("link", { name: "View report", exact: true }),
+  ).toHaveCount(2);
+  await expect(dialog.locator(".session-card-summary time")).toHaveCount(4);
+  for (const width of [375, 768, 1440]) {
+    await page.setViewportSize({ width, height: 950 });
+    expect(
+      await dialog.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth,
+      ),
+    ).toBe(true);
+    const bounds = (await dialog.boundingBox())!;
+    for (const link of await dialog
+      .locator(".session-card-link, .resume-indicator")
+      .all()) {
+      const rect = (await link.boundingBox())!;
+      expect(rect.x).toBeGreaterThanOrEqual(bounds.x);
+      expect(rect.x + rect.width).toBeLessThanOrEqual(bounds.x + bounds.width);
+    }
+    await page.screenshot({
+      path: testInfo.outputPath(`sessions-${width}.png`),
+    });
+  }
+  const toggle = dialog.getByRole("button", {
+    name: `Session details: ${titles[1]}`,
+    exact: true,
+  });
+  await toggle.focus();
+  await toggle.press("Enter");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    dialog.getByRole("button", {
+      name: `Delete session: ${titles[1]}`,
+      exact: true,
+    }),
+  ).toBeVisible();
+  expect(
+    (await new AxeBuilder({ page }).include(".session-history-modal").analyze())
+      .violations,
+  ).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath("sessions-expanded.png") });
+  await toggle.press("Enter");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+});
+
 test("session history appends pages, retries in place, and preserves deletion", async ({
   page,
 }, testInfo) => {
@@ -986,6 +1064,9 @@ test("session history appends pages, retries in place, and preserves deletion", 
   await page.getByRole("button", { name: "My Sessions", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.locator(".session-card")).toHaveCount(2);
+  await dialog
+    .getByRole("button", { name: "Session details: Lesson B" })
+    .click();
   await dialog
     .getByRole("button", { name: "Delete session: Lesson B" })
     .click();
@@ -1689,7 +1770,7 @@ test("mobile classroom details expand with keyboard and give space back to chat"
     .getByRole("button", { name: "Open teaching board", exact: true })
     .click();
   await expect(
-    page.getByRole("dialog", { name: "Teaching board" }),
+    page.getByRole("dialog", { name: "Your teaching board" }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
   for (const width of [320, 661, 844]) {

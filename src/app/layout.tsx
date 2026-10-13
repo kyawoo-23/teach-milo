@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { LocaleProvider } from "@/components/locale-context";
 import { getLocale } from "@/lib/i18n/server";
+import { ThemeProvider } from "@/components/theme-context";
+import { getTheme } from "@/lib/theme-server";
 import { translate } from "@/lib/i18n/messages";
 import { AuthProvider } from "@/components/auth-context";
 import { AuthModal } from "@/components/auth-modal";
@@ -13,7 +15,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
-  themeColor: "#f8f9fc",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f8f9fc" },
+    { media: "(prefers-color-scheme: dark)", color: "#12131c" },
+  ],
 };
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -51,21 +56,23 @@ export default async function Layout({
 }: {
   children: React.ReactNode;
 }) {
-  const locale = await getLocale();
+  const [locale, theme] = await Promise.all([getLocale(), getTheme()]);
   return (
-    <html lang={locale} data-scroll-behavior="smooth">
+    <html lang={locale} data-theme={theme} data-scroll-behavior="smooth">
       <body>
         <LocaleProvider initialLocale={locale}>
-          <a className="skip-link" href="#main">
-            {translate(locale, "Skip to content")}
-          </a>
-          <AuthProvider>
-            <ConfirmationProvider>
-              <AuthModal />
-              <SessionHistoryModal />
-              {children}
-            </ConfirmationProvider>
-          </AuthProvider>
+          <ThemeProvider initialTheme={theme}>
+            <a className="skip-link" href="#main">
+              {translate(locale, "Skip to content")}
+            </a>
+            <AuthProvider>
+              <ConfirmationProvider>
+                <AuthModal />
+                <SessionHistoryModal />
+                {children}
+              </ConfirmationProvider>
+            </AuthProvider>
+          </ThemeProvider>
         </LocaleProvider>
       </body>
     </html>

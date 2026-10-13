@@ -1,12 +1,19 @@
 "use client";
 
 import { useI18n } from "@/components/locale-context";
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { ChevronDown, LogOut, Settings } from "lucide-react";
 import { UserPublic } from "@/lib/contracts";
 import { useConfirmation } from "./confirmation";
 import { useAuth } from "./auth-context";
 import { AccountSettings } from "./account-settings";
+import { ThemeInlinePicker } from "./theme-selector";
 
 export function UserProfileMenu({
   user,
@@ -21,7 +28,9 @@ export function UserProfileMenu({
   const { logout } = useAuth();
   const [profileOpen, setProfileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<CSSProperties>({});
   const profileRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const compact = variant === "session";
 
   useEffect(() => {
@@ -45,6 +54,53 @@ export function UserProfileMenu({
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [profileOpen]);
+
+  useLayoutEffect(() => {
+    if (!profileOpen) return;
+    const menu = profileRef.current;
+    const dropdown = dropdownRef.current;
+    if (!menu || !dropdown) return;
+
+    const place = () => {
+      const anchor = menu.getBoundingClientRect();
+      const width = dropdown.offsetWidth;
+      const height = dropdown.offsetHeight;
+      const margin = 16;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      let left = anchor.right - width;
+      if (left < margin) left = margin;
+      if (left + width > viewportWidth - margin) {
+        left = Math.max(margin, viewportWidth - margin - width);
+      }
+      const below = anchor.bottom + 8;
+      const above = anchor.top - height - 8;
+      const top =
+        below + height > viewportHeight - margin && above >= margin
+          ? above - anchor.top
+          : below - anchor.top;
+      const next = {
+        left: left - anchor.left,
+        right: "auto",
+        top,
+      } satisfies CSSProperties;
+      setDropdownStyle((current) =>
+        current.left === next.left &&
+        current.right === next.right &&
+        current.top === next.top
+          ? current
+          : next,
+      );
+    };
+
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
     };
   }, [profileOpen]);
 
@@ -94,10 +150,19 @@ export function UserProfileMenu({
       </button>
 
       {profileOpen && (
-        <div className="user-profile-dropdown" role="menu">
+        <div
+          className="user-profile-dropdown"
+          role="menu"
+          ref={dropdownRef}
+          style={dropdownStyle}
+        >
           <div className="user-profile-dropdown-meta">
             <span className="user-profile-dropdown-name">{user.name}</span>
             <span className="user-profile-dropdown-email">{user.email}</span>
+          </div>
+          <div className="user-profile-dropdown-section">
+            <span className="user-profile-dropdown-section-label">{t("Theme")}</span>
+            <ThemeInlinePicker />
           </div>
           <button
             type="button"

@@ -1,6 +1,5 @@
 "use client";
 import { useId, useMemo, useState } from "react";
-import { ArrowUpRight, Check, RotateCcw } from "lucide-react";
 import type { Board, BoardSubmission } from "@/lib/contracts";
 import { compileBoard } from "@/lib/board-catalog";
 import {
@@ -14,6 +13,8 @@ import { calculationSandbox } from "@/lib/sandbox";
 import { useI18n } from "../locale-context";
 import { useConfirmation } from "../confirmation";
 import { ErrorNotice } from "../ui";
+import { BoardAttachButton } from "../board-attach-button";
+import attachStyles from "../board-attach-button.module.css";
 import { BoardNodeView, type BoardContext } from "./catalog-components";
 import { useBoardCalculation } from "./use-board-calculation";
 
@@ -38,6 +39,7 @@ export function BoardRenderer({
   const confirm = useConfirmation();
   const idPrefix = useId();
   const [attached, setAttached] = useState(false);
+  const [attaching, setAttaching] = useState(false);
   const [error, setError] = useState<string | Error>("");
   const compiled = useMemo(() => compileBoard(board), [board]);
   const initial = useMemo(
@@ -69,7 +71,7 @@ export function BoardRenderer({
     values,
     metrics: calculation.metrics ?? {},
     series: calculation.series,
-    disabled,
+    disabled: disabled || attaching,
     language: teachingLanguage,
     idPrefix,
     t,
@@ -81,34 +83,9 @@ export function BoardRenderer({
   return (
     <div className="teaching-board">
       <div className="board-content">
-        <div className="board-reset-row">
-          <span className="small-label">
-            {t("A space to make your thinking visible")}
-          </span>
-          <button
-            type="button"
-            className="icon-button"
-            title={changed ? t("Reset board") : t("Nothing to reset yet")}
-            aria-label={t("Reset board")}
-            disabled={disabled || !changed}
-            onClick={async () => {
-              if (
-                await confirm({
-                  title: "Reset this board?",
-                  description:
-                    "Your current board settings will be lost and the initial settings restored.",
-                  confirmLabel: "Reset board",
-                  destructive: true,
-                })
-              ) {
-                setAttached(false);
-                onValuesChange(initial);
-              }
-            }}
-          >
-            <RotateCcw size={16} />
-          </button>
-        </div>
+        <p className="small-label">
+          {t("A space to make your thinking visible")}
+        </p>
         <h3 lang={lessonLanguage(teachingLanguage)}>{board.title}</h3>
         <p
           className="board-instruction"
@@ -136,10 +113,7 @@ export function BoardRenderer({
           </p>
         )}
         {!unavailable && (
-          <div
-            className="board-nodes"
-            lang={lessonLanguage(teachingLanguage)}
-          >
+          <div className="board-nodes" lang={lessonLanguage(teachingLanguage)}>
             {compiled.tree.map((node) => (
               <BoardNodeView key={node.id} node={node} ctx={ctx} />
             ))}
@@ -149,41 +123,58 @@ export function BoardRenderer({
           <p className="board-assumptions">{board.assumptions}</p>
         )}
         {error && <ErrorNotice message={error} />}
-        {!unavailable && (
-          <>
+      </div>
+      {!unavailable && (
+        <div className="workspace-share">
+          <div className="workspace-actions">
             <button
               type="button"
-              className="secondary-button full-width"
+              className={`secondary-button full-width ${attachStyles.button} ${attachStyles.reset} workspace-reset`}
+              disabled={disabled || attaching || !changed}
+              title={changed ? undefined : t("Nothing to reset yet")}
+              onClick={async () => {
+                if (
+                  !(await confirm({
+                    title: "Reset this board?",
+                    description:
+                      "Your current board settings will be lost and the initial settings restored.",
+                    confirmLabel: "Reset board",
+                    destructive: true,
+                  }))
+                )
+                  return;
+                setAttached(false);
+                onValuesChange(initial);
+              }}
+            >
+              {t("Reset board")}
+            </button>
+            <BoardAttachButton
+              attaching={attaching}
+              attached={attached}
               disabled={disabled}
               onClick={async () => {
+                setAttaching(true);
+                setError("");
                 const snapshot: BoardSubmission = { version: 3, ...values };
                 try {
                   validateBoardValues(board, compiled, snapshot);
+                  const accepted = await onAttach(structuredClone(snapshot));
+                  if (accepted !== false) setAttached(true);
                 } catch (e) {
                   setError(e as Error);
-                  return;
+                } finally {
+                  setAttaching(false);
                 }
-                const accepted = await onAttach(structuredClone(snapshot));
-                if (accepted !== false) setAttached(true);
               }}
-            >
-              {attached ? (
-                <>
-                  <Check size={17} /> {t("Attached to your explanation")}
-                </>
-              ) : (
-                <>
-                  {t("Attach to explanation")} <ArrowUpRight size={17} />
-                </>
-              )}
-            </button>
-            <p className="board-footnote">
-              {t("Add your own explanation when you send.")}{" "}
-              {t("This illustration is not an assessment answer key.")}
-            </p>
-          </>
-        )}
-      </div>
+            />
+          </div>
+          <p className="board-footnote">
+            {t("Add your own explanation when you send.")}{" "}
+            {t("This illustration is not an assessment answer key.")}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

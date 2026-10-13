@@ -1,6 +1,6 @@
 "use client";
 import type { ReactNode } from "react";
-import { ArrowDown, ArrowUp, Grip } from "lucide-react";
+import { Check } from "lucide-react";
 import type { Board, BoardCompositeValue } from "@/lib/contracts";
 import type { CompiledNode, PropValue } from "@/lib/board-catalog";
 import { formatBoardValue, type BoardValues } from "@/lib/boards";
@@ -8,6 +8,7 @@ import { lessonLanguage, type TeachingLanguage } from "@/lib/i18n/locales";
 import type { TranslationKey, TranslationParams } from "@/lib/i18n/messages";
 import { BoardNumberField } from "../schema-form";
 import { CustomSelect } from "../custom-select";
+import { BoardReorderControls } from "../board-reorder-controls";
 import type { Series } from "./use-board-calculation";
 
 export type BoardContext = {
@@ -120,9 +121,23 @@ export function BoardNodeView({
             onChange={(value) => ctx.setState(id, value)}
           />
           {node.component === "Slider" ? (
-            <div className="range-ends">
-              <span>{s.min}</span>
-              <span>{s.max}</span>
+            <div className="board-slider-value">
+              <div className="range-ends">
+                <span>{s.min}</span>
+                <span>{s.max}</span>
+              </div>
+              <BoardNumberField
+                id={`${fieldId}-value`}
+                aria-label={ctx.t("Value for {label}", { label })}
+                className="board-number"
+                inputMode="decimal"
+                disabled={ctx.disabled}
+                min={s.min}
+                max={s.max}
+                step={s.step}
+                value={ctx.values.state[id]}
+                onChange={(value) => ctx.setState(id, value)}
+              />
             </div>
           ) : (
             s.unit && <small className="board-unit">{s.unit}</small>
@@ -195,7 +210,9 @@ export function BoardNodeView({
       const { label, unit, number } = lookup(ctx, id);
       const max = amount(ctx, props.max);
       const ratio =
-        number !== undefined && max ? Math.min(1, Math.max(0, number / max)) : 0;
+        number !== undefined && max
+          ? Math.min(1, Math.max(0, number / max))
+          : 0;
       const name = text(props.label) ?? label;
       return (
         <div className="board-bar">
@@ -264,12 +281,14 @@ export function BoardNodeView({
       const xs = lookup(ctx, x),
         ys = lookup(ctx, y);
       const caption =
-        text(props.label) ?? ctx.t("{y} as {x} changes", { x: xs.label, y: ys.label });
+        text(props.label) ??
+        ctx.t("{y} as {x} changes", { x: xs.label, y: ys.label });
       const values = points.map((p) => p.metrics[y]);
       const low = Math.min(...values),
         high = Math.max(...values);
       const s = ctx.board.state.find((v) => v.id === x)!;
-      const px = (value: number) => 8 + ((value - s.min) / (s.max - s.min)) * 284;
+      const px = (value: number) =>
+        8 + ((value - s.min) / (s.max - s.min)) * 284;
       const py = (value: number) =>
         high === low ? 70 : 132 - ((value - low) / (high - low)) * 124;
       return (
@@ -304,65 +323,36 @@ export function BoardNodeView({
       );
     }
     case "SortableList": {
-      const order = (ctx.values.composites[node.id] as string[] | undefined) ??
+      const order =
+        (ctx.values.composites[node.id] as string[] | undefined) ??
         node.items.map((i) => i.id);
       const item = (id: string) => node.items.find((i) => i.id === id);
-      const move = (index: number, offset: number) => {
+      const move = (index: number, target: number) => {
         const next = [...order];
-        [next[index], next[index + offset]] = [next[index + offset], next[index]];
+        const [moved] = next.splice(index, 1);
+        next.splice(target, 0, moved);
         ctx.setComposite(node.id, next);
       };
       return (
-        <ol className="sequence-items" aria-label={text(props.label)}>
+        <ol
+          className="sequence-items"
+          aria-label={text(props.label)}
+          data-reorder-list
+        >
           {order.map((id, index) => (
-            <li
-              key={id}
-              draggable={!ctx.disabled}
-              onDragStart={(e) => e.dataTransfer.setData("text/plain", id)}
-              onDragOver={(e) => {
-                if (!ctx.disabled) e.preventDefault();
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (ctx.disabled) return;
-                const dragged = e.dataTransfer.getData("text/plain");
-                const next = [...order];
-                const from = next.indexOf(dragged);
-                if (from < 0) return;
-                next.splice(from, 1);
-                next.splice(index, 0, dragged);
-                ctx.setComposite(node.id, next);
-              }}
-            >
-              <Grip size={16} />
+            <li key={id} data-reorder-item={id} data-reorder-index={index}>
               <span>
                 <strong>{item(id)?.label}</strong>
                 <small>{item(id)?.detail}</small>
               </span>
-              <div>
-                <button
-                  type="button"
-                  className="icon-button"
-                  aria-label={ctx.t("Move {item} up", {
-                    item: item(id)?.label ?? "",
-                  })}
-                  disabled={ctx.disabled || index === 0}
-                  onClick={() => move(index, -1)}
-                >
-                  <ArrowUp size={15} />
-                </button>
-                <button
-                  type="button"
-                  className="icon-button"
-                  aria-label={ctx.t("Move {item} down", {
-                    item: item(id)?.label ?? "",
-                  })}
-                  disabled={ctx.disabled || index === order.length - 1}
-                  onClick={() => move(index, 1)}
-                >
-                  <ArrowDown size={15} />
-                </button>
-              </div>
+              <BoardReorderControls
+                itemId={id}
+                label={item(id)?.label ?? ""}
+                index={index}
+                count={order.length}
+                disabled={ctx.disabled}
+                onMove={(target) => move(index, target)}
+              />
             </li>
           ))}
         </ol>
@@ -371,8 +361,8 @@ export function BoardNodeView({
     case "Buckets": {
       const groups = props.groups as string[];
       const assigned =
-        (ctx.values.composites[node.id] as Record<string, string> | undefined) ??
-        {};
+        (ctx.values.composites[node.id] as
+          Record<string, string> | undefined) ?? {};
       return (
         <div className="classification-items">
           {text(props.label) && (
@@ -381,7 +371,8 @@ export function BoardNodeView({
           <div className="classification-groups">
             {groups.map((group) => (
               <span key={group}>
-                {group} ({Object.values(assigned).filter((g) => g === group).length})
+                {group} (
+                {Object.values(assigned).filter((g) => g === group).length})
               </span>
             ))}
           </div>
@@ -413,6 +404,9 @@ export function BoardNodeView({
       const selected = ctx.values.composites[node.id];
       return (
         <div className="comparison-items" aria-label={text(props.label)}>
+          {text(props.label) && (
+            <p className="board-text">{text(props.label)}</p>
+          )}
           {node.items.map((item) => (
             <button
               type="button"
@@ -423,6 +417,7 @@ export function BoardNodeView({
               onClick={() => ctx.setComposite(node.id, item.id)}
             >
               <strong>{item.label}</strong>
+              {selected === item.id && <Check size={18} aria-hidden="true" />}
               {item.detail && <p>{item.detail}</p>}
             </button>
           ))}

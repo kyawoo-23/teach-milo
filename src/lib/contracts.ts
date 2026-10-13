@@ -4,11 +4,7 @@ import {
   lessonLanguage,
   type TeachingLanguage,
 } from "./i18n/locales";
-import {
-  ToolStateSchema,
-  BOARD_PNG_BYTES,
-  type ToolKind,
-} from "./board-tools";
+import { ToolStateSchema, BOARD_PNG_BYTES, type ToolKind } from "./board-tools";
 export const TeachingLanguageSchema = z.enum(teachingLanguages);
 
 export const Id = z.string().uuid();
@@ -73,7 +69,11 @@ export const BoardGeneratedSchema = z.object({
   state: z.array(BoardStateSchema).max(8),
   derived: z
     .array(
-      z.object({ id: Ref, label: z.string().max(80), unit: z.string().max(30) }),
+      z.object({
+        id: Ref,
+        label: z.string().max(80),
+        unit: z.string().max(30),
+      }),
     )
     .max(8),
   code: z.string().max(12_000),
@@ -290,16 +290,25 @@ export const ReportGeneratedSchema = z.object({
 export type ReportGenerated = z.infer<typeof ReportGeneratedSchema>;
 export type SessionReport = ReportGenerated & {
   total: number | null;
+  // Points possible across the skills this session assesses (10 when all five apply).
+  maxTotal?: number;
+  // Skills left out of this session, e.g. the misconception in "teach" mode.
+  excluded?: Dimension[];
   availablePoints: number;
   earnedPoints: number;
   overallLabel: "strong_evidence" | "developing" | "incomplete";
   expectedTransferExplanation: string;
   transferCorrect: boolean | null;
 };
+// "correct": Milo opens with the lesson misconception for the learner to fix.
+// "teach": Milo never raises a misconception. Missing on older sessions (raised mid-chat).
+export const SessionModeSchema = z.enum(["correct", "teach"]);
+export type SessionMode = z.infer<typeof SessionModeSchema>;
 export type Session = {
   id: string;
   ownerId: string;
   lessonId: string;
+  mode?: SessionMode;
   lessonSummary?: Pick<
     LessonPublic,
     "title" | "scope" | "level" | "objectives" | "teachingLanguage"
@@ -320,7 +329,13 @@ export type Session = {
 };
 export type SessionPublic = Pick<
   Session,
-  "id" | "phase" | "revision" | "challengeUsed" | "hintUsed" | "expiresAt"
+  | "id"
+  | "phase"
+  | "revision"
+  | "challengeUsed"
+  | "hintUsed"
+  | "expiresAt"
+  | "mode"
 > & {
   lesson: LessonPublic;
   messages: Message[];

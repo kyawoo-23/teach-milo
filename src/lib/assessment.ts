@@ -1,6 +1,7 @@
 import { dictionaryLocale } from "./i18n/locales";
 import { translate, localize } from "./i18n/messages";
 import {
+  Dimension,
   dimensions,
   Lesson,
   Message,
@@ -24,6 +25,7 @@ export function finalizeReport(
   messages: Message[],
   skipped: boolean,
   answers?: Record<string, number>,
+  excluded: Dimension[] = [],
 ): SessionReport {
   const locale = dictionaryLocale(lesson.teachingLanguage);
   const report = structuredClone(raw);
@@ -95,24 +97,39 @@ export function finalizeReport(
     ...s,
     citations: validCitations(s.citations, messages),
   }));
-  const assessed = dimensions.filter((d) => report.scores[d].score !== null);
+  // Skills left out of this session never count toward the total or its maximum.
+  for (const name of excluded)
+    report.scores[name] = {
+      score: null,
+      status: "insufficient_evidence",
+      citations: [],
+      explanation: localize(
+        locale,
+        "Not part of this lesson — you chose to teach without Milo’s mix-up.",
+      ),
+    };
+  const included = dimensions.filter((d) => !excluded.includes(d));
+  const maxTotal = included.length * 2;
+  const assessed = included.filter((d) => report.scores[d].score !== null);
   const earnedPoints = assessed.reduce(
     (sum, d) => sum + report.scores[d].score!,
     0,
   );
-  const total = assessed.length === 5 ? earnedPoints : null;
+  const total = assessed.length === included.length ? earnedPoints : null;
   return {
     ...report,
     total,
     earnedPoints,
+    maxTotal,
+    excluded,
     availablePoints: assessed.length * 2,
     overallLabel:
       total !== null &&
-      total >= 8 &&
+      total >= 0.8 * maxTotal &&
       report.scores.transfer.score === 2 &&
       !report.criticalMisconception
         ? "strong_evidence"
-        : skipped || assessed.length < 5
+        : skipped || assessed.length < included.length
           ? "incomplete"
           : "developing",
     expectedTransferExplanation: lesson.transfer.expected,

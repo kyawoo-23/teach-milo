@@ -5,6 +5,7 @@ import {
   Lesson,
   Session,
   SessionHistoryPage,
+  SessionModeSchema,
   SessionSummary,
 } from "@/lib/contracts";
 import { AppError } from "@/lib/errors";
@@ -176,14 +177,19 @@ export async function POST(request: Request) {
     const input = await json(
       request,
       z
-        .object({ operationId: z.string().uuid(), lessonId: z.string().uuid() })
+        .object({
+          operationId: z.string().uuid(),
+          lessonId: z.string().uuid(),
+          mode: SessionModeSchema.optional(),
+        })
         .strict(),
     );
     const id = await ownerOperation(
       ownerId,
       input.operationId,
-      { type: "create", lessonId: input.lessonId },
-      () => createSession(input.operationId, input.lessonId, ownerId),
+      { type: "create", lessonId: input.lessonId, mode: input.mode },
+      () =>
+        createSession(input.operationId, input.lessonId, ownerId, input.mode),
     );
     return respond(await publicSession(id, ownerId), 201);
   });

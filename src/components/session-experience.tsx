@@ -31,11 +31,12 @@ import {
 } from "@/lib/contracts";
 import { useAuth } from "./auth-context";
 import { lessonLanguage } from "@/lib/i18n/locales";
-import { LanguageSelector } from "./language-selector";
+import { HeaderPreferences } from "./header-preferences";
 import { Brand } from "./brand";
 import { UserProfileMenu } from "./user-profile-menu";
 import { Milo } from "./milo";
 import { TeachingBoard } from "./teaching-board";
+import { BoardResizer } from "./board-resizer";
 import { useBoardWorkspace } from "./use-board-workspace";
 import { BoardPreview } from "./board-preview";
 import { clearBoardDrafts } from "@/lib/board-drafts";
@@ -47,6 +48,7 @@ import {
   draftStorage,
   ErrorNotice,
   Modal,
+  ModalFooter,
   Spinner,
   useOperationId,
 } from "./ui";
@@ -547,7 +549,7 @@ export function SessionExperience({ id }: { id: string }) {
             </span>
           </div>
           <nav className="session-header-actions" aria-label={t("Session")}>
-            <LanguageSelector />
+            <HeaderPreferences showTheme={!user} />
             {isTeaching && (
               <button
                 className="quiet-button"
@@ -1116,6 +1118,7 @@ export function SessionExperience({ id }: { id: string }) {
               </p>
             </div>
           </section>
+          <BoardResizer />
           <aside className="board-sidebar">
             {session.board && boardWorkspace.workspace && (
               <TeachingBoard
@@ -1180,26 +1183,28 @@ export function SessionExperience({ id }: { id: string }) {
                 "You can try the independent check now, or finish with feedback on the explanations you’ve given. Skipped criteria will remain unscored.",
               )}
             </p>
-            <div className="modal-actions">
-              <button
-                className="primary-button"
-                onClick={() => action("start_transfer")}
-              >
-                {t("Try the independent check")}
-              </button>
-              <button
-                className="secondary-button"
-                onClick={() => action("end")}
-              >
-                {t("End and see my feedback")}
-              </button>
-              <button
-                className="quiet-button"
-                onClick={() => setEndOpen(false)}
-              >
-                {t("Keep teaching")}
-              </button>
-            </div>
+            <ModalFooter>
+              <div className="modal-actions">
+                <button
+                  className="primary-button"
+                  onClick={() => action("start_transfer")}
+                >
+                  {t("Try the independent check")}
+                </button>
+                <button
+                  className="secondary-button"
+                  onClick={() => action("end")}
+                >
+                  {t("End and see my feedback")}
+                </button>
+                <button
+                  className="quiet-button"
+                  onClick={() => setEndOpen(false)}
+                >
+                  {t("Keep teaching")}
+                </button>
+              </div>
+            </ModalFooter>
           </Modal>
         </main>
       )}

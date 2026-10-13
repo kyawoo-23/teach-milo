@@ -35,6 +35,7 @@ export function allowedMoves(session: Session) {
     "redirect",
   ];
   if (
+    session.mode !== "teach" &&
     session.phase !== "baseline" &&
     !session.challengeUsed &&
     session.ledger.misconceptionCorrection.length === 0 &&

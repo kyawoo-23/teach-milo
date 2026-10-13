@@ -1,9 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { crc32 } from "node:zlib";
 import { extractInWorker, extractUpload, readUpload } from "@/server/materials";
 import type { Model } from "@/server/model";
 import { ctx } from "./fixtures";
+import { pngFixture } from "./board-fixtures";
+import { extractionCacheId } from "@/server/extraction-cache";
+async function scannedPdf(pages = 1) {
+  const pdf = await PDFDocument.create();
+  const image = await pdf.embedPng(pngFixture());
+  for (let i = 0; i < pages; i++)
+    pdf.addPage().drawImage(image, { x: 0, y: 0, width: 200, height: 200 });
+  return pdf;
+}
 function zip(entries: Record<string, string>) {
   const chunks: Buffer[] = [];
   const directory: Buffer[] = [];
@@ -41,6 +50,24 @@ function zip(entries: Record<string, string>) {
   return Buffer.concat([...chunks, dir, end]);
 }
 describe("bounded material extraction", () => {
+  it("invalidates extraction reuse when user, bytes, model or prompt change", () => {
+    const key = extractionCacheId(
+      "owner",
+      Buffer.from("pdf"),
+      "model",
+      "prompt",
+    );
+    expect(
+      extractionCacheId("owner", Buffer.from("pdf"), "model", "prompt"),
+    ).toBe(key);
+    for (const changed of [
+      extractionCacheId("another", Buffer.from("pdf"), "model", "prompt"),
+      extractionCacheId("owner", Buffer.from("changed"), "model", "prompt"),
+      extractionCacheId("owner", Buffer.from("pdf"), "another", "prompt"),
+      extractionCacheId("owner", Buffer.from("pdf"), "model", "another"),
+    ])
+      expect(changed).not.toBe(key);
+  });
   it("extracts UTF-8 text and rejects binary or oversized text", async () => {
     const data = await extractInWorker(
       Buffer.from(
@@ -68,11 +95,130 @@ describe("bounded material extraction", () => {
     const result = await extractInWorker(Buffer.from(await pdf.save()), "pdf");
     expect(result.sources[0].id).toBe("p1");
     expect(result.sources[0].text).toContain("convolution weights");
-    expect(result.chunks).toHaveLength(1);
+    expect(result.chunks).toHaveLength(0);
+  });
+  it("extracts clean prose and blank pages without calling Gemini", async () => {
+    const pdf = await PDFDocument.create();
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    for (let i = 0; i < 20; i++)
+      pdf
+        .addPage()
+        .drawText(
+          "A clear explanation of how energy is stored and transferred.",
+          { font, size: 12 },
+        );
+    pdf.addPage();
+    const generate = vi.fn();
+    const sources = await extractUpload(
+      Buffer.from(await pdf.save()),
+      "prose.pdf",
+      ctx,
+      { generate },
+    );
+    expect(generate).not.toHaveBeenCalled();
+    expect(sources).toHaveLength(21);
+    expect(sources[20]).toMatchObject({
+      id: "p21",
+      text: "",
+      warnings: [expect.any(String)],
+    });
+    expect(sources[0].text).toContain("energy is stored");
+  });
+  it("packs nonadjacent visual pages together and keeps original references", async () => {
+    const pdf = await PDFDocument.create();
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    const image = await pdf.embedPng(pngFixture());
+    const prose =
+      "A clear explanation of how energy is stored and transferred.";
+    pdf.addPage().drawText(prose, { font, size: 12 });
+    pdf.addPage().drawImage(image, { width: 200, height: 200 });
+    pdf.addPage().drawText(prose, { font, size: 12 });
+    const diagram = pdf.addPage();
+    diagram.drawText(prose, { font, size: 12 });
+    diagram.drawLine({ start: { x: 20, y: 20 }, end: { x: 90, y: 90 } });
+    pdf.addPage();
+    pdf
+      .addPage()
+      .drawText("Calculate the unknown quantity using the formula x = 2.", {
+        font,
+        size: 12,
+      });
+    const mixed = pdf.addPage();
+    mixed.drawText(prose, { font, size: 12 });
+    mixed.drawImage(image, { width: 200, height: 200 });
+    const bytes = Buffer.from(await pdf.save());
+    expect(
+      (await extractInWorker(bytes, "pdf")).chunks.map((chunk) => chunk.pages),
+    ).toEqual([[2, 4, 6, 7]]);
+    let calls = 0;
+    const model: Model = {
+      async generate(schema, _system, data, _ctx, media) {
+        calls++;
+        expect(data).toEqual({ pageCount: 4 });
+        expect((await PDFDocument.load(media as Buffer)).getPageCount()).toBe(
+          4,
+        );
+        return schema.parse({
+          pages: [4, 2, 1, 3].map((page) => ({
+            page,
+            text: `Visual learning content from attachment page ${page}.`,
+            warnings: [],
+          })),
+        });
+      },
+    };
+    const sources = await extractUpload(bytes, "mixed.pdf", ctx, model);
+    expect(calls).toBe(1);
+    expect(sources.map((source) => source.id)).toEqual([
+      "p1",
+      "p2",
+      "p3",
+      "p4",
+      "p5",
+      "p6",
+      "p7",
+    ]);
+    expect(sources[3].text).toContain("attachment page 2");
+    expect(sources[6].text).toContain("attachment page 4");
+    expect(sources[0].text).toBe(prose);
+  });
+  it("keeps superscripts and column reading-order resets on the vision path", async () => {
+    const pdf = await PDFDocument.create();
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    const equation = pdf.addPage();
+    equation.drawText("The unknown quantity is expressed by the variable x", {
+      font,
+      size: 12,
+      x: 20,
+      y: 500,
+    });
+    equation.drawText("2", { font, size: 7, x: 290, y: 505 });
+    const columns = pdf.addPage();
+    columns.drawText("First column begins with a useful explanation.", {
+      font,
+      size: 12,
+      x: 20,
+      y: 500,
+    });
+    columns.drawText("First column continues with another sentence.", {
+      font,
+      size: 12,
+      x: 20,
+      y: 480,
+    });
+    columns.drawText("Second column begins with related material.", {
+      font,
+      size: 12,
+      x: 320,
+      y: 500,
+    });
+    expect(
+      (await extractInWorker(Buffer.from(await pdf.save()), "pdf")).chunks[0]
+        .pages,
+    ).toEqual([1, 2]);
   });
   it("uses visual extraction for scanned pages and preserves uncertainty", async () => {
-    const pdf = await PDFDocument.create();
-    pdf.addPage();
+    const pdf = await scannedPdf();
     const model: Model = {
       async generate(schema, _s, _d, _ctx, bytes) {
         expect(bytes?.length).toBeGreaterThan(0);
@@ -97,9 +243,7 @@ describe("bounded material extraction", () => {
     expect(sources[0].label).toBe("Page 1");
   });
   it("rejects incomplete OCR coverage and excessive PDF pages", async () => {
-    const pdf = await PDFDocument.create();
-    pdf.addPage();
-    pdf.addPage();
+    const pdf = await scannedPdf(2);
     const model: Model = {
       async generate(schema) {
         return schema.parse({
@@ -120,6 +264,64 @@ describe("bounded material extraction", () => {
     await expect(
       extractInWorker(Buffer.from(await pdf.save()), "pdf"),
     ).rejects.toThrow("50 pages");
+  });
+  it("never checkpoints incomplete coverage and rejects a wholly blank document", async () => {
+    const pdf = await scannedPdf(2);
+    const checkpoint = vi.fn();
+    const model: Model = {
+      async generate(schema) {
+        return schema.parse({
+          pages: [1, 1].map((page) => ({
+            page,
+            text: "A readable explanation of the learning material.",
+            warnings: [],
+          })),
+        });
+      },
+    };
+    await expect(
+      extractUpload(
+        Buffer.from(await pdf.save()),
+        "duplicate.pdf",
+        ctx,
+        model,
+        { sources: [], checkpoint },
+      ),
+    ).rejects.toMatchObject({ code: "OCR_INCOMPLETE" });
+    expect(checkpoint).not.toHaveBeenCalled();
+    const blank = await PDFDocument.create();
+    blank.addPage();
+    const generate = vi.fn();
+    await expect(
+      extractUpload(Buffer.from(await blank.save()), "blank.pdf", ctx, {
+        generate,
+      }),
+    ).rejects.toMatchObject({ code: "UNREADABLE" });
+    expect(generate).not.toHaveBeenCalled();
+  });
+  it("does not cache unreadable OCR or extraction exceeding the combined text limit", async () => {
+    const pdf = await scannedPdf(2);
+    const bytes = Buffer.from(await pdf.save());
+    const checkpoint = vi.fn();
+    for (const [text, code] of [
+      ["", "UNREADABLE"],
+      ["x".repeat(25_001), "TOO_MUCH_TEXT"],
+    ] as const) {
+      const model: Model = {
+        async generate(schema) {
+          return schema.parse({
+            pages: [1, 2].map((page) => ({ page, text, warnings: [] })),
+          });
+        },
+      };
+      await expect(
+        extractUpload(bytes, "scan.pdf", ctx, model, {
+          sources: [],
+          checkpoint,
+        }),
+      ).rejects.toMatchObject({ code });
+      expect(checkpoint).not.toHaveBeenCalled();
+    }
   });
   it("reads raw DOCX text without rendering document HTML", async () => {
     const bytes = zip({

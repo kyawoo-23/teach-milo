@@ -17,7 +17,7 @@ import {
   type TeachingLanguage,
 } from "@/lib/i18n/locales";
 import { useConfirmation } from "./confirmation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
@@ -32,8 +32,20 @@ import {
   UploadCloud,
   X,
 } from "lucide-react";
-import { LevelIcon } from "./level-icon";
-import { LessonPublic, SessionPublic, Source } from "@/lib/contracts";
+import { LevelIcon, type LessonLevel } from "./level-icon";
+
+const lessonLevels = ["introductory", "intermediate", "advanced"] as const;
+
+function isLessonLevel(value: string): value is LessonLevel {
+  return (lessonLevels as readonly string[]).includes(value);
+}
+import { CustomSelect } from "./custom-select";
+import {
+  LessonPublic,
+  SessionMode,
+  SessionPublic,
+  Source,
+} from "@/lib/contracts";
 import { useAuth } from "./auth-context";
 import { MarkdownEditor } from "./markdown-editor";
 import { clearDraft, saveDraft, takeDraft } from "./material-draft";
@@ -49,6 +61,7 @@ import {
 } from "./ui";
 
 type MaterialResult = { id: string; name: string; sources: Source[] };
+const START_SESSION_BUSY = "Milo is getting ready to learn…";
 export function Onboarding() {
   const { t, text: localizeText, locale } = useI18n();
 
@@ -72,6 +85,14 @@ export function Onboarding() {
   const [notes, setNotes] = materialForm.state("notes");
   const [topic, setTopic] = materialForm.state("topic");
   const [level, setLevel] = materialForm.state("level");
+  const levelId = useId();
+  const levelLabel = t("How advanced should this lesson be?");
+  const levelName = (lessonLevel: LessonLevel) =>
+    lessonLevel === "introductory"
+      ? t("Introductory")
+      : lessonLevel === "intermediate"
+        ? t("Intermediate")
+        : t("Advanced");
   const [teachingLanguage, setTeachingLanguage] =
     materialForm.state("teachingLanguage");
   const languageChosen = useRef(false);
@@ -83,6 +104,7 @@ export function Onboarding() {
   const reviewForm = useSchemaForm(LessonReviewFormSchema, { sources: [] });
   const [sources, setSources] = reviewForm.state("sources");
   const [lesson, setLesson] = useState<LessonPublic | null>(null);
+  const [sessionMode, setSessionMode] = useState<SessionMode>("correct");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState<string | Error>("");
   const [help, setHelp] = useState(false);
@@ -154,6 +176,7 @@ export function Onboarding() {
   async function run(
     label: string,
     action: (isCurrent: () => boolean) => Promise<void>,
+    options?: { holdBusy?: boolean },
   ) {
     if (busyRef.current) return;
     const owner = currentOwner.current;
@@ -161,15 +184,17 @@ export function Onboarding() {
     busyRef.current = true;
     setBusy(label);
     setError("");
+    let hold = false;
     try {
       await action(isCurrent);
+      if (options?.holdBusy && isCurrent()) hold = true;
     } catch (e) {
       if (!isCurrent()) return;
       if (e instanceof ApiError && e.code === "AUTH_REQUIRED")
         openAuthModal("login");
       setError(e instanceof Error ? e : "Please try again.");
     } finally {
-      if (isCurrent()) {
+      if (isCurrent() && !hold) {
         setBusy("");
         busyRef.current = false;
       }
@@ -205,10 +230,6 @@ export function Onboarding() {
   async function submitMaterial() {
     if (busyRef.current || loading) return;
     if (!user) {
-      if (mode === "upload" && !file) {
-        setError("Choose a learning document first.");
-        return;
-      }
       setError("");
       await saveDraft({ mode, notes, topic, level, teachingLanguage }, file);
       setResume(true);
@@ -273,13 +294,18 @@ export function Onboarding() {
     );
   }
   async function start() {
-    await run("Milo is getting ready to learn…", async (isCurrent) => {
-      const result = await api<SessionPublic>("/api/sessions", {
-        lessonId: lesson!.id,
-        operationId: getOperation(`start:${lesson!.id}`),
-      });
-      if (isCurrent()) router.push(`/session/${result.id}`);
-    });
+    await run(
+      START_SESSION_BUSY,
+      async (isCurrent) => {
+        const result = await api<SessionPublic>("/api/sessions", {
+          lessonId: lesson!.id,
+          mode: sessionMode,
+          operationId: getOperation(`start:${lesson!.id}:${sessionMode}`),
+        });
+        if (isCurrent()) router.push(`/session/${result.id}`);
+      },
+      { holdBusy: true },
+    );
   }
   return (
     <div className="home-shell">
@@ -363,7 +389,12 @@ export function Onboarding() {
               </div>
               <form
                 noValidate
-                onSubmit={materialForm.handleSubmit(submitMaterial)}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (busyRef.current || loading) return;
+                  if (!user) void submitMaterial();
+                  else void materialForm.handleSubmit(submitMaterial)(event);
+                }}
               >
                 <div
                   className="segmented"
@@ -375,14 +406,18 @@ export function Onboarding() {
                     aria-pressed={mode === "upload"}
                     onClick={() => setMode("upload")}
                   >
-                    <UploadCloud size={17} /> {t("Upload a document")}
+                    <UploadCloud size={17} aria-hidden="true" />
+                    <span className="segmented-label">
+                      {t("Upload a document")}
+                    </span>
                   </button>
                   <button
                     type="button"
                     aria-pressed={mode === "paste"}
                     onClick={() => setMode("paste")}
                   >
-                    <FileText size={17} /> {t("Paste notes")}
+                    <FileText size={17} aria-hidden="true" />
+                    <span className="segmented-label">{t("Paste notes")}</span>
                   </button>
                 </div>
                 <div className="material-source">
@@ -536,11 +571,9 @@ export function Onboarding() {
                   )}
                 />
                 <fieldset className="level-field">
-                  <legend>{t("How advanced should this lesson be?")}</legend>
+                  <legend>{levelLabel}</legend>
                   <div className="level-options">
-                    {(
-                      ["introductory", "intermediate", "advanced"] as const
-                    ).map((l) => (
+                    {lessonLevels.map((l) => (
                       <label key={l}>
                         <input
                           type="radio"
@@ -549,17 +582,33 @@ export function Onboarding() {
                           checked={level === l}
                         />
                         <span>
-                          <LevelIcon level={l} />
-                          {l === "introductory"
-                            ? t("Introductory")
-                            : l === "intermediate"
-                              ? t("Intermediate")
-                              : t("Advanced")}
+                          <LevelIcon level={l} muted={level !== l} />
+                          {levelName(l)}
                         </span>
                       </label>
                     ))}
                   </div>
                 </fieldset>
+                <div className="level-select">
+                  <label className="field-label" htmlFor={levelId}>
+                    {levelLabel}
+                  </label>
+                  <CustomSelect
+                    id={levelId}
+                    label={levelLabel}
+                    value={level}
+                    disabled={!!busy}
+                    icon={<LevelIcon level={level} />}
+                    options={lessonLevels.map((l) => ({
+                      value: l,
+                      label: levelName(l),
+                      icon: <LevelIcon level={l} />,
+                    }))}
+                    onChange={(value) => {
+                      if (isLessonLevel(value)) setLevel(value);
+                    }}
+                  />
+                </div>
                 {error && <ErrorNotice message={error} />}
                 <button
                   className="primary-button full-width"
@@ -818,20 +867,66 @@ export function Onboarding() {
                       )}
                     </p>
                   </div>
+                  <fieldset className="mode-field">
+                    <legend>{t("How do you want to start?")}</legend>
+                    {(
+                      [
+                        [
+                          "correct",
+                          "Correct Milo’s mix-up first",
+                          "Milo starts with a common misunderstanding about this topic. Spot it and set Milo straight, then keep teaching.",
+                        ],
+                        [
+                          "teach",
+                          "Just start teaching",
+                          "Teach Milo from scratch. Milo won’t bring up a misconception.",
+                        ],
+                      ] as const
+                    ).map(([value, title, detail]) => (
+                      <label key={value}>
+                        <input
+                          type="radio"
+                          name="session-mode"
+                          value={value}
+                          checked={sessionMode === value}
+                          disabled={!!busy}
+                          onChange={() => setSessionMode(value)}
+                        />
+                        <span className="mode-icon" aria-hidden="true">
+                          {value === "correct" ? (
+                            <Lightbulb size={18} />
+                          ) : (
+                            <MessageCircle size={18} />
+                          )}
+                        </span>
+                        <span>
+                          <strong>{t(title)}</strong>
+                          <small>{t(detail)}</small>
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
                   {error && <ErrorNotice message={error} />}
                   <button
+                    type="button"
                     className="primary-button full-width"
                     disabled={!!busy}
+                    aria-busy={busy === START_SESSION_BUSY}
                     onClick={start}
                   >
-                    {busy ? (
-                      <Spinner label={t("Opening your classroom")} />
+                    {busy === START_SESSION_BUSY ? (
+                      <Spinner label={t(START_SESSION_BUSY)} />
                     ) : (
                       <>
                         {t("Let’s teach Milo")} <ArrowRight size={18} />
                       </>
                     )}
                   </button>
+                  {busy === START_SESSION_BUSY && (
+                    <p className="processing-note" role="status">
+                      {localizeText(START_SESSION_BUSY)}
+                    </p>
+                  )}
                 </>
               )
             )}
