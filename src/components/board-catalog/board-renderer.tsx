@@ -1,6 +1,6 @@
 "use client";
 import { useId, useMemo, useState } from "react";
-import { ArrowUpRight, Check, Layers3, RotateCcw } from "lucide-react";
+import { ArrowUpRight, Check, RotateCcw } from "lucide-react";
 import type { Board, BoardSubmission } from "@/lib/contracts";
 import { compileBoard } from "@/lib/board-catalog";
 import {
@@ -80,39 +80,35 @@ export function BoardRenderer({
   };
   return (
     <div className="teaching-board">
-      <div className="board-heading">
-        <span className="board-icon">
-          <Layers3 size={18} />
-        </span>
-        <h2>{t("Teaching board")}</h2>
-        <button
-          type="button"
-          className="icon-button"
-          title={changed ? t("Reset board") : t("Nothing to reset yet")}
-          aria-label={t("Reset board")}
-          disabled={disabled || !changed}
-          onClick={async () => {
-            if (
-              await confirm({
-                title: "Reset this board?",
-                description:
-                  "Your current board settings will be lost and the initial settings restored.",
-                confirmLabel: "Reset board",
-                destructive: true,
-              })
-            ) {
-              setAttached(false);
-              onValuesChange(initial);
-            }
-          }}
-        >
-          <RotateCcw size={16} />
-        </button>
-      </div>
       <div className="board-content">
-        <span className="small-label">
-          {t("A space to make your thinking visible")}
-        </span>
+        <div className="board-reset-row">
+          <span className="small-label">
+            {t("A space to make your thinking visible")}
+          </span>
+          <button
+            type="button"
+            className="icon-button"
+            title={changed ? t("Reset board") : t("Nothing to reset yet")}
+            aria-label={t("Reset board")}
+            disabled={disabled || !changed}
+            onClick={async () => {
+              if (
+                await confirm({
+                  title: "Reset this board?",
+                  description:
+                    "Your current board settings will be lost and the initial settings restored.",
+                  confirmLabel: "Reset board",
+                  destructive: true,
+                })
+              ) {
+                setAttached(false);
+                onValuesChange(initial);
+              }
+            }}
+          >
+            <RotateCcw size={16} />
+          </button>
+        </div>
         <h3 lang={lessonLanguage(teachingLanguage)}>{board.title}</h3>
         <p
           className="board-instruction"

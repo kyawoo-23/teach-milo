@@ -15,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { SessionHistoryPage, SessionSummary } from "@/lib/contracts";
+import { LevelIcon } from "./level-icon";
 import { useAuth } from "./auth-context";
 import { api, ErrorNotice, Modal, Spinner } from "./ui";
 import { clearBoardDrafts } from "@/lib/board-drafts";
@@ -157,6 +158,7 @@ export function SessionHistoryModal() {
       open={sessionModalOpen && !!user}
       onClose={closeSessionModal}
       title={t("My Learning Sessions")}
+      className="session-history-modal"
     >
       <div className="session-history-content">
         {!user ? (
@@ -251,6 +253,7 @@ export function SessionHistoryModal() {
                             {localizeText(phaseInfo.label)}
                           </span>
                           <span className="level-badge">
+                            <LevelIcon level={item.level} size={14} />
                             {localizeText(item.level)}
                           </span>
                         </div>

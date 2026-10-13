@@ -151,4 +151,58 @@ describe("bounded material extraction", () => {
       ),
     ).rejects.toMatchObject({ status: 413 });
   });
+  it.each([false, true])(
+    "accepts one file and its operation ID (file first: %s)",
+    async (fileFirst) => {
+      const form = new FormData();
+      const operationId = "11111111-1111-4111-8111-111111111111";
+      const contents = "A learning document about energy storage.";
+      const appendFile = () =>
+        form.append("file", new Blob([contents]), "lesson.txt");
+      if (fileFirst) appendFile();
+      form.append("operationId", operationId);
+      if (!fileFirst) appendFile();
+      const upload = await readUpload(
+        new Request("http://localhost/api/materials", {
+          method: "POST",
+          body: form,
+        }),
+      );
+      expect(upload).toEqual({
+        bytes: Buffer.from(contents),
+        filename: "lesson.txt",
+        operationId,
+      });
+    },
+  );
+  it.each(["file", "operationId"])(
+    "rejects an additional %s part",
+    async (extraPart) => {
+      const form = new FormData();
+      form.append("operationId", "11111111-1111-4111-8111-111111111111");
+      form.append("file", new Blob(["Learning notes"]), "lesson.txt");
+      if (extraPart === "file")
+        form.append("file", new Blob(["More notes"]), "extra.txt");
+      else form.append("operationId", "22222222-2222-4222-8222-222222222222");
+      const encoded = new Request("http://localhost/api/materials", {
+        method: "POST",
+        body: form,
+      });
+      await expect(
+        readUpload(
+          new Request(encoded.url, {
+            method: "POST",
+            headers: encoded.headers,
+            body: await encoded.arrayBuffer(),
+          }),
+        ),
+      ).rejects.toMatchObject({
+        status: 413,
+        message:
+          extraPart === "file"
+            ? "Upload one file at a time."
+            : "Unexpected upload fields.",
+      });
+    },
+  );
 });

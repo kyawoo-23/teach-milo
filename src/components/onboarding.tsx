@@ -32,6 +32,7 @@ import {
   UploadCloud,
   X,
 } from "lucide-react";
+import { LevelIcon } from "./level-icon";
 import { LessonPublic, SessionPublic, Source } from "@/lib/contracts";
 import { useAuth } from "./auth-context";
 import { MarkdownEditor } from "./markdown-editor";
@@ -384,111 +385,122 @@ export function Onboarding() {
                     <FileText size={17} /> {t("Paste notes")}
                   </button>
                 </div>
-                {mode === "upload" ? (
+                <div className="material-source">
                   <div
-                    className={`dropzone ${dragging ? "dragging" : ""} ${file ? "has-file" : ""}`}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setDragging(true);
-                    }}
-                    onDragLeave={() => setDragging(false)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setDragging(false);
-                      chooseFile(e.dataTransfer.files[0]);
-                    }}
+                    className={`material-source-panel ${mode === "upload" ? "is-active" : ""}`}
+                    aria-hidden={mode !== "upload"}
+                    inert={mode !== "upload" ? true : undefined}
                   >
-                    <input
-                      name="file"
-                      ref={(node) => {
-                        inputRef.current = node;
-                        materialForm.register("file").ref(node);
+                    <div
+                      className={`dropzone ${dragging ? "dragging" : ""} ${file ? "has-file" : ""}`}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragging(true);
                       }}
-                      {...materialForm.a11y("file", "material-file")}
-                      id="material-file"
-                      type="file"
-                      className="visually-hidden"
-                      accept=".pdf,.docx,.txt"
-                      onChange={(e) => chooseFile(e.target.files?.[0])}
-                    />
-                    {file ? (
-                      <>
-                        <span className="file-symbol">
-                          <FileText size={26} />
-                        </span>
-                        <strong>{file.name}</strong>
-                        <span>
-                          {(file.size / 1024).toFixed(0)}{" "}
-                          {t("KB · Ready to read")}
-                        </span>
-                        <button
-                          type="button"
-                          className="text-button"
-                          onClick={async () => {
-                            if (
-                              !(await confirm({
-                                title: "Remove selected file?",
-                                description:
-                                  "You’ll need to choose a file again before preparing your lesson.",
-                                confirmLabel: "Remove file",
-                                destructive: true,
-                              }))
-                            )
-                              return;
-                            setFile(null);
-                            if (inputRef.current) inputRef.current.value = "";
-                          }}
-                        >
-                          {t("Choose another file")}
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <span className="upload-symbol">
-                          <UploadCloud size={28} />
-                        </span>
-                        <label htmlFor="material-file" className="file-label">
-                          {t("Choose a file")}{" "}
-                          <span>{t("or drop it here")}</span>
-                        </label>
-                        <span>{t("PDF, DOCX, or TXT · Up to 10 MB")}</span>
-                        <span className="ocr-note">
-                          {t("Scanned PDFs welcome. We’ll read those too.")}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <div className="paste-field">
-                    <label htmlFor="notes" className="visually-hidden">
-                      {t("Your learning notes")}
-                    </label>
-                    <textarea
-                      id="notes"
-                      {...materialForm.register("notes")}
-                      {...materialForm.a11y("notes", "notes")}
-                      autoComplete="off"
-                      minLength={30}
-                      maxLength={50000}
-                      required
-                      rows={7}
-                      placeholder={t(
-                        "Paste a passage, your class notes, or an explanation you want to understand better…",
+                      onDragLeave={() => setDragging(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDragging(false);
+                        chooseFile(e.dataTransfer.files[0]);
+                      }}
+                    >
+                      <input
+                        name="file"
+                        ref={(node) => {
+                          inputRef.current = node;
+                          materialForm.register("file").ref(node);
+                        }}
+                        {...materialForm.a11y("file", "material-file")}
+                        id="material-file"
+                        type="file"
+                        className="visually-hidden"
+                        accept=".pdf,.docx,.txt"
+                        onChange={(e) => chooseFile(e.target.files?.[0])}
+                      />
+                      {file ? (
+                        <>
+                          <span className="file-symbol">
+                            <FileText size={26} />
+                          </span>
+                          <strong>{file.name}</strong>
+                          <span>
+                            {(file.size / 1024).toFixed(0)}{" "}
+                            {t("KB · Ready to read")}
+                          </span>
+                          <button
+                            type="button"
+                            className="text-button"
+                            onClick={async () => {
+                              if (
+                                !(await confirm({
+                                  title: "Remove selected file?",
+                                  description:
+                                    "You’ll need to choose a file again before preparing your lesson.",
+                                  confirmLabel: "Remove file",
+                                  destructive: true,
+                                }))
+                              )
+                                return;
+                              setFile(null);
+                              if (inputRef.current) inputRef.current.value = "";
+                            }}
+                          >
+                            {t("Choose another file")}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="upload-symbol">
+                            <UploadCloud size={28} />
+                          </span>
+                          <label htmlFor="material-file" className="file-label">
+                            {t("Choose a file")}{" "}
+                            <span>{t("or drop it here")}</span>
+                          </label>
+                          <span>{t("PDF, DOCX, or TXT · Up to 10 MB")}</span>
+                          <span className="ocr-note">
+                            {t("Scanned PDFs welcome. We’ll read those too.")}
+                          </span>
+                        </>
                       )}
+                    </div>
+                    <FieldError
+                      id="material-file"
+                      message={materialForm.formState.errors.file?.message}
                     />
+                  </div>
+                  <div
+                    className={`material-source-panel ${mode === "paste" ? "is-active" : ""}`}
+                    aria-hidden={mode !== "paste"}
+                    inert={mode !== "paste" ? true : undefined}
+                  >
+                    <div className="paste-field">
+                      <label htmlFor="notes" className="visually-hidden">
+                        {t("Your learning notes")}
+                      </label>
+                      <textarea
+                        id="notes"
+                        {...materialForm.register("notes")}
+                        {...materialForm.a11y("notes", "notes")}
+                        autoComplete="off"
+                        minLength={30}
+                        maxLength={50000}
+                        required
+                        rows={7}
+                        placeholder={t(
+                          "Paste a passage, your class notes, or an explanation you want to understand better…",
+                        )}
+                      />
+                      <span className="character-count">
+                        {formatNumber(locale, notes.length)} / 50,000
+                      </span>
+                    </div>
                     <FieldError
                       id="notes"
                       message={materialForm.formState.errors.notes?.message}
                     />
-                    <span className="character-count">
-                      {formatNumber(locale, notes.length)} / 50,000
-                    </span>
                   </div>
-                )}
-                <FieldError
-                  id="material-file"
-                  message={materialForm.formState.errors.file?.message}
-                />
+                </div>
                 <label className="field-label" htmlFor="topic">
                   {t("What would you like to focus on?")}
                 </label>
@@ -537,6 +549,7 @@ export function Onboarding() {
                           checked={level === l}
                         />
                         <span>
+                          <LevelIcon level={l} />
                           {l === "introductory"
                             ? t("Introductory")
                             : l === "intermediate"
@@ -760,6 +773,7 @@ export function Onboarding() {
                     })}
                   </p>
                   <span className="level-chip">
+                    <LevelIcon level={lesson.level} />
                     {localizeText(lesson.level)} {t("depth")}
                   </span>
                   <h2 className="objectives-heading">
