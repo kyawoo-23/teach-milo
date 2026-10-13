@@ -410,6 +410,7 @@ export const UserPublicSchema = z.object({
   email: z.string().email(),
   name: z.string(),
   avatarUrl: z.string().optional(),
+  hasPassword: z.boolean().optional(),
 });
 export type UserPublic = z.infer<typeof UserPublicSchema>;
 
@@ -453,3 +454,21 @@ export const LoginSchema = z
     password: z.string().min(1, "Password is required."),
   })
   .strict();
+
+export const UpdateProfileSchema = z
+  .object({ name: SignupSchema.shape.name })
+  .strict();
+
+export const UpdatePasswordSchema = z
+  .object({
+    currentPassword: z
+      .string()
+      .min(1, "Current password is required.")
+      .max(1024),
+    newPassword: SignupSchema.shape.password.max(1024),
+  })
+  .strict()
+  .refine((value) => value.currentPassword !== value.newPassword, {
+    path: ["newPassword"],
+    message: "Choose a different password from your current password.",
+  });

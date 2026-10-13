@@ -75,7 +75,7 @@ export async function GET(request: Request) {
       });
     }
 
-    await createUserSession(user.id);
+    await createUserSession(user.id, user.authVersion ?? 0);
 
     const successTarget = new URL(returnTo, origin);
     return Response.redirect(successTarget.toString(), 302);

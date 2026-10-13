@@ -4022,6 +4022,56 @@ input[type="range"] {
 }
 
 /* Auth Modal */
+.account-settings-content {
+  display: grid;
+  gap: 24px;
+  padding-top: 12px;
+}
+.account-settings-content fieldset {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.account-settings-content legend,
+.account-settings-content h3 {
+  margin: 0 0 14px;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.account-settings-content .auth-tab {
+  min-height: 44px;
+}
+.account-settings-content .auth-tab:focus-visible,
+.account-settings-content [role="tabpanel"]:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 3px;
+}
+.account-settings-content .input-with-icon input {
+  padding: 12px 14px;
+  font-size: 16px;
+}
+.account-settings-content input[readonly] {
+  background: var(--surface);
+  color: var(--muted);
+}
+.account-settings-help {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.account-settings-status {
+  margin: 0;
+  font-size: 13px;
+  color: var(--purple);
+}
+.account-settings-status:empty {
+  display: none;
+}
 .auth-modal-content {
   padding: 10px 0 0;
   display: flex;

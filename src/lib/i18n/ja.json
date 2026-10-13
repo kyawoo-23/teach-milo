@@ -558,5 +558,22 @@
   " {label}: you entered {submitted}; the expected value is {expected}.": " {label}：入力値は {submitted}、期待される値は {expected} です。",
   "Enter a value for each field.": "各欄に値を入力してください。",
   "Enter a number.": "数値を入力してください。",
-  "The board calculation couldn't run. Reset the board and try again.": "ボードの計算を実行できませんでした。ボードをリセットしてもう一度お試しください。"
+  "The board calculation couldn't run. Reset the board and try again.": "ボードの計算を実行できませんでした。ボードをリセットしてもう一度お試しください。",
+  "Account settings": "アカウント設定",
+  "Profile": "プロフィール",
+  "Display name": "表示名",
+  "Your email address cannot be changed.": "メールアドレスは変更できません。",
+  "Save profile": "プロフィールを保存",
+  "Profile updated.": "プロフィールを更新しました。",
+  "Change password": "パスワードを変更",
+  "Current password": "現在のパスワード",
+  "New password": "新しいパスワード",
+  "Current password is required.": "現在のパスワードを入力してください。",
+  "Choose a different password from your current password.": "現在のパスワードとは異なるパスワードを選んでください。",
+  "Your current password is incorrect.": "現在のパスワードが正しくありません。",
+  "Use at least 8 characters. Other browsers will be signed out.": "8文字以上で入力してください。他のブラウザーからはサインアウトされます。",
+  "Your password is managed by Google. Change it in your Google account.": "パスワードはGoogleが管理しています。Googleアカウントで変更してください。",
+  "Update password": "パスワードを更新",
+  "Password updated.": "パスワードを更新しました。",
+  "Saving…": "保存中…"
 }
