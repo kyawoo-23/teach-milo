@@ -15,6 +15,7 @@ const db = getFirestore();
 for (const collection of [
   "sessions",
   "materials",
+  "extraction_cache",
   "lessons",
   "guests",
   "operations",

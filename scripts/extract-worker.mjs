@@ -1,7 +1,48 @@
 import { parentPort, workerData } from "node:worker_threads";
 import { createRequire } from "node:module";
+import path from "node:path";
 const require = createRequire(import.meta.url);
 const MAX_TEXT = 50000;
+
+// Fail closed: a text layer can coexist with scans, diagrams or broken math.
+function reliableText(items, text) {
+  if (
+    text.length < 30 ||
+    /[\uFFFD\p{Co}\p{Sm}\u00b2\u00b3\u00b9\u2070-\u209f]|[\x00-\x08\x0b\x0c\x0e-\x1f]/u.test(
+      text,
+    )
+  )
+    return false;
+  let previous;
+  for (const item of items.filter((item) => item.str?.trim())) {
+    const [a, b, c, d, x, y] = item.transform;
+    if (
+      item.dir !== "ltr" ||
+      ![a, b, c, d, x, y, item.width, item.height].every(Number.isFinite) ||
+      Math.abs(b) > 0.01 ||
+      Math.abs(c) > 0.01 ||
+      a <= 0 ||
+      d <= 0 ||
+      item.height <= 0
+    )
+      return false;
+    if (previous) {
+      const height = Math.max(previous.height, item.height);
+      const dy = previous.y - y;
+      // Reading-order resets, superscripts/subscripts and wide column gaps
+      // are uncertain. Let vision reconstruct them rather than flatten them.
+      if (
+        dy < -0.5 ||
+        (Math.abs(dy) > 0.5 && dy < height * 0.8) ||
+        (Math.abs(dy) <= 0.5 &&
+          (x < previous.x - 0.5 || x - previous.end > height * 3))
+      )
+        return false;
+    }
+    previous = { x, y, end: x + item.width, height: item.height };
+  }
+  return true;
+}
 
 async function inspectDocx(bytes) {
   const yauzl = require("yauzl");
@@ -65,19 +106,63 @@ async function extract() {
   if (workerData.extension === "pdf") {
     if (!bytes.subarray(0, 1024).includes(Buffer.from("%PDF-")))
       throw new Error("This file is not a PDF.");
-    const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const { getDocument, OPS } =
+      await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const visualOps = new Set([
+      OPS.constructPath,
+      OPS.moveTo,
+      OPS.lineTo,
+      OPS.curveTo,
+      OPS.curveTo2,
+      OPS.curveTo3,
+      OPS.rectangle,
+      OPS.stroke,
+      OPS.closeStroke,
+      OPS.fill,
+      OPS.eoFill,
+      OPS.fillStroke,
+      OPS.eoFillStroke,
+      OPS.closeFillStroke,
+      OPS.closeEOFillStroke,
+      OPS.shadingFill,
+      OPS.paintXObject,
+      OPS.paintFormXObjectBegin,
+      OPS.beginAnnotation,
+      OPS.beginInlineImage,
+      OPS.paintImageMaskXObject,
+      OPS.paintImageMaskXObjectGroup,
+      OPS.paintImageXObject,
+      OPS.paintInlineImageXObject,
+      OPS.paintInlineImageXObjectGroup,
+      OPS.paintImageXObjectRepeat,
+      OPS.paintImageMaskXObjectRepeat,
+      OPS.paintSolidColorImageMask,
+      OPS.rawFillPath,
+    ]);
+    const textOps = new Set([
+      OPS.showText,
+      OPS.showSpacedText,
+      OPS.nextLineShowText,
+      OPS.nextLineSetSpacingShowText,
+    ]);
     const task = getDocument({
       data: new Uint8Array(bytes),
       stopAtErrors: true,
       isEvalSupported: false,
       disableFontFace: true,
       useSystemFonts: false,
+      standardFontDataUrl:
+        path.join(
+          path.dirname(require.resolve("pdfjs-dist/package.json")),
+          "standard_fonts",
+        ) + path.sep,
     });
     try {
       const pdf = await task.promise;
       if (pdf.numPages > 50)
         throw new Error("Choose a PDF with 50 pages or fewer.");
       const sources = [];
+      const visualPages = [];
       let length = 0;
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
@@ -92,21 +177,52 @@ async function extract() {
           throw new Error(
             "Choose a shorter section: materials are limited to 50,000 characters.",
           );
-        sources.push({ id: `p${i}`, label: `Page ${i}`, text, warnings: [] });
+        let needsVision = true;
+        let blank = false;
+        try {
+          const operators = await page.getOperatorList();
+          const annotations = await page.getAnnotations();
+          const hasVisuals =
+            annotations.length > 0 ||
+            operators.fnArray.some(
+              (op, index) =>
+                visualOps.has(op) ||
+                (op === OPS.setTextRenderingMode &&
+                  operators.argsArray[index][0] !== 0),
+            );
+          blank =
+            !text &&
+            !hasVisuals &&
+            !operators.fnArray.some((op) => textOps.has(op));
+          needsVision =
+            !blank && (hasVisuals || !reliableText(content.items, text));
+        } catch {
+          // Unsupported visual inspection keeps the existing Gemini path.
+        }
+        if (needsVision) visualPages.push(i);
+        sources.push({
+          id: `p${i}`,
+          label: `Page ${i}`,
+          text,
+          warnings: blank
+            ? ["No readable content was extracted from this page."]
+            : [],
+        });
         page.cleanup();
       }
+      if (!visualPages.length) return { sources, chunks: [] };
       const { PDFDocument } = await import("pdf-lib");
       const original = await PDFDocument.load(bytes, { updateMetadata: false });
       const chunks = [];
-      for (let start = 0; start < pdf.numPages; start += 5) {
+      for (let start = 0; start < visualPages.length; start += 5) {
         const part = await PDFDocument.create();
-        const count = Math.min(5, pdf.numPages - start);
+        const pages = visualPages.slice(start, start + 5);
         for (const page of await part.copyPages(
           original,
-          Array.from({ length: count }, (_, i) => start + i),
+          pages.map((page) => page - 1),
         ))
           part.addPage(page);
-        chunks.push({ start: start + 1, count, bytes: await part.save() });
+        chunks.push({ pages, bytes: await part.save() });
       }
       return { sources, chunks };
     } finally {
