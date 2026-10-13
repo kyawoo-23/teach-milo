@@ -37,6 +37,7 @@ import { Brand } from "./brand";
 import { UserProfileMenu } from "./user-profile-menu";
 import { Milo } from "./milo";
 import { TeachingBoard } from "./teaching-board";
+import { BoardResizer } from "./board-resizer";
 import { useBoardWorkspace } from "./use-board-workspace";
 import { BoardPreview } from "./board-preview";
 import { clearBoardDrafts } from "@/lib/board-drafts";
@@ -1118,6 +1119,7 @@ export function SessionExperience({ id }: { id: string }) {
               </p>
             </div>
           </section>
+          <BoardResizer />
           <aside className="board-sidebar">
             {session.board && boardWorkspace.workspace && (
               <TeachingBoard

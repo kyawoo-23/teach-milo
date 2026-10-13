@@ -308,13 +308,19 @@ test("concept maps, matching and comparison tables work with keyboard controls",
   await chooseTool(page, board, "matching");
   for (let n = 1; n <= 2; n++) {
     await board.getByRole("button", { name: "Add pair", exact: true }).click();
+    // A new pair opens its term for editing in place.
+    const term = board.getByRole("textbox", { name: `Term ${n}`, exact: true });
+    await expect(term).toBeFocused();
+    await term.fill(n === 1 ? "Evaporation" : "Condensation");
+    await page.keyboard.press("Enter");
     await board
-      .getByLabel(`Term ${n}`, { exact: true })
-      .fill(n === 1 ? "Evaporation" : "Condensation");
+      .getByRole("button", { name: `Description ${n}`, exact: true })
+      .click();
     await board
-      .getByLabel(`Description ${n}`, { exact: true })
+      .getByRole("textbox", { name: `Description ${n}`, exact: true })
       .fill(n === 1 ? "Liquid to gas" : "Gas to liquid");
   }
+  await board.getByRole("button", { name: "Done", exact: true }).click();
   await board.getByRole("button", { name: "Evaporation", exact: true }).click();
   await board
     .getByRole("button", { name: "Liquid to gas", exact: true })

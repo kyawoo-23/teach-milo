@@ -279,16 +279,93 @@
   padding: 10px 0;
   cursor: pointer;
 }
-.pair-editor {
-  display: grid;
-  gap: 6px;
-  margin-bottom: 12px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+.matching-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 8px 0 12px;
 }
-.pair-editor label {
+/* The hint's first line (19px) is centred on the 28px buttons beside it. */
+.matching-toolbar .tool-hint {
+  flex: 1;
+  min-width: 0;
+  margin: 4px 0 0;
+}
+.matching-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.board-workspace .matching-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid var(--purple);
+  border-radius: 8px;
+  background: var(--lavender);
+  color: var(--purple-dark);
   font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.board-workspace .matching-actions button:hover:not(:disabled) {
+  background: light-dark(#e3e0fa, #37335c);
+}
+.board-workspace .matching-actions .matching-done {
+  border-color: var(--purple-strong);
+  background: var(--purple-strong);
+  color: white;
+}
+.board-workspace .matching-actions .matching-done:hover:not(:disabled) {
+  background: light-dark(#453ba0, #5249c0);
+}
+.board-workspace .matching-actions button:disabled {
+  opacity: 0.5;
+}
+.matching-column-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.matching-columns-editing .matching-editable {
+  width: 100%;
+  border-style: dashed;
+  cursor: text;
+}
+.matching-columns .matching-placeholder {
+  color: var(--muted);
+}
+.matching-term-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+.matching-term-row > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.matching-columns .matching-delete {
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+.matching-field textarea {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px;
+  font: inherit;
+  font-size: 13px;
+  border-radius: 8px;
+  resize: vertical;
 }
 .board-table-scroll {
   overflow-x: auto;
@@ -1686,7 +1763,11 @@ body:has(.classroom, .completed-session) {
 }
 .classroom {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 350px);
+  /* --board-track is set by BoardResizer once the learner drags the divider. */
+  grid-template-columns: minmax(0, 1fr) auto var(
+      --board-track,
+      minmax(260px, 350px)
+    );
   grid-template-rows: minmax(0, 1fr);
   max-width: var(--session-content-max);
   margin-inline: auto;
@@ -2045,6 +2126,28 @@ body:has(.classroom, .completed-session) {
   background: transparent;
   color: inherit;
   margin-left: 5px;
+}
+.board-resizer {
+  position: relative;
+  width: 10px;
+  margin-inline: -5px;
+  z-index: 2;
+  cursor: col-resize;
+  touch-action: none;
+}
+.board-resizer::after {
+  content: "";
+  position: absolute;
+  inset: 0 4px;
+  border-radius: 2px;
+  transition: background 0.15s;
+}
+.board-resizer:hover::after,
+.board-resizer:focus-visible::after {
+  background: var(--purple);
+}
+.board-resizer:focus-visible {
+  outline: none;
 }
 .board-sidebar {
   min-width: 0;
@@ -3339,7 +3442,7 @@ input[type="range"] {
     padding: 25px 23px 18px;
   }
   .classroom {
-    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-columns: minmax(0, 1fr) auto var(--board-track, 320px);
   }
   .session-header-inner {
     padding: 0 24px;
@@ -3367,7 +3470,8 @@ input[type="range"] {
   .classroom {
     grid-template-columns: minmax(0, 1fr);
   }
-  .board-sidebar {
+  .board-sidebar,
+  .board-resizer {
     display: none;
   }
   .mobile-board-button {
@@ -3423,7 +3527,8 @@ input[type="range"] {
     flex: 1 1 auto;
     border-right: 0;
   }
-  .board-sidebar {
+  .board-sidebar,
+  .board-resizer {
     display: none;
   }
   .mobile-board-button {
@@ -3598,7 +3703,8 @@ input[type="range"] {
     min-height: 0;
     border: 0;
   }
-  .board-sidebar {
+  .board-sidebar,
+  .board-resizer {
     display: none;
   }
   .conversation-heading {
@@ -4436,6 +4542,31 @@ input[type="range"] {
   }
 }
 
+.sessions-groups {
+  display: grid;
+  gap: 20px;
+}
+.sessions-group {
+  display: grid;
+  gap: 10px;
+}
+.sessions-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.sessions-group-count {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: light-dark(#f3f3f8, #272833);
+}
+
 .history-pagination {
   display: grid;
   justify-items: center;
@@ -4580,6 +4711,17 @@ input[type="range"] {
   background: light-dark(#f0f9f3, #1a2c21);
   padding: 2px 7px;
   border-radius: 999px;
+}
+.session-expiry {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.session-expiry-soon {
+  color: light-dark(#b06000, #e49047);
+  font-weight: 500;
 }
 .resume-indicator {
   display: flex;
