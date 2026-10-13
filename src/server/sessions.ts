@@ -11,6 +11,7 @@ import {
   publicLesson,
   ReportGeneratedSchema,
   Session,
+  SessionMode,
   SessionPublic,
   SessionUpdate,
   StudentReplySchema,
@@ -47,19 +48,29 @@ import { gemini, Model } from "./model";
 import { sessionOperation } from "./operations";
 import { CallContext, event } from "./usage";
 
-const numericFields = (lesson: Lesson) =>
-  lesson.transfer.numeric?.fields ?? [];
+const numericFields = (lesson: Lesson) => lesson.transfer.numeric?.fields ?? [];
 
+// "correct" mode: Milo's first message states the lesson misconception for the learner to fix.
+function openWithMisconception(lesson: Lesson) {
+  const language = lesson.teachingLanguage;
+  const lead = translateTeaching(
+    language,
+    "Before you start, here’s what I think:",
+  );
+  const ask = translateTeaching(language, "Is that right?");
+  return `${greetLearner(lesson.opening, language)}\n\n${lead} ${lesson.misconception.trim()} ${ask}`;
+}
 export async function createSession(
   id: string,
   lessonId: string,
   ownerId: string,
+  mode?: SessionMode,
 ) {
   const existing = await database().collection("sessions").doc(id).get();
   if (existing.exists) {
     const old = decode<Session>(existing.data());
     assertOwned(old, ownerId);
-    if (old.lessonId !== lessonId)
+    if (old.lessonId !== lessonId || old.mode !== mode)
       throw new AppError(
         "OPERATION_CONFLICT",
         "This session request has different content.",
@@ -74,6 +85,7 @@ export async function createSession(
     id,
     ownerId,
     lessonId,
+    ...(mode ? { mode } : {}),
     lessonSummary: {
       title: lesson.title,
       scope: lesson.scope,
@@ -84,7 +96,8 @@ export async function createSession(
     phase: "baseline",
     revision: 0,
     nextSequence: 1,
-    challengeUsed: false,
+    // In "correct" mode the misconception is raised in the greeting, so it must be fixed before the check.
+    challengeUsed: mode === "correct",
     hintUsed: false,
     ledger: emptyLedger(),
     createdAt: now,
@@ -101,7 +114,10 @@ export async function createSession(
   const greeting: Message = {
     id: randomUUID(),
     role: "student",
-    text: greetLearner(lesson.opening, lesson.teachingLanguage),
+    text:
+      mode === "correct"
+        ? openWithMisconception(lesson)
+        : greetLearner(lesson.opening, lesson.teachingLanguage),
     createdAt: now,
     sequence: 0,
     kind: "teaching",
@@ -362,9 +378,16 @@ export async function submitTurn(
           knowledge: lesson.knowledge,
           objectives: lesson.objectives,
           allowedMoves: allowedMoves(session),
-          misconception: !session.challengeUsed
-            ? lesson.misconception
-            : undefined,
+          misconception:
+            !session.challengeUsed && session.mode !== "teach"
+              ? lesson.misconception
+              : undefined,
+          // Already stated by Milo but not yet corrected; readiness waits on this.
+          openMisconception:
+            session.challengeUsed &&
+            session.ledger.misconceptionCorrection.length === 0
+              ? lesson.misconception
+              : undefined,
           ledger: session.ledger,
           messages: modelMessages(messages),
           teachingBoard: {
@@ -480,7 +503,14 @@ async function evaluate(
     },
     ctx,
   );
-  const report = finalizeReport(raw, lesson, messages, skipped, answers);
+  const report = finalizeReport(
+    raw,
+    lesson,
+    messages,
+    skipped,
+    answers,
+    session.mode === "teach" ? ["misconception"] : [],
+  );
   if (session.ledger.unresolvedError) {
     report.criticalMisconception = true;
     if (report.overallLabel === "strong_evidence")

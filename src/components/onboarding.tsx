@@ -33,7 +33,12 @@ import {
   X,
 } from "lucide-react";
 import { LevelIcon } from "./level-icon";
-import { LessonPublic, SessionPublic, Source } from "@/lib/contracts";
+import {
+  LessonPublic,
+  SessionMode,
+  SessionPublic,
+  Source,
+} from "@/lib/contracts";
 import { useAuth } from "./auth-context";
 import { MarkdownEditor } from "./markdown-editor";
 import { clearDraft, saveDraft, takeDraft } from "./material-draft";
@@ -83,6 +88,7 @@ export function Onboarding() {
   const reviewForm = useSchemaForm(LessonReviewFormSchema, { sources: [] });
   const [sources, setSources] = reviewForm.state("sources");
   const [lesson, setLesson] = useState<LessonPublic | null>(null);
+  const [sessionMode, setSessionMode] = useState<SessionMode>("correct");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState<string | Error>("");
   const [help, setHelp] = useState(false);
@@ -276,7 +282,8 @@ export function Onboarding() {
     await run("Milo is getting ready to learn…", async (isCurrent) => {
       const result = await api<SessionPublic>("/api/sessions", {
         lessonId: lesson!.id,
-        operationId: getOperation(`start:${lesson!.id}`),
+        mode: sessionMode,
+        operationId: getOperation(`start:${lesson!.id}:${sessionMode}`),
       });
       if (isCurrent()) router.push(`/session/${result.id}`);
     });
@@ -818,6 +825,45 @@ export function Onboarding() {
                       )}
                     </p>
                   </div>
+                  <fieldset className="mode-field">
+                    <legend>{t("How do you want to start?")}</legend>
+                    {(
+                      [
+                        [
+                          "correct",
+                          "Correct Milo’s mix-up first",
+                          "Milo starts with a common misunderstanding about this topic. Spot it and set Milo straight, then keep teaching.",
+                        ],
+                        [
+                          "teach",
+                          "Just start teaching",
+                          "Teach Milo from scratch. Milo won’t bring up a misconception.",
+                        ],
+                      ] as const
+                    ).map(([value, title, detail]) => (
+                      <label key={value}>
+                        <input
+                          type="radio"
+                          name="session-mode"
+                          value={value}
+                          checked={sessionMode === value}
+                          disabled={!!busy}
+                          onChange={() => setSessionMode(value)}
+                        />
+                        <span className="mode-icon" aria-hidden="true">
+                          {value === "correct" ? (
+                            <Lightbulb size={18} />
+                          ) : (
+                            <MessageCircle size={18} />
+                          )}
+                        </span>
+                        <span>
+                          <strong>{t(title)}</strong>
+                          <small>{t(detail)}</small>
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
                   {error && <ErrorNotice message={error} />}
                   <button
                     className="primary-button full-width"
