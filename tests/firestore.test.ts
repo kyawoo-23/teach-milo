@@ -21,9 +21,8 @@ import { sessionOperation } from "@/server/operations";
 import { readBoardImage } from "@/server/board-media";
 import { pngFixture, sketchFixture } from "./board-fixtures";
 import { prepareLesson } from "@/server/lessons";
-import { localizedCnnBoard, localizedCnnTransfer } from "@/content/cnn";
 import { translate } from "@/lib/i18n/messages";
-import { textBoard, exampleBoard } from "@/lib/boards";
+import { exampleBoard } from "@/lib/boards";
 import type { Lesson } from "@/lib/contracts";
 import { saveMaterial } from "@/server/materials";
 import { reserveModelCall } from "@/server/usage";
@@ -31,6 +30,7 @@ import type { Model } from "@/server/model";
 import type { Message, Session, SessionHistoryPage } from "@/lib/contracts";
 import { AppError } from "@/lib/errors";
 import {
+  boardFixture,
   ctx,
   lessonFixture,
   messageFixture,
@@ -177,7 +177,7 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
         {
           operationId: lessonId,
           materialId,
-          topic: "CNN weight sharing",
+          topic: "Constant speed",
           level: "introductory",
           sources: generated.sources,
           teachingLanguage: locale,
@@ -187,8 +187,8 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
       );
       const saved = await readOwned<Lesson>("lessons", lessonId, ctx.ownerId);
       expect(saved.teachingLanguage).toBe(locale);
-      expect(saved.board).toEqual(localizedCnnBoard(locale));
-      expect(saved.transfer).toEqual(localizedCnnTransfer(locale));
+      expect(saved.board).toEqual(boardFixture());
+      expect(saved.transfer).toEqual(generated.transfer);
       await createSession(id, lessonId, ctx.ownerId);
       let session = await publicSession(id, ctx.ownerId);
       expect(session.lesson.teachingLanguage).toBe(locale);
@@ -214,8 +214,8 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
       );
       const text =
         locale === "ja"
-          ? "同じ重みを使い回すので、画像が大きくなってもパラメーター数は同じです。"
-          : "相同权重在每个位置重复使用，所以图像变大时参数量不变。";
+          ? "距離は速さと時間のかけ算なので、時間が2倍になると距離も2倍になります。"
+          : "距离等于速度乘以时间，所以时间加倍时距离也加倍。";
       await submitTurn(
         id,
         { operationId: randomUUID(), revision: session.revision, text },
@@ -249,7 +249,7 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
           revision: session.revision,
           answer: text,
           skip: false,
-          parameters: { small: 204, large: 204 },
+          answers: { distance: 150 },
         },
         ctx,
         model,
@@ -284,20 +284,23 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
       const generated = {
         ...lessonFixture(),
         title: "A source-grounded concept",
-        board: { ...textBoard(), kind: "custom" as const, code: "invalid" },
+        board: { ...boardFixture(), code: "invalid" },
       };
       const materialId = randomUUID();
       const id = randomUUID();
       await saveMaterial(materialId, ctx.ownerId, "Notes", generated.sources);
       let calls = 0;
       const model: Model = {
-        async generate(schema, system) {
+        async generate(schema, system, data) {
           calls++;
           expect(system).toContain(
             locale === "ja" ? "Use Japanese" : "Use Simplified Chinese",
           );
           if (calls === 1) return schema.parse(generated);
           expect(system).toContain("Repair the supplied board");
+          expect(
+            (data as { diagnostics: string[] }).diagnostics.join("\n"),
+          ).toContain("calculate()");
           throw new Error("Repair unavailable");
         },
       };
@@ -363,18 +366,29 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
     expect(initial.phase).toBe("baseline");
     expect(initial.transferQuestion).toBeUndefined();
     expect(JSON.stringify(initial)).not.toContain("misconceptionCorrection");
-    expect(JSON.stringify(initial)).not.toContain("204 parameters");
+    expect(JSON.stringify(initial)).not.toContain("6 × 25");
+    expect(JSON.stringify(initial)).not.toContain("tolerance");
     const op = randomUUID();
     const turn = {
       operationId: op,
       revision: 0,
-      text: "The same filter coefficients are reused at every location. Both sizes have 224 parameters; 194,400 and 830,304 multiplications show that spatial work grows.",
-      board: { version: 1 as const, inputs: { inputSize: 64 } },
+      text: "Distance is speed times time, so at 20 m/s for 10 s the board shows 200 m; doubling either one doubles the distance.",
+      board: {
+        version: 3 as const,
+        state: { speed: 20 },
+        composites: {},
+      },
     };
     await submitTurn(id, turn, ctx, model);
     await submitTurn(id, turn, ctx, model);
     expect(studentCalls).toBe(1);
-    expect((await readMessages(id)).length).toBe(3);
+    const stored = await readMessages(id);
+    expect(stored.length).toBe(3);
+    expect(stored.find((m) => m.id === op)?.board).toMatchObject({
+      kind: "board",
+      verified: true,
+      metrics: { distance: 200 },
+    });
     const ready = await publicSession(id, ctx.ownerId);
     expect(ready.phase).toBe("ready_for_check");
     await sessionAction(
@@ -386,15 +400,26 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
     const check = await publicSession(id, ctx.ownerId);
     expect(check.board).toBeUndefined();
     expect(check.messages).toEqual([]);
-    expect(check.transferQuestion).toContain("5×5");
+    expect(check.transferQuestion).toContain("6 m/s");
+    expect(check.numericFields).toEqual([
+      { id: "distance", label: "Distance", unit: "m" },
+    ]);
     const transfer = {
       operationId: randomUUID(),
       revision: 2,
       answer:
-        "There are 204 parameters for both sizes because the same weights are reused. More output positions require more multiplications.",
-      parameters: { small: 204, large: 204 },
+        "6 × 25 = 150 m, and riding twice as long doubles it to 300 m because distance is proportional to time.",
+      answers: { distance: 150 },
       skip: false,
     };
+    await expect(
+      submitTransfer(
+        id,
+        { ...transfer, operationId: randomUUID(), answers: undefined },
+        ctx,
+        model,
+      ),
+    ).rejects.toMatchObject({ code: "NUMBERS_REQUIRED" });
     await submitTransfer(id, transfer, ctx, model);
     await submitTransfer(id, transfer, ctx, model);
     expect(reportCalls).toBe(1);

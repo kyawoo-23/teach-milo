@@ -1,20 +1,19 @@
 import { describe, expect, it } from "vitest";
-import {
-  BoardSubmissionSchema,
-  BoardSchema,
-  type Board,
-} from "@/lib/contracts";
+import { BoardSubmissionSchema, type Board } from "@/lib/contracts";
 import {
   emptyTool,
   ToolStateSchema,
   DraftToolStateSchema,
 } from "@/lib/board-tools";
+import { compileBoard } from "@/lib/board-catalog";
 import {
   exampleBoard,
+  initialBoardValues,
+  lessonBoard,
   suggestedTool,
-  textBoard,
-  validateBoardConfiguration,
-  validateBoardInputs,
+  validateBoardValues,
+  validateWorkspaceSubmission,
+  type BoardValues,
 } from "@/lib/boards";
 import {
   modelMessages,
@@ -22,6 +21,7 @@ import {
   validatePng,
 } from "@/server/board-media";
 import {
+  boardFixture,
   lessonFixture,
   messageFixture,
   sessionFixture,
@@ -36,12 +36,23 @@ import { pngFixture, sketchFixture } from "./board-fixtures";
 import { modelResponseSchema } from "@/server/model-schema";
 import { LessonGeneratedSchema } from "@/lib/contracts";
 import { z } from "zod";
+const toolBoard = (kind: Board["suggestedTool"]["kind"]): Board => ({
+  ...exampleBoard("Seeds"),
+  suggestedTool: {
+    kind,
+    columns: kind === "table" ? ["Concept", "Example"] : [],
+    items: [
+      { id: "first", label: "First", detail: "Description one" },
+      { id: "second", label: "Second", detail: "Description two" },
+    ],
+  },
+});
 describe("interactive board contracts", () => {
   it("does not count text found only inside a drawing as cited learner reasoning", () => {
     const lesson = lessonFixture(),
       session = sessionFixture(lesson),
       message = messageFixture("Here is my sketch.");
-    message.board = validateBoardInputs(lesson.board, {
+    message.board = validateWorkspaceSubmission({
       version: 2,
       inputs: {},
       state: sketchFixture,
@@ -63,7 +74,10 @@ describe("interactive board contracts", () => {
   });
   it("keeps strict runtime limits while removing Gemini decoder upper bounds", () => {
     const response = modelResponseSchema(LessonGeneratedSchema);
-    expect(JSON.stringify(response)).not.toContain('"maxItems":');
+    const json = JSON.stringify(response);
+    expect(json).not.toContain('"maxItems":');
+    expect(json).not.toContain('"const"');
+    expect(json).not.toMatch(/"(minimum|maximum)":/);
     expect(response.properties?.objectives).toHaveProperty("minItems", 2);
     expect(
       z.toJSONSchema(LessonGeneratedSchema).properties?.objectives,
@@ -76,68 +90,69 @@ describe("interactive board contracts", () => {
     expect(LessonGeneratedSchema.safeParse(generated).success).toBe(false);
   });
   it.each(["concept_map", "matching", "table"] as const)(
-    "seeds and validates %s activities",
+    "seeds and validates %s tools",
     (kind) => {
-      const board: Board = {
-        ...textBoard(),
-        kind,
-        groups: kind === "table" ? ["Concept", "Example"] : [],
-        items: [
-          { id: "first", label: "First", detail: "Description one" },
-          { id: "second", label: "Second", detail: "Description two" },
-        ],
-      };
-      expect(() =>
-        validateBoardConfiguration(BoardSchema.parse(board)),
-      ).not.toThrow();
+      const board = toolBoard(kind);
+      const compiled = compileBoard(board);
+      expect(compiled.fatal).toBe(false);
+      expect(compiled.board.suggestedTool.kind).toBe(kind);
       const state = suggestedTool(board)!;
+      expect(state.kind).toBe(kind);
       expect(
-        validateBoardInputs(board, { version: 2, inputs: {}, state }).kind,
+        validateWorkspaceSubmission({ version: 2, inputs: {}, state }).kind,
       ).toBe(kind);
     },
   );
-  it("rejects empty generated activities and inactive calculations", () => {
-    for (const kind of [
-      "concept_map",
-      "matching",
-      "table",
-      "sequence",
-      "classification",
-      "comparison",
-      "causal",
-      "custom",
-    ] as const)
-      expect(() =>
-        validateBoardConfiguration({ ...textBoard(), kind }),
-      ).toThrow();
-    const board: Board = {
-      ...textBoard(),
-      kind: "causal",
-      controls: [
-        { id: "x", label: "X", min: 0, max: 10, step: 1, initial: 1, unit: "" },
-      ],
-      metrics: [{ id: "y", label: "Y", base: 1, factors: [], unit: "" }],
-    };
-    expect(() => validateBoardConfiguration(board)).toThrow(
-      "adjustable result",
-    );
-  });
   it("makes a localized example fallback without supplying facts", () => {
     const board = exampleBoard("Literary themes", "ja");
-    validateBoardConfiguration(board);
-    expect(board.groups).toEqual(["概念", "例", "当てはまる理由"]);
+    expect(compileBoard(board).fatal).toBe(false);
+    expect(board.suggestedTool.columns).toEqual(["概念", "例", "当てはまる理由"]);
     expect(suggestedTool(board)).toMatchObject({
       kind: "table",
       rows: [{ cells: ["Literary themes", "", ""] }],
     });
   });
-  it("preserves legacy arithmetic snapshots", () => {
+  it("replaces boards stored before catalog composition with the example table", () => {
+    const lesson = lessonFixture();
+    const legacy = {
+      ...lesson,
+      board: { kind: "cnn", version: 1 } as unknown as Board,
+    };
+    expect(lessonBoard(legacy)).toEqual(
+      exampleBoard(lesson.title, lesson.teachingLanguage),
+    );
+    expect(lessonBoard(lesson)).toBe(lesson.board);
+  });
+  it("defaults missing board values and rejects unknown or out-of-range ones", () => {
+    const board = boardFixture();
+    const compiled = compileBoard(board);
+    expect(initialBoardValues(board, compiled)).toEqual({
+      state: { speed: 10, time: 10 },
+      composites: { steps: ["read", "multiply", "units"] },
+    });
     expect(
-      validateBoardInputs(lessonFixture().board, {
-        version: 1,
-        inputs: { inputSize: 64 },
+      validateBoardValues(board, compiled, {
+        version: 3,
+        state: { speed: 20 },
+        composites: {},
       }),
-    ).toMatchObject({ verified: true, metrics: { parameters: 224 } });
+    ).toEqual({
+      state: { speed: 20, time: 10 },
+      composites: { steps: ["read", "multiply", "units"] },
+    });
+    const cases: [BoardValues, string][] = [
+      [{ state: { speed: 31 }, composites: {} }, "outside its allowed range"],
+      [{ state: { distance: 1 }, composites: {} }, "Reset the board"],
+      [{ state: {}, composites: { other: "x" } }, "Reset the board"],
+      [
+        { state: {}, composites: { steps: ["read", "read", "units"] } },
+        "exactly once",
+      ],
+    ];
+    for (const [submission, message] of cases)
+      expect(() =>
+        validateBoardValues(board, compiled, { version: 3, ...submission }),
+      ).toThrow(message);
   });
   it("rejects unknown fields, invalid references and reused IDs", () => {
     expect(
@@ -145,6 +160,14 @@ describe("interactive board contracts", () => {
         version: 2,
         inputs: { x: 4 },
         state: emptyTool("sketch"),
+      }).success,
+    ).toBe(false);
+    expect(
+      BoardSubmissionSchema.safeParse({
+        version: 3,
+        state: { speed: 4 },
+        composites: {},
+        metrics: { distance: 1 },
       }).success,
     ).toBe(false);
     expect(
@@ -201,14 +224,14 @@ describe("interactive board contracts", () => {
   });
   it("requires a nonempty workspace and a sketch preview", () => {
     expect(() =>
-      validateBoardInputs(textBoard(), {
+      validateWorkspaceSubmission({
         version: 2,
         inputs: {},
         state: emptyTool("table"),
       }),
     ).toThrow("Add something");
     expect(() =>
-      validateBoardInputs(textBoard(), {
+      validateWorkspaceSubmission({
         version: 2,
         inputs: {},
         state: sketchFixture,
@@ -235,7 +258,7 @@ describe("bounded sketch media", () => {
   it("removes raster data from model JSON and public history", () => {
     const message = {
       ...messageFixture(),
-      board: validateBoardInputs(textBoard(), {
+      board: validateWorkspaceSubmission({
         version: 2,
         inputs: {},
         state: sketchFixture,
@@ -252,5 +275,24 @@ describe("bounded sketch media", () => {
     );
     expect(publicMessage.board).not.toHaveProperty("png");
     expect(message.board).toHaveProperty("png");
+  });
+  it("sends Milo only labelled values for catalog boards", () => {
+    const message = {
+      ...messageFixture(),
+      board: {
+        version: 3 as const,
+        state: { speed: 20, time: 10 },
+        composites: {},
+        kind: "board" as const,
+        verified: true,
+        metrics: { distance: 200 },
+        display: [{ label: "Distance", value: "200", unit: "m" }],
+      },
+    };
+    expect(modelMessages([message])[0].board).toEqual({
+      kind: "board",
+      verified: true,
+      display: [{ label: "Distance", value: "200", unit: "m" }],
+    });
   });
 });

@@ -16,8 +16,7 @@ import {
   validateStudent,
 } from "@/lib/controller";
 import { finalizeReport } from "@/lib/assessment";
-import { localizedCnnBoard, localizedCnnTransfer } from "@/content/cnn";
-import { textBoard } from "@/lib/boards";
+import { exampleBoard, formatBoardValue } from "@/lib/boards";
 import { languageInstruction } from "@/content/prompts";
 import { AppError } from "@/lib/errors";
 import {
@@ -151,7 +150,7 @@ describe("fixed teaching language", () => {
     ).toBe(false);
   });
   it.each(["zh-CN", "ja"] as const)(
-    "localizes deterministic content in %s without changing arithmetic",
+    "localizes deterministic content in %s without changing numeric keys",
     (locale) => {
       const lesson = { ...lessonFixture(), teachingLanguage: locale };
       const message = messageFixture(
@@ -159,15 +158,10 @@ describe("fixed teaching language", () => {
           ? "同じ重みを各位置で使います。"
           : "每个位置重复使用相同权重。",
       );
-      const transfer = localizedCnnTransfer(locale);
-      expect(transfer.arithmetic).toBe("cnn");
-      expect(transfer.expected).toContain("204");
-      expect(transfer.question).not.toBe(localizedCnnTransfer("en").question);
-      expect(localizedCnnBoard(locale).title).not.toBe(
-        localizedCnnBoard("en").title,
+      expect(exampleBoard("x", locale).instruction).not.toBe(
+        exampleBoard("x").instruction,
       );
-      expect(textBoard(locale).instruction).not.toBe(textBoard().instruction);
-      lesson.transfer = transfer;
+      expect(lesson.transfer.numeric.fields[0].expected).toBe(150);
       const report = finalizeReport(
         reportFixture(message),
         lesson,
@@ -180,7 +174,7 @@ describe("fixed teaching language", () => {
           "The independent check was skipped, so there is no unaided transfer evidence.",
         ),
       );
-      expect(report.expectedTransferExplanation).toBe(transfer.expected);
+      expect(report.expectedTransferExplanation).toBe(lesson.transfer.expected);
       expect(report.scores.accuracy.citations[0].quote).toBe(message.text);
       expect(languageInstruction(locale)).toContain(
         locale === "ja" ? "Japanese" : "Simplified Chinese",
@@ -190,25 +184,41 @@ describe("fixed teaching language", () => {
   it("localizes canned teaching copy for languages without a site catalog", () => {
     expect(languageInstruction("vi")).toContain("Vietnamese");
     expect(languageInstruction("my")).toContain("Burmese");
-    expect(textBoard("my").title).not.toBe(textBoard("en").title);
-    expect(textBoard("my").instruction).not.toBe(textBoard().instruction);
-    expect(localizedCnnBoard("my").title).not.toBe(
-      localizedCnnBoard("en").title,
+    expect(exampleBoard("x", "my").instruction).not.toBe(
+      exampleBoard("x").instruction,
     );
-    expect(localizedCnnTransfer("id").expected).toContain("204");
-    expect(localizedCnnTransfer("vi").question).not.toBe(
-      localizedCnnTransfer("en").question,
+    expect(exampleBoard("x", "vi").suggestedTool.columns).not.toEqual(
+      exampleBoard("x").suggestedTool.columns,
     );
+    const toggle = {
+      ...exampleBoard("x"),
+      state: [
+        {
+          id: "on",
+          label: "Light",
+          unit: "",
+          type: "boolean" as const,
+          initial: 1,
+          min: 0,
+          max: 1,
+          step: 1,
+          options: [],
+        },
+      ],
+    };
+    const values = { state: { on: 1 }, composites: {} };
+    expect(formatBoardValue(toggle, "on", values, {}, "id")).toBe("Aktif");
+    expect(formatBoardValue(toggle, "on", values, {}, "ja")).toBe("オン");
     expect(
-      greetLearner("မင်္ဂလာပါ! ကွန်ဗိုလူးရှင်းကို သင်ပေးပါ။", "my"),
+      greetLearner("မင်္ဂလာပါ! အမြန်နှုန်းကို သင်ပေးပါ။", "my"),
     ).toMatch(/^မင်္ဂလာပါ!/);
   });
   it("adds a single localized greeting", () => {
     expect(greetLearner("こんにちは！光について教えて？", "ja")).toBe(
       "こんにちは！ 光について教えて？",
     );
-    expect(greetLearner("你好！能教我卷积吗？", "zh-CN")).toBe(
-      "你好！ 能教我卷积吗？",
+    expect(greetLearner("你好！能教我速度吗？", "zh-CN")).toBe(
+      "你好！ 能教我速度吗？",
     );
   });
   it.each(["zh-CN", "ja"] as const)(

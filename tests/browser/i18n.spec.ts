@@ -49,16 +49,15 @@ async function setup(page: Page) {
     ],
     progress: [{ id: "o1", label: "解释权重共享", status: "missing" }],
     board: {
-      kind: "text",
-      version: 1,
+      version: 2,
       title: "用例子解释",
       instruction: "请选择一个例子。",
       assumptions: "",
-      controls: [],
-      metrics: [],
-      items: [],
-      groups: [],
+      state: [],
+      derived: [],
       code: "",
+      nodes: [] as unknown[],
+      suggestedTool: { kind: "none", items: [], columns: [] },
     },
     pending: false,
   };
@@ -370,14 +369,21 @@ test("classification menus select groups in the teaching board and its mobile di
 }, testInfo) => {
   const state = await setup(page);
   Object.assign(state.board, {
-    kind: "classification",
     title: "Sort the examples",
     instruction: "Choose the matching group.",
-    items: [
-      { id: "a", label: "Shared weights", detail: "One filter is reused." },
-      { id: "b", label: "Image width", detail: "The image size changes." },
+    nodes: [
+      { id: "main", parentId: "", component: "Stack", props: [], items: [] },
+      {
+        id: "sort",
+        parentId: "main",
+        component: "Buckets",
+        props: [{ key: "groups", value: "Parameters|Computation" }],
+        items: [
+          { id: "a", label: "Shared weights", detail: "One filter is reused." },
+          { id: "b", label: "Image width", detail: "The image size changes." },
+        ],
+      },
     ],
-    groups: ["Parameters", "Computation"],
   });
   await page.goto(`/session/${sessionId}`);
   const mobile = testInfo.project.name === "mobile";

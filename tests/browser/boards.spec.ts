@@ -36,16 +36,27 @@ async function setup(page: Page, failTurn = false) {
       },
     ],
     board: {
-      kind: "cnn",
-      version: 1,
+      version: 2,
       title: "One filter",
       instruction: "Compare the image sizes.",
       assumptions: "",
-      controls: [],
-      metrics: [],
-      items: [],
-      groups: [],
+      state: [],
+      derived: [],
       code: "",
+      nodes: [
+        { id: "main", parentId: "", component: "Stack", props: [], items: [] },
+        {
+          id: "sizes",
+          parentId: "main",
+          component: "CompareCards",
+          props: [],
+          items: [
+            { id: "small", label: "32 × 32", detail: "" },
+            { id: "large", label: "64 × 64", detail: "" },
+          ],
+        },
+      ],
+      suggestedTool: { kind: "none", items: [], columns: [] },
     },
   };
   const payloads: any[] = [];

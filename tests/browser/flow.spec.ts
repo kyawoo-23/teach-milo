@@ -1,4 +1,4 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect, Locator, Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { calculationSandbox } from "../../src/lib/sandbox";
 
@@ -20,20 +20,74 @@ const lesson = {
     { id: "o2", label: "Compare parameters and computation" },
   ],
 };
+const sizes = ["32 × 32", "64 × 64"];
 const board = {
-  kind: "cnn",
-  version: 1,
+  version: 2,
   title: "One filter. Many positions.",
   instruction:
     "Compare the two image sizes. Tell Milo what changes and what stays the same.",
   assumptions:
     "Valid convolution · stride 1 · 3×3 kernel · 3 input channels · 8 filters · biases enabled",
-  controls: [],
-  metrics: [],
-  items: [],
-  groups: [],
-  code: "",
+  state: [
+    {
+      id: "size",
+      label: "Input size",
+      unit: "",
+      type: "choice",
+      initial: 0,
+      min: 0,
+      max: 1,
+      step: 1,
+      options: sizes,
+    },
+  ],
+  derived: [
+    { id: "parameters", label: "Learned parameters", unit: "" },
+    { id: "multiplications", label: "Multiplications", unit: "" },
+  ],
+  code: "function calculate(inputs) { const out = 30 + 32 * inputs.size; return { metrics: { parameters: 3 * 3 * 3 * 8 + 8, multiplications: out * out * 216 } }; }",
+  nodes: [
+    { id: "main", parentId: "", component: "Stack", props: [], items: [] },
+    {
+      id: "size_select",
+      parentId: "main",
+      component: "Select",
+      props: [{ key: "bind", value: "size" }],
+      items: [],
+    },
+    {
+      id: "parameters_metric",
+      parentId: "main",
+      component: "Metric",
+      props: [{ key: "value", value: "parameters" }],
+      items: [],
+    },
+    {
+      id: "work_metric",
+      parentId: "main",
+      component: "Metric",
+      props: [{ key: "value", value: "multiplications" }],
+      items: [],
+    },
+  ],
+  suggestedTool: { kind: "none", items: [], columns: [] },
 };
+const sizeSnapshot = (size: number) => ({
+  version: 3,
+  state: { size },
+  composites: {},
+  kind: "board",
+  verified: true,
+  display: [{ label: "Input size", value: sizes[size], unit: "" }],
+});
+const numericFields = [
+  { id: "small", label: "Parameters at 20 × 20", unit: "" },
+  { id: "large", label: "Parameters at 40 × 40", unit: "" },
+];
+async function chooseSize(board: Locator, size: string) {
+  await board.getByRole("combobox", { name: "Input size" }).click();
+  await board.page().getByRole("option", { name: size, exact: true }).click();
+}
 async function fixtures(page: Page) {
   const state: any = {
     id: sessionId,
@@ -94,7 +148,7 @@ async function fixtures(page: Page) {
         id: data.operationId,
         role: "learner",
         text: data.text,
-        board: data.board && { ...data.board, kind: "cnn", verified: true },
+        board: data.board && sizeSnapshot(data.board.state.size),
         createdAt: new Date().toISOString(),
         sequence: turns * 2 - 1,
         kind: "teaching",
@@ -121,7 +175,7 @@ async function fixtures(page: Page) {
       state.revision++;
       if (data.action === "start_transfer") {
         state.phase = "transfer";
-        state.numericalCheck = true;
+        state.numericFields = numericFields;
         state.transferQuestion =
           "A valid stride-1 convolution has 5×5 kernels, 2 input channels, and 4 output filters, with biases. Compare inputs of 20×20×2 and 40×40×2. How many learned parameters are there in each case, and what changes when the image grows? Explain why.";
       } else if (data.action === "continue") state.phase = "teaching";
@@ -351,10 +405,8 @@ test("materials-to-report golden path — scripted walkthrough", async ({
   if (testInfo.project.name === "mobile")
     await page.getByRole("button", { name: "Open teaching board" }).click();
   const teachingBoard = page.locator(".teaching-board:visible");
-  await teachingBoard.getByRole("button", { name: "64 × 64" }).click();
-  await expect(
-    teachingBoard.getByText("830,304", { exact: true }),
-  ).toBeVisible();
+  await chooseSize(teachingBoard, "64 × 64");
+  await expect(teachingBoard.getByText("830304", { exact: true })).toBeVisible();
   await checkpoint();
   await teachingBoard
     .getByRole("button", { name: "Attach to explanation" })
@@ -479,7 +531,13 @@ test("worker sandbox returns calculations and terminates a stuck script", async 
         };
         window.addEventListener("message", receive);
         frame.contentWindow!.postMessage(
-          { type: "calculate", channel, requestId, code, inputs: { size: 5 } },
+          {
+            type: "calculate",
+            channel,
+            requestId,
+            code,
+            batch: [{ size: 5 }, { size: 6 }],
+          },
           "*",
         );
       });
@@ -495,7 +553,9 @@ test("worker sandbox returns calculations and terminates a stuck script", async 
     frame.remove();
     return { good, stuck, storage };
   }, calculationSandbox);
-  expect(results.good.result.metrics.area).toBe(25);
+  expect(
+    results.good.results.map((r: any) => r.metrics.area),
+  ).toEqual([25, 36]);
   expect(results.stuck.error).toBe("Calculation timed out");
   expect(results.storage.error).toBeTruthy();
 });
@@ -589,7 +649,7 @@ test("independent-check draft survives refresh without reopening aids", async ({
 }) => {
   const { state } = await fixtures(page);
   state.phase = "transfer";
-  state.numericalCheck = true;
+  state.numericFields = numericFields;
   state.transferQuestion =
     "Explain how a larger image changes computation with a fixed set of weights.";
   await page.goto(`/session/${sessionId}/transfer`);
@@ -752,7 +812,7 @@ for (const viewport of [
       await page.getByRole("button", { name: "Open teaching board" }).click();
     }
     const teachingBoard = page.locator(".teaching-board:visible");
-    await teachingBoard.getByRole("button", { name: "64 × 64" }).click();
+    await chooseSize(teachingBoard, "64 × 64");
     await assertFits();
     await teachingBoard
       .getByRole("button", { name: "Attach to explanation" })
@@ -1320,12 +1380,7 @@ test("completed chat preserves paginated history, retries, and supports keyboard
     kind: sequence === 58 ? "hint" : sequence === 59 ? "transfer" : "teaching",
     ...(sequence === 57
       ? {
-          board: {
-            kind: "cnn",
-            version: 1,
-            inputs: { inputSize: 64 },
-            verified: true,
-          },
+          board: sizeSnapshot(1),
         }
       : {}),
   });
@@ -1380,8 +1435,9 @@ test("completed chat preserves paginated history, retries, and supports keyboard
   ).toBeVisible();
   await expect(transcript.getByText("A little nudge")).toBeVisible();
   await expect(transcript.getByText("Independent-check answer")).toBeVisible();
+  await expect(transcript.getByText("Demonstration shared")).toBeVisible();
   await expect(
-    transcript.getByText("Demonstration shared · 64 × 64"),
+    transcript.locator(".board-preview").getByText("64 × 64"),
   ).toBeVisible();
   await expect(transcript.locator(".message.student")).toHaveCount(15);
   await expect(transcript.locator(".message.learner")).toHaveCount(15);
@@ -1734,32 +1790,26 @@ test("confirmation modals guard board resets, snapshot replacement and removal",
     return page.locator(".teaching-board:visible");
   };
   let teachingBoard = await openBoard();
-  await teachingBoard
-    .getByRole("button", { name: "64 × 64", exact: true })
-    .click();
+  const size = () =>
+    teachingBoard.getByRole("combobox", { name: "Input size" });
+  await chooseSize(teachingBoard, "64 × 64");
   await teachingBoard
     .getByRole("button", { name: "Reset board", exact: true })
     .click();
   const reset = page.getByRole("alertdialog", { name: "Reset this board?" });
   await reset.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(
-    teachingBoard.getByRole("button", { name: "64 × 64", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  await expect(size()).toHaveAttribute("data-value", "1");
   await teachingBoard
     .getByRole("button", { name: "Reset board", exact: true })
     .click();
   await reset.getByRole("button", { name: "Reset board", exact: true }).click();
-  await expect(
-    teachingBoard.getByRole("button", { name: "32 × 32", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  await expect(size()).toHaveAttribute("data-value", "0");
   await teachingBoard
     .getByRole("button", { name: "Attach to explanation" })
     .click();
   await expect(page.locator(".attachment-chip")).toBeVisible();
   teachingBoard = await openBoard();
-  await teachingBoard
-    .getByRole("button", { name: "64 × 64", exact: true })
-    .click();
+  await chooseSize(teachingBoard, "64 × 64");
   await teachingBoard
     .getByRole("button", { name: "Attach to explanation" })
     .click();
@@ -1905,7 +1955,7 @@ for (const phase of ["teaching", "transfer"] as const) {
         : Array.from({ length: 30 }, (_, index) => message(index + 30));
     state.nextCursor = phase === "transfer" ? undefined : 30;
     state.transferQuestion = "Explain a fresh example.";
-    state.numericalCheck = false;
+    state.numericFields = [];
     await page.route(
       `**/api/sessions/${sessionId}/${phase === "transfer" ? "transfer" : "actions"}`,
       (route) => route.fulfill({ json: completed }),
