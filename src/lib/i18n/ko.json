@@ -558,5 +558,22 @@
   " {label}: you entered {submitted}; the expected value is {expected}.": " {label}: 입력한 값은 {submitted}이고, 예상 값은 {expected}입니다.",
   "Enter a value for each field.": "각 칸에 값을 입력하세요.",
   "Enter a number.": "숫자를 입력하세요.",
-  "The board calculation couldn't run. Reset the board and try again.": "보드 계산을 실행할 수 없습니다. 보드를 재설정한 뒤 다시 시도하세요."
+  "The board calculation couldn't run. Reset the board and try again.": "보드 계산을 실행할 수 없습니다. 보드를 재설정한 뒤 다시 시도하세요.",
+  "Account settings": "계정 설정",
+  "Profile": "프로필",
+  "Display name": "표시 이름",
+  "Your email address cannot be changed.": "이메일 주소는 변경할 수 없습니다.",
+  "Save profile": "프로필 저장",
+  "Profile updated.": "프로필이 업데이트되었습니다.",
+  "Change password": "비밀번호 변경",
+  "Current password": "현재 비밀번호",
+  "New password": "새 비밀번호",
+  "Current password is required.": "현재 비밀번호를 입력해 주세요.",
+  "Choose a different password from your current password.": "현재 비밀번호와 다른 비밀번호를 선택해 주세요.",
+  "Your current password is incorrect.": "현재 비밀번호가 올바르지 않습니다.",
+  "Use at least 8 characters. Other browsers will be signed out.": "8자 이상을 사용해 주세요. 다른 브라우저에서는 로그아웃됩니다.",
+  "Your password is managed by Google. Change it in your Google account.": "비밀번호는 Google에서 관리합니다. Google 계정에서 변경해 주세요.",
+  "Update password": "비밀번호 업데이트",
+  "Password updated.": "비밀번호가 업데이트되었습니다.",
+  "Saving…": "저장 중…"
 }

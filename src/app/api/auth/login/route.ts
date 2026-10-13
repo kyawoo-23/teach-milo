@@ -27,7 +27,7 @@ export async function POST(request: Request) {
         401,
       );
     }
-    await createUserSession(user.id);
+    await createUserSession(user.id, user.authVersion ?? 0);
     return respond({ user: toPublicUser(user) });
   });
 }

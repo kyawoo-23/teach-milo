@@ -25,6 +25,7 @@ type AuthContextType = {
   openSessionModal: () => void;
   closeSessionModal: () => void;
   refreshUser: () => Promise<void>;
+  updateProfile: (name: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -127,6 +128,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const updateProfile = async (name: string) => {
+    const generation = beginAuthChange();
+    const res = await api<{ user: UserPublic }>(
+      "/api/auth/profile",
+      { name },
+      "PATCH",
+    );
+    if (generation === authGeneration.current) setUser(res.user);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -141,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         openSessionModal,
         closeSessionModal,
         refreshUser,
+        updateProfile,
         login,
         signup,
         logout,

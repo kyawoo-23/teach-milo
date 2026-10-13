@@ -6,6 +6,7 @@ import {
   SignupSchema,
   TransferSchema,
   TurnSchema,
+  UpdatePasswordSchema,
 } from "./contracts";
 
 export const formErrorMap: z.core.$ZodErrorMap = (issue) => {
@@ -29,6 +30,13 @@ export const authFormSchema = (signup: boolean) =>
           message: "Passwords do not match.",
         });
     });
+
+export const PasswordFormSchema = UpdatePasswordSchema.safeExtend({
+  confirmPassword: z.string(),
+}).refine((value) => value.newPassword === value.confirmPassword, {
+  path: ["confirmPassword"],
+  message: "Passwords do not match.",
+});
 
 export const LearningFileSchema = z
   .custom<File>(
