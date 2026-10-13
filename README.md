@@ -115,6 +115,6 @@ English interface; no voice, web search, standalone images, slides, or recording
 
 The website supports English, Simplified Chinese, and Japanese. The navigation selector remembers the website language in this browser for one year; without a saved choice, browser language preferences select the initial language. URLs stay unchanged.
 
-Choose the AI teaching language before preparing a lesson. It initially follows the website language and is preserved across sign-in. Lesson text, Milo’s messages, the independent check, and feedback stay in that language even when the website language changes. Existing lessons default to English; original material and learner quotes are never translated. Prepare a new lesson to change its teaching language.
+Choose what language Milo should use before preparing a lesson. It initially follows the website language and is preserved across sign-in. Lesson text, Milo’s messages, the independent check, and feedback stay in that language even when the website language changes. Existing lessons default to English; original material and learner quotes are never translated. Prepare a new lesson to change its teaching language.
 
 Translations live in `src/lib/i18n`; add matching keys and interpolation parameters to both dictionaries. User-facing API errors can include `messageKey` and `params` while retaining their English `message` and existing error code.

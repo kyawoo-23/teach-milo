@@ -66,7 +66,6 @@ export function SessionExperience({ id }: { id: string }) {
   const [busy, setBusy] = useState(false);
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
-  const listeningTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [replyKey, setReplyKey] = useState<string | undefined>();
   const lastStudent = useRef<{ sessionKey: string; messageId?: string } | null>(
     null,
@@ -226,12 +225,6 @@ export function SessionExperience({ id }: { id: string }) {
     const timer = setTimeout(() => setReplyKey(undefined), 1200);
     return () => clearTimeout(timer);
   }, [replyKey]);
-  useEffect(
-    () => () => {
-      if (listeningTimer.current) clearTimeout(listeningTimer.current);
-    },
-    [id],
-  );
   useEffect(() => {
     generation.current++;
     request.current?.controller.abort();
@@ -242,6 +235,7 @@ export function SessionExperience({ id }: { id: string }) {
     setSession(null);
     setOlder([]);
     setOutgoing(null);
+    setListening(false);
     setBoard(undefined);
     setBoardOpen(false);
     setClassroomDetailsOpen(false);
@@ -954,13 +948,11 @@ export function SessionExperience({ id }: { id: string }) {
                   onChange={(e) => {
                     setText(e.target.value);
                     setListening(e.target.value.trim().length > 0);
-                    if (listeningTimer.current)
-                      clearTimeout(listeningTimer.current);
-                    listeningTimer.current = setTimeout(
-                      () => setListening(false),
-                      2000,
-                    );
                   }}
+                  onFocus={(e) =>
+                    setListening(e.currentTarget.value.trim().length > 0)
+                  }
+                  onBlur={() => setListening(false)}
                   placeholder={t("Explain it to Milo in your own words…")}
                   onKeyDown={(e) => {
                     if (

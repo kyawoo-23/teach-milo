@@ -1,7 +1,7 @@
 "use client";
 
 import { useI18n } from "@/components/locale-context";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { MiloArtwork } from "./milo-artwork";
 import { animateMilo, MILO_MOTIONS, type MiloState } from "./milo-motion";
 
@@ -31,7 +31,8 @@ export function Milo({
   const requested = thinking ? "thinking" : (state ?? "idle");
   const greetingAllowed =
     requested !== "thinking" && requested !== "celebration";
-  const baseKey = `${requested}:${reactionKey ?? ""}`;
+  // Reply identifiers must not restart a listening loop while the learner types.
+  const baseKey = `${requested}:${MILO_MOTIONS[requested].loop ? "" : (reactionKey ?? "")}`;
   const greetingId =
     greetingAllowed && greeting?.baseKey === baseKey ? greeting.id : 0;
   const requestKey = `${baseKey}:${greetingId}`;
@@ -49,7 +50,8 @@ export function Milo({
     setGreeting(null);
   }, [baseKey]);
 
-  useEffect(() => {
+  // Install the new timeline before paint so its static pose cannot flash first.
+  useLayoutEffect(() => {
     const svg = svgRef.current;
     if (!svg || !animated) return;
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");

@@ -470,7 +470,7 @@ export function Onboarding() {
                   disabled={!!busy}
                 />
                 <fieldset className="level-field">
-                  <legend>{t("Choose your depth")}</legend>
+                  <legend>{t("How advanced should this lesson be?")}</legend>
                   <div className="level-options">
                     {[t("introductory"), t("intermediate"), t("advanced")].map(
                       (l) => (
