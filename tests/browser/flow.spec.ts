@@ -406,7 +406,9 @@ test("materials-to-report golden path — scripted walkthrough", async ({
     await page.getByRole("button", { name: "Open teaching board" }).click();
   const teachingBoard = page.locator(".teaching-board:visible");
   await chooseSize(teachingBoard, "64 × 64");
-  await expect(teachingBoard.getByText("830304", { exact: true })).toBeVisible();
+  await expect(
+    teachingBoard.getByText("830304", { exact: true }),
+  ).toBeVisible();
   await checkpoint();
   await teachingBoard
     .getByRole("button", { name: "Attach to explanation" })
@@ -553,9 +555,9 @@ test("worker sandbox returns calculations and terminates a stuck script", async 
     frame.remove();
     return { good, stuck, storage };
   }, calculationSandbox);
-  expect(
-    results.good.results.map((r: any) => r.metrics.area),
-  ).toEqual([25, 36]);
+  expect(results.good.results.map((r: any) => r.metrics.area)).toEqual([
+    25, 36,
+  ]);
   expect(results.stuck.error).toBe("Calculation timed out");
   expect(results.storage.error).toBeTruthy();
 });
