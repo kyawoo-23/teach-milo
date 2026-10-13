@@ -12,6 +12,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - Prefer minimal, targeted fixes when debugging API/UI failures; run `pnpm typecheck` and relevant tests after substantive changes.
 - Local Gemini latency matters: `gemini-3-flash-preview` is an acceptable faster alternative to the repo default when iterating on lesson/chat flows; `gemini-3.5-flash-lite` is fine for cost/speed if structured JSON and PDF OCR stay reliable.
+- Do not add topic-specific modules, filenames, or board kinds; lessons and boards stay fully catalog- and prep-driven with no per-subject code paths.
 
 ## Learned Workspace Facts
 
@@ -28,3 +29,4 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Milo teaching-turn system prompt is `STUDENT_PROMPT` in `src/content/prompts.ts` (prep/evaluate prompts and `languageInstruction()` live there too); `src/server/sessions.ts` appends `languageInstruction(lesson.teachingLanguage)` on each turn.
 - Session chat UI optimistically shows the learner message via `outgoing` in `session-experience.tsx`; scroll effect deps use `messageCount`, `outgoingId`, and `busy`.
 - Retention is 7 days by default (`SESSION_RETENTION_DAYS`, `expiresAt()` in `src/server/db.ts`): sessions (and messages/operations), extracted `materials`, and `lessons` all get `expiresAt` on create (materials at upload); original PDF/DOCX bytes are not stored. Finishing to report does not extend expiry. After expiry the API returns 410, history omits the session, and `/session/…` reads as missing. Firestore TTL on `expiresAt` in `firestore.indexes.json` plus `pnpm cleanup` / `scripts/cleanup.mjs` remove documents (TTL is async). Auth cookies in `user_sessions` last 30 days; users can delete a session anytime via `DELETE /api/sessions/:id`.
+- UI locale cookie `teachback-locale` supports `en`, `zh-CN`, `ja`, `ko`, `th` (`src/lib/i18n/locales.ts` and matching JSON dictionaries). Milo teaching-language options add JAPAC codes `vi`, `id`, `ms`, `my`; UI strings for those teaching-only locales live in `src/lib/i18n/teaching-phrases.ts`.

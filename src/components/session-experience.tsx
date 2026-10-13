@@ -112,12 +112,7 @@ export function SessionExperience({ id }: { id: string }) {
   const [classroomDetailsOpen, setClassroomDetailsOpen] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 960px), (max-height: 860px)");
-    const sync = () => {
-      setClassroomDetailsOpen(!mq.matches);
-    };
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
+    setClassroomDetailsOpen(!mq.matches);
   }, []);
   const [endOpen, setEndOpen] = useState(false);
   const [celebrationDismissed, setCelebrationDismissed] = useState(false);
@@ -909,11 +904,12 @@ export function SessionExperience({ id }: { id: string }) {
                   )}
                 </button>
               )}
-              {messages.map((message) => (
+              {messages.map((message, index) => (
                 <ConversationMessage
                   teachingLanguage={session.lesson.teachingLanguage}
                   key={message.id}
                   message={message}
+                  previousMessage={messages[index - 1]}
                   user={user}
                 />
               ))}

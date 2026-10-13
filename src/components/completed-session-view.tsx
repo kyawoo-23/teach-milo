@@ -173,11 +173,12 @@ export function CompletedSessionView({
             )}
             {messages.length ? (
               <>
-                {messages.map((message) => (
+                {messages.map((message, index) => (
                   <ConversationMessage
                     teachingLanguage={session.lesson.teachingLanguage}
                     key={message.id}
                     message={message}
+                    previousMessage={messages[index - 1]}
                     user={user}
                   />
                 ))}

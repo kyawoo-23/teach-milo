@@ -10,62 +10,113 @@ import { BoardPreview } from "./board-preview";
 
 export const ConversationMessage = memo(function ConversationMessage({
   message,
+  previousMessage,
   user,
   teachingLanguage,
 }: {
   message: Message;
+  previousMessage?: Message;
   teachingLanguage?: TeachingLanguage;
   user: UserPublic | null;
 }) {
   const { t } = useI18n();
+  const showTimestamp =
+    !previousMessage ||
+    Date.parse(message.createdAt) - Date.parse(previousMessage.createdAt) >=
+      15 * 60 * 1000;
 
   return (
-    <article
-      key={message.id}
-      id={`message-${message.id}`}
-      className={`message ${message.role}`}
-    >
-      <div className="message-avatar">
-        {message.role === "student" ? (
-          <Milo size={34} animated={false} />
-        ) : (
-          <LearnerMessageAvatar user={user} />
-        )}
-      </div>
-      <div className="message-body">
-        <span className="message-name">
-          {message.role === "student" ? "Milo" : t("You")}
-          {message.kind === "transfer" && (
-            <small> {t("Independent-check answer")}</small>
+    <>
+      {showTimestamp && <MessageTimestamp createdAt={message.createdAt} />}
+      <article
+        key={message.id}
+        id={`message-${message.id}`}
+        className={`message ${message.role}`}
+      >
+        <div className="message-avatar">
+          {message.role === "student" ? (
+            <Milo size={34} animated={false} />
+          ) : (
+            <LearnerMessageAvatar user={user} />
           )}
-          {message.kind === "hint" && <small> {t("A little nudge")}</small>}
-        </span>
-        <div className="message-bubble">
-          <div
-            className="message-text"
-            lang={
-              message.role === "student"
-                ? lessonLanguage(teachingLanguage)
-                : undefined
-            }
-          >
-            {message.text}
-          </div>
         </div>
-        {message.role === "student" && <CopyButton text={message.text} />}
-        {message.board && (
-          <div className="shared-board-preview">
-            <div className="shared-board">
-              <Layers3 size={15} />
-              <span>{t("Demonstration shared")}</span>
+        <div className="message-body">
+          <span className="message-name">
+            {message.role === "student" ? "Milo" : t("You")}
+            {message.kind === "transfer" && (
+              <small> {t("Independent-check answer")}</small>
+            )}
+            {message.kind === "hint" && <small> {t("A little nudge")}</small>}
+          </span>
+          <div className="message-bubble">
+            <div
+              className="message-text"
+              lang={
+                message.role === "student"
+                  ? lessonLanguage(teachingLanguage)
+                  : undefined
+              }
+            >
+              {message.text}
             </div>
-            <BoardPreview snapshot={message.board} />
           </div>
-        )}
-      </div>
-    </article>
+          {message.role === "student" && (
+            <div className="message-footer">
+              <CopyButton text={message.text} />
+            </div>
+          )}
+          {message.board && (
+            <div className="shared-board-preview">
+              <div className="shared-board">
+                <Layers3 size={15} />
+                <span>{t("Demonstration shared")}</span>
+              </div>
+              <BoardPreview snapshot={message.board} />
+            </div>
+          )}
+        </div>
+      </article>
+    </>
   );
 });
+
+function MessageTimestamp({ createdAt }: { createdAt: string }) {
+  const { locale } = useI18n();
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const timestamp = Date.parse(createdAt);
+  // Render after mounting so server and browser clocks/time zones cannot disagree.
+  if (now === null || !Number.isFinite(timestamp)) return null;
+
+  const seconds = Math.max(0, Math.floor((now - timestamp) / 1000));
+  const [value, unit]: [number, Intl.RelativeTimeFormatUnit] =
+    seconds < 60
+      ? [seconds, "second"]
+      : seconds < 3600
+        ? [Math.floor(seconds / 60), "minute"]
+        : seconds < 86_400
+          ? [Math.floor(seconds / 3600), "hour"]
+          : [Math.floor(seconds / 86_400), "day"];
+  const fullDate = new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "medium",
+  }).format(timestamp);
+
+  return (
+    <time className="message-timestamp" dateTime={createdAt} title={fullDate}>
+      {new Intl.RelativeTimeFormat(locale, {
+        style: "narrow",
+        numeric: "always",
+      }).format(-value, unit)}
+    </time>
+  );
+}
 
 function LearnerMessageAvatar({ user }: { user: UserPublic | null }) {
   const [imageFailed, setImageFailed] = useState(false);
