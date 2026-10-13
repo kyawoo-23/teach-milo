@@ -49,6 +49,7 @@ describe("Authentication utilities and contracts", () => {
       id: "u-123",
       email: "marie@curie.org",
       name: "Marie Curie",
+      hasPassword: true,
     });
     expect(
       (publicUser as Record<string, unknown>).passwordHash,
