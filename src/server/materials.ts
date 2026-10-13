@@ -10,6 +10,11 @@ import { assertOwned, database, decode, encode, expiresAt } from "./db";
 import { gemini, Model } from "./model";
 import { CallContext } from "./usage";
 import { OCR_PROMPT } from "@/content/prompts";
+import {
+  extractionCacheId,
+  withExtractionCache,
+  type ExtractionProgress,
+} from "./extraction-cache";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 export async function readUpload(
@@ -91,7 +96,7 @@ export async function readUpload(
 }
 type Extraction = {
   sources: Source[];
-  chunks: { start: number; count: number; bytes: Uint8Array }[];
+  chunks: { pages: number[]; bytes: Uint8Array }[];
 };
 export function extractInWorker(
   bytes: Buffer,
@@ -153,6 +158,7 @@ export async function extractUpload(
   filename: string,
   ctx: CallContext,
   model: Model = gemini,
+  progress?: ExtractionProgress,
 ) {
   const extension = filename.split(".").at(-1)?.toLowerCase();
   if (!extension || !["pdf", "docx", "txt"].includes(extension))
@@ -175,32 +181,66 @@ export async function extractUpload(
       .min(1)
       .max(5),
   });
-  const result: Source[] = [];
-  let characters = 0;
+  const visualIds = new Set(
+    extracted.chunks.flatMap((chunk) => chunk.pages.map((page) => `p${page}`)),
+  );
+  const result = new Map(
+    extracted.sources
+      .filter((source) => !visualIds.has(source.id))
+      .map((source) => [source.id, source]),
+  );
+  for (const source of progress?.sources ?? [])
+    if (visualIds.has(source.id)) result.set(source.id, source);
+  const sortedSources = () =>
+    [...result.values()].sort(
+      (a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)),
+    );
+  const checkSize = () => {
+    const characters = [...result.values()].reduce(
+      (sum, source) => sum + source.text.length,
+      0,
+    );
+    if (characters > 50_000)
+      throw new AppError(
+        "TOO_MUCH_TEXT",
+        "The extracted document exceeds 50,000 characters. Upload a shorter section.",
+        413,
+      );
+    return characters;
+  };
+  checkSize();
+  const checkReadable = () => {
+    if (checkSize() < 30)
+      throw new AppError(
+        "UNREADABLE",
+        "Too little content could be read. Try a clearer PDF or paste your notes.",
+        422,
+      );
+  };
   const started = Date.now();
   for (const chunk of extracted.chunks) {
+    if (chunk.pages.every((page) => result.has(`p${page}`))) continue;
     if (Date.now() - started > 210_000)
       throw new AppError(
         "EXTRACTION_TIMEOUT",
         "OCR took too long. Try uploading fewer pages at a time.",
         422,
       );
-    const visual = await model.generate(
-      schema,
-      OCR_PROMPT,
-      {
-        pageCount: chunk.count,
-        nativeText: extracted.sources
-          .slice(chunk.start - 1, chunk.start + chunk.count - 1)
-          .map((s) => s.text),
-      },
-      ctx,
-      Buffer.from(chunk.bytes),
+    const visual = schema.parse(
+      await model.generate(
+        schema,
+        OCR_PROMPT,
+        {
+          pageCount: chunk.pages.length,
+        },
+        ctx,
+        Buffer.from(chunk.bytes),
+      ),
     );
     if (
-      visual.pages.length !== chunk.count ||
-      new Set(visual.pages.map((p) => p.page)).size !== chunk.count ||
-      visual.pages.some((p) => p.page > chunk.count)
+      visual.pages.length !== chunk.pages.length ||
+      new Set(visual.pages.map((p) => p.page)).size !== chunk.pages.length ||
+      visual.pages.some((p) => p.page > chunk.pages.length)
     )
       throw new AppError(
         "OCR_INCOMPLETE",
@@ -208,7 +248,7 @@ export async function extractUpload(
         422,
       );
     for (const page of visual.pages.sort((a, b) => a.page - b.page)) {
-      const actual = chunk.start + page.page - 1;
+      const actual = chunk.pages[page.page - 1];
       const native = extracted.sources[actual - 1].text;
       const text = page.text.trim() || native;
       const warnings = [...page.warnings];
@@ -218,28 +258,38 @@ export async function extractUpload(
         );
       if (!text)
         warnings.push("No readable content was extracted from this page.");
-      characters += text.length;
-      if (characters > 50_000)
-        throw new AppError(
-          "TOO_MUCH_TEXT",
-          "The extracted document exceeds 50,000 characters. Upload a shorter section.",
-          413,
-        );
-      result.push({
+      result.set(`p${actual}`, {
         id: `p${actual}`,
         label: `Page ${actual}`,
         text,
-        warnings,
+        warnings: warnings.slice(0, 20),
       });
     }
+    checkSize();
+    if (result.size === extracted.sources.length) checkReadable();
+    await progress?.checkpoint(sortedSources());
   }
-  if (characters < 30)
-    throw new AppError(
-      "UNREADABLE",
-      "Too little content could be read. Try a clearer PDF or paste your notes.",
-      422,
-    );
-  return result;
+  checkReadable();
+  return sortedSources();
+}
+
+export async function extractCachedUpload(
+  bytes: Buffer,
+  filename: string,
+  ctx: CallContext,
+  model: Model = gemini,
+) {
+  if (filename.split(".").at(-1)?.toLowerCase() !== "pdf")
+    return extractUpload(bytes, filename, ctx, model);
+  const key = extractionCacheId(
+    ctx.ownerId,
+    bytes,
+    process.env.GEMINI_MODEL || "gemini-3.8-flash",
+    OCR_PROMPT,
+  );
+  return withExtractionCache(ctx.ownerId, key, (progress) =>
+    extractUpload(bytes, filename, ctx, model, progress),
+  );
 }
 export async function saveMaterial(
   id: string,

@@ -10,7 +10,11 @@ import {
   route,
 } from "@/server/http";
 import { readOwned } from "@/server/db";
-import { extractUpload, readUpload, saveMaterial } from "@/server/materials";
+import {
+  extractCachedUpload,
+  readUpload,
+  saveMaterial,
+} from "@/server/materials";
 import { ownerOperation } from "@/server/operations";
 import { callContext } from "@/server/usage";
 import type { Material } from "@/lib/contracts";
@@ -39,7 +43,7 @@ export async function POST(request: Request) {
             op,
             ownerId,
             upload.filename,
-            await extractUpload(
+            await extractCachedUpload(
               upload.bytes,
               upload.filename,
               callContext(ownerId, request),

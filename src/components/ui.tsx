@@ -1,7 +1,18 @@
 "use client";
 
 import { useI18n } from "@/components/locale-context";
-import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
+import {
+  Children,
+  isValidElement,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import { createPortal } from "react-dom";
 import { AlertCircle, LoaderCircle, X } from "lucide-react";
 
 export const draftStorage = {
@@ -60,6 +71,36 @@ export function Spinner({ label = "Loading" }: { label?: string }) {
     </span>
   );
 }
+export function ModalFooter({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`modal-footer${className ? ` ${className}` : ""}`}>
+      {children}
+    </div>
+  );
+}
+
+function splitModalChildren(children: ReactNode) {
+  const body: ReactNode[] = [];
+  const footers: ReactNode[] = [];
+  Children.forEach(children, (child) => {
+    if (
+      isValidElement(child) &&
+      (child as ReactElement<{ children?: ReactNode }>).type === ModalFooter
+    ) {
+      footers.push(child);
+    } else if (child !== null && child !== undefined) {
+      body.push(child);
+    }
+  });
+  return { body, footers };
+}
+
 export function Modal({
   open,
   onClose,
@@ -73,7 +114,7 @@ export function Modal({
   open: boolean;
   onClose: () => void;
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
   role?: "dialog" | "alertdialog";
   descriptionId?: string;
   className?: string;
@@ -82,6 +123,8 @@ export function Modal({
   const { t, text: localizeText } = useI18n();
 
   const ref = useRef<HTMLDialogElement>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   useLayoutEffect(() => {
     const dialog = ref.current;
     return () => {
@@ -89,13 +132,16 @@ export function Modal({
     };
   }, []);
   useEffect(() => {
+    if (!mounted) return;
     const dialog = ref.current;
-    if (open && !dialog?.open) {
-      dialog?.showModal();
+    if (!dialog) return;
+    if (open && !dialog.open) {
+      dialog.showModal();
       initialFocusRef?.current?.focus();
-    } else if (!open && dialog?.open) dialog.close();
-  }, [open, initialFocusRef]);
-  return (
+    } else if (!open && dialog.open) dialog.close();
+  }, [open, initialFocusRef, mounted]);
+  const { body, footers } = splitModalChildren(children);
+  const dialog = (
     <dialog
       ref={ref}
       className={`modal ${className}`}
@@ -112,8 +158,13 @@ export function Modal({
         )
           onClose();
       }}
-      onCancel={onClose}
+      onCancel={(event) => {
+        // Escape dismisses the top dialog, including an editor inside a board.
+        event.stopPropagation();
+        onClose();
+      }}
       onClose={(event) => {
+        event.stopPropagation();
         if (!event.currentTarget.open) onClose();
       }}
       aria-label={localizeText(title)}
@@ -122,16 +173,20 @@ export function Modal({
       <div className="modal-heading">
         <h2>{localizeText(title)}</h2>
         <button
-          className="icon-button"
+          type="button"
+          className="icon-button modal-close"
           aria-label={t("Close dialog")}
           onClick={onClose}
         >
           <X size={20} />
         </button>
       </div>
-      {children}
+      {body.length > 0 && <div className="modal-body">{body}</div>}
+      {footers}
     </dialog>
   );
+  if (!mounted) return null;
+  return createPortal(dialog, document.body);
 }
 export function useOperationId(scope = "preparation") {
   const operation = useRef<{ key: string; id: string } | null>(null);

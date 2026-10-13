@@ -151,5 +151,19 @@ describe("client form validation", () => {
     expect(
       schema.parse({ from: "a", to: "b", relation: " causes " }).relation,
     ).toBe("causes");
+    const taken = relationshipFormSchema(
+      ["a", "b", "c"],
+      [{ id: "edge", from: "a", to: "b" }],
+    );
+    expect(
+      taken.safeParse({ from: "b", to: "a", relation: "reverses" }).success,
+    ).toBe(false);
+    expect(
+      relationshipFormSchema(
+        ["a", "b"],
+        [{ id: "edge", from: "a", to: "b" }],
+        "edge",
+      ).safeParse({ from: "b", to: "a", relation: "reverses" }).success,
+    ).toBe(true);
   });
 });

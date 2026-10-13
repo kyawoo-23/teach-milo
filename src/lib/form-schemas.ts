@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { conceptPairKey } from "./board-tools";
 import {
   CreateMaterialSchema,
   LoginSchema,
@@ -115,14 +116,37 @@ export const transferFormSchema = (fieldIds: string[]) =>
 export const ConceptFormSchema = z.object({
   name: z.string().trim().min(1, "Enter a concept.").max(100),
 });
-export const relationshipFormSchema = (ids: string[]) =>
+export const relationshipFormSchema = (
+  ids: string[],
+  links: { id: string; from: string; to: string }[] = [],
+  currentId?: string,
+) =>
   z
     .object({
       from: z.string().refine((id) => ids.includes(id), "Choose a concept."),
       to: z.string().refine((id) => ids.includes(id), "Choose a concept."),
       relation: z.string().trim().min(1, "Enter a relationship.").max(300),
     })
-    .refine((value) => value.from !== value.to, {
-      path: ["to"],
-      message: "Choose two different concepts.",
+    .superRefine((value, ctx) => {
+      if (value.from === value.to) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["to"],
+          message: "Choose two different concepts.",
+        });
+        return;
+      }
+      if (
+        links.some(
+          (link) =>
+            link.id !== currentId &&
+            conceptPairKey(link.from, link.to) ===
+              conceptPairKey(value.from, value.to),
+        )
+      )
+        ctx.addIssue({
+          code: "custom",
+          path: ["to"],
+          message: "These concepts are already connected.",
+        });
     });

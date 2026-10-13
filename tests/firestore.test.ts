@@ -25,6 +25,13 @@ import { translate } from "@/lib/i18n/messages";
 import { exampleBoard } from "@/lib/boards";
 import type { Lesson } from "@/lib/contracts";
 import { saveMaterial } from "@/server/materials";
+import { extractCachedUpload } from "@/server/materials";
+import {
+  extractionCacheId,
+  withExtractionCache,
+} from "@/server/extraction-cache";
+import { OCR_PROMPT } from "@/content/prompts";
+import { PDFDocument } from "pdf-lib";
 import { reserveModelCall } from "@/server/usage";
 import type { Model } from "@/server/model";
 import type { Message, Session, SessionHistoryPage } from "@/lib/contracts";
@@ -52,6 +59,135 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
     await createSession(id, lesson.id, ctx.ownerId);
     return { id, lesson };
   }
+  it("resumes validated OCR batches, reuses identical uploads, and isolates owners and expiry", async () => {
+    const ownerId = randomUUID();
+    const anotherOwner = randomUUID();
+    const pdf = await PDFDocument.create();
+    const image = await pdf.embedPng(pngFixture());
+    for (let i = 0; i < 6; i++)
+      pdf.addPage().drawImage(image, { width: 200, height: 200 });
+    const bytes = Buffer.from(await pdf.save());
+    const configuredModel = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+    const ref = database()
+      .collection("extraction_cache")
+      .doc(extractionCacheId(ownerId, bytes, configuredModel, OCR_PROMPT));
+    const otherRef = database()
+      .collection("extraction_cache")
+      .doc(extractionCacheId(anotherOwner, bytes, configuredModel, OCR_PROMPT));
+    let calls = 0;
+    const model: Model = {
+      async generate(schema, _system, data) {
+        calls++;
+        if (calls === 2)
+          throw new AppError("MODEL_FAILURE", "Interrupted OCR", 502);
+        return schema.parse({
+          pages: Array.from(
+            { length: (data as { pageCount: number }).pageCount },
+            (_, index) => ({
+              page: index + 1,
+              text: "The scanned learning notes explain energy storage and transfer.",
+              warnings: [],
+            }),
+          ),
+        });
+      },
+    };
+    const context = { ...ctx, ownerId };
+    try {
+      await expect(
+        extractCachedUpload(bytes, "scan.pdf", context, model),
+      ).rejects.toMatchObject({ code: "MODEL_FAILURE" });
+      const partial = await ref.get();
+      expect(partial.get("sources")).toHaveLength(5);
+      expect(partial.get("status")).toBe("partial");
+      const expiry = partial.get("expiresAt").toMillis();
+      const sources = await extractCachedUpload(
+        bytes,
+        "scan.pdf",
+        context,
+        model,
+      );
+      expect(sources.map((source) => source.id)).toEqual([
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6",
+      ]);
+      expect(calls).toBe(3);
+      expect(
+        await extractCachedUpload(bytes, "renamed.PDF", context, model),
+      ).toEqual(sources);
+      expect(calls).toBe(3);
+      expect((await ref.get()).get("expiresAt").toMillis()).toBe(expiry);
+      await extractCachedUpload(
+        bytes,
+        "scan.pdf",
+        { ...ctx, ownerId: anotherOwner },
+        model,
+      );
+      expect(calls).toBe(5);
+      await ref.update({ expiresAt: Timestamp.fromMillis(0) });
+      await extractCachedUpload(bytes, "scan.pdf", context, model);
+      expect(calls).toBe(7);
+      expect((await ref.get()).get("expiresAt").toMillis()).toBeGreaterThan(
+        Date.now(),
+      );
+    } finally {
+      await Promise.all([ref.delete(), otherRef.delete()]);
+    }
+  });
+  it("prevents concurrent extraction and rejects checkpoints from replaced leases", async () => {
+    const ownerId = randomUUID();
+    const key = randomUUID();
+    const ref = database().collection("extraction_cache").doc(key);
+    const sources = [
+      {
+        id: "p1",
+        label: "Page 1",
+        text: "A clear explanation of how energy is stored and transferred.",
+        warnings: [],
+      },
+    ];
+    let release!: () => void;
+    let entered!: () => void;
+    const ready = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const first = withExtractionCache(ownerId, key, async (progress) => {
+      entered();
+      await hold;
+      await progress.checkpoint(sources);
+      return sources;
+    });
+    // Observe rejection before releasing the lease, avoiding an unhandled promise.
+    const failed = expect(first).rejects.toMatchObject({
+      code: "STALE_REQUEST",
+    });
+    try {
+      await ready;
+      await expect(
+        withExtractionCache(ownerId, key, async () => sources),
+      ).rejects.toMatchObject({ code: "BUSY" });
+      await ref.update({ token: "replacement", status: "running" });
+      release();
+      await failed;
+      expect((await ref.get()).get("status")).toBe("running");
+      expect((await ref.get()).get("sources")).toEqual([]);
+      await ref.update({ until: 0 });
+      expect(
+        await withExtractionCache(ownerId, key, async () => sources),
+      ).toEqual(sources);
+    } finally {
+      release();
+      await first.catch(() => {});
+      await ref.delete();
+    }
+  });
   it("sends one sketch inline, preserves retries, and protects lightweight image history", async () => {
     const { id } = await setup();
     const input = {
@@ -1045,6 +1181,10 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
     const session = f.collection("sessions").doc(randomUUID());
     const message = session.collection("messages").doc(randomUUID());
     const operation = session.collection("operations").doc(randomUUID());
+    const expiredExtraction = f
+      .collection("extraction_cache")
+      .doc(randomUUID());
+    const activeExtraction = f.collection("extraction_cache").doc(randomUUID());
     const future = Timestamp.fromMillis(Date.now() + 30 * 86_400_000);
     const batch = f.batch();
     batch.create(user, { id: user.id, email: "cleanup@example.test" });
@@ -1058,6 +1198,11 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
     batch.create(session, { expiresAt: Timestamp.fromMillis(0) });
     batch.create(message, { text: "Expired parent", expiresAt: future });
     batch.create(operation, { status: "complete", expiresAt: future });
+    batch.create(expiredExtraction, {
+      sources: [],
+      expiresAt: Timestamp.fromMillis(0),
+    });
+    batch.create(activeExtraction, { sources: [], expiresAt: future });
     try {
       await batch.commit();
       const { stdout } = await promisify(execFile)(
@@ -1073,6 +1218,9 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
         },
       );
       expect(stdout).toContain("user_sessions: removed 101 expired records");
+      expect(stdout).toContain("extraction_cache: removed 1 expired records");
+      expect((await expiredExtraction.get()).exists).toBe(false);
+      expect((await activeExtraction.get()).exists).toBe(true);
       expect(stdout).toMatch(/sessions: removed [1-9]\d* expired records/);
       expect((await f.getAll(...expired)).every((doc) => !doc.exists)).toBe(
         true,
@@ -1087,7 +1235,11 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
       );
       expect((await user.get()).exists).toBe(true);
     } finally {
-      await Promise.all([user, active, ...expired].map((ref) => ref.delete()));
+      await Promise.all(
+        [user, active, expiredExtraction, activeExtraction, ...expired].map(
+          (ref) => ref.delete(),
+        ),
+      );
       await f.recursiveDelete(session);
       await f.terminate();
       await deleteApp(app);
