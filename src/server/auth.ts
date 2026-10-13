@@ -20,6 +20,7 @@ export type User = {
   passwordHash?: string;
   passwordSalt?: string;
   googleId?: string;
+  authVersion?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -29,6 +30,7 @@ export type UserPublic = {
   email: string;
   name: string;
   avatarUrl?: string;
+  hasPassword: boolean;
 };
 
 export const AUTH_COOKIE_NAME = "teachback_auth";
@@ -61,6 +63,7 @@ export function toPublicUser(user: User): UserPublic {
     email: user.email,
     name: user.name,
     avatarUrl: user.avatarUrl,
+    hasPassword: !!(user.passwordHash && user.passwordSalt),
   };
 }
 
@@ -120,7 +123,10 @@ export async function createUser(params: {
   return user;
 }
 
-export async function createUserSession(userId: string): Promise<string> {
+export async function createUserSession(
+  userId: string,
+  authVersion = 0,
+): Promise<string> {
   const jar = await cookies();
   const secret = randomBytes(32).toString("base64url");
   const id = hash(secret);
@@ -133,6 +139,7 @@ export async function createUserSession(userId: string): Promise<string> {
       encode({
         id,
         userId,
+        authVersion,
         createdAt: new Date().toISOString(),
         expiresAt: expiry,
       }),
@@ -157,10 +164,97 @@ export async function getAuthenticatedUser(): Promise<User | null> {
   const doc = await database().collection("user_sessions").doc(id).get();
   if (!doc.exists) return null;
 
-  const session = decode<{ userId: string; expiresAt: string }>(doc.data());
+  const session = decode<{
+    userId: string;
+    expiresAt: string;
+    authVersion?: number;
+  }>(doc.data());
   if (new Date(session.expiresAt).getTime() <= Date.now()) return null;
 
-  return findUserById(session.userId);
+  const user = await findUserById(session.userId);
+  return user && (session.authVersion ?? 0) === (user.authVersion ?? 0)
+    ? user
+    : null;
+}
+
+export async function updateProfile(
+  userId: string,
+  name: string,
+): Promise<User> {
+  const ref = database().collection("users").doc(userId);
+  return database().runTransaction(async (tx) => {
+    const doc = await tx.get(ref);
+    if (!doc.exists)
+      throw new AppError(
+        "AUTH_REQUIRED",
+        "Sign in or create an account to continue.",
+        401,
+      );
+    const user = decode<User>(doc.data());
+    const updates = { name, updatedAt: new Date().toISOString() };
+    tx.update(ref, updates);
+    return { ...user, ...updates };
+  });
+}
+
+export async function updatePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const token = (await cookies()).get(AUTH_COOKIE_NAME)?.value;
+  if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token))
+    throw new AppError(
+      "AUTH_REQUIRED",
+      "Sign in or create an account to continue.",
+      401,
+    );
+  const f = database();
+  const userRef = f.collection("users").doc(userId);
+  const sessionRef = f.collection("user_sessions").doc(hash(token));
+  const password = hashPassword(newPassword);
+  await f.runTransaction(async (tx) => {
+    const [userDoc, sessionDoc] = await tx.getAll(userRef, sessionRef);
+    const user = userDoc.exists ? decode<User>(userDoc.data()) : null;
+    const session = sessionDoc.exists
+      ? decode<{ userId: string; authVersion?: number; expiresAt: string }>(
+          sessionDoc.data(),
+        )
+      : null;
+    if (
+      !user ||
+      !session ||
+      session.userId !== userId ||
+      new Date(session.expiresAt).getTime() <= Date.now() ||
+      (session.authVersion ?? 0) !== (user.authVersion ?? 0)
+    )
+      throw new AppError(
+        "AUTH_REQUIRED",
+        "Sign in or create an account to continue.",
+        401,
+      );
+    if (!user.passwordHash || !user.passwordSalt)
+      throw new AppError(
+        "PASSWORD_MANAGED_BY_GOOGLE",
+        "Your password is managed by Google. Change it in your Google account.",
+        400,
+      );
+    if (!verifyPassword(currentPassword, user.passwordHash, user.passwordSalt))
+      throw new AppError(
+        "INVALID_PASSWORD",
+        "Your current password is incorrect.",
+        400,
+      );
+    const authVersion = (user.authVersion ?? 0) + 1;
+    tx.update(userRef, {
+      passwordHash: password.hash,
+      passwordSalt: password.salt,
+      authVersion,
+      updatedAt: new Date().toISOString(),
+    });
+    // Keep this browser signed in and invalidate all earlier sessions atomically.
+    tx.update(sessionRef, { authVersion });
+  });
 }
 
 export async function clearUserSession(): Promise<void> {

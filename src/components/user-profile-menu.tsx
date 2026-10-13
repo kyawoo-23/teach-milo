@@ -2,10 +2,11 @@
 
 import { useI18n } from "@/components/locale-context";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, LogOut } from "lucide-react";
+import { ChevronDown, LogOut, Settings } from "lucide-react";
 import { UserPublic } from "@/lib/contracts";
 import { useConfirmation } from "./confirmation";
 import { useAuth } from "./auth-context";
+import { AccountSettings } from "./account-settings";
 
 export function UserProfileMenu({
   user,
@@ -19,6 +20,7 @@ export function UserProfileMenu({
   const confirm = useConfirmation();
   const { logout } = useAuth();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const compact = variant === "session";
 
@@ -101,6 +103,15 @@ export function UserProfileMenu({
             type="button"
             role="menuitem"
             className="user-profile-dropdown-item"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Settings size={16} aria-hidden="true" />
+            <span>{t("Account settings")}</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="user-profile-dropdown-item"
             onClick={async () => {
               if (
                 await confirm({
@@ -122,6 +133,9 @@ export function UserProfileMenu({
             <span>{t("Sign out")}</span>
           </button>
         </div>
+      )}
+      {settingsOpen && (
+        <AccountSettings user={user} onClose={() => setSettingsOpen(false)} />
       )}
     </div>
   );
