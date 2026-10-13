@@ -94,7 +94,7 @@ export function MiloArtwork({
                     state === "celebration"
                       ? "M54 70q7 10 14 0"
                       : state === "thinking"
-                        ? "M57 74q4-2 8 0"
+                        ? "M57 72q4 4 8 0"
                         : "M55 71q6 6 12 0"
                   }
                   fill="none"
