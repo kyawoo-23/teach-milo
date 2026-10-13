@@ -8,14 +8,22 @@ import {
   SessionReport,
 } from "./contracts";
 import { validCitations } from "./controller";
-import { convolution } from "./cnn";
+import { formatBoardNumber } from "./boards";
+
+export const withinTolerance = (
+  value: number,
+  expected: number,
+  tolerance: number,
+) =>
+  Math.abs(value - expected) <=
+  tolerance + 1e-9 * Math.max(1, Math.abs(expected));
 
 export function finalizeReport(
   raw: ReportGenerated,
   lesson: Lesson,
   messages: Message[],
   skipped: boolean,
-  arithmetic?: { small: number; large: number },
+  answers?: Record<string, number>,
 ): SessionReport {
   const locale = dictionaryLocale(lesson.teachingLanguage);
   const report = structuredClone(raw);
@@ -54,27 +62,31 @@ export function finalizeReport(
           "The source material has unresolved factual concerns. This judgment is withheld until those concerns are clarified.",
         );
       }
-  if (lesson.transfer.arithmetic === "cnn" && !skipped) {
-    const expected = convolution(20, 5, 2, 4).parameters;
+  const fields = lesson.transfer.numeric?.fields ?? [];
+  if (fields.length && !skipped) {
     const dimension = report.scores.transfer;
-    if (!arithmetic) {
+    if (!answers || fields.some((f) => answers[f.id] === undefined)) {
       dimension.score = null;
       dimension.status = "insufficient_evidence";
       dimension.explanation = localize(
         locale,
         "The numerical fields were not supplied, so arithmetic could not be independently checked.",
       );
-    } else if (arithmetic.small !== expected || arithmetic.large !== expected) {
-      if (dimension.score !== null)
-        dimension.score = Math.min(dimension.score, 1) as 0 | 1;
-      dimension.explanation += translate(
-        locale,
-        " The entered parameter counts were {small} and {large}; both should be {expected}.",
-        { small: arithmetic.small, large: arithmetic.large, expected },
-      );
-      if (arithmetic.small !== arithmetic.large)
-        report.criticalMisconception = true;
-    }
+    } else
+      for (const f of fields)
+        if (!withinTolerance(answers[f.id], f.expected, f.tolerance)) {
+          if (dimension.score !== null)
+            dimension.score = Math.min(dimension.score, 1) as 0 | 1;
+          dimension.explanation += translate(
+            locale,
+            " {label}: you entered {submitted}; the expected value is {expected}.",
+            {
+              label: f.label,
+              submitted: `${answers[f.id]}${f.unit ? ` ${f.unit}` : ""}`,
+              expected: `${formatBoardNumber(f.expected, 6)}${f.unit ? ` ${f.unit}` : ""}`,
+            },
+          );
+        }
   }
   report.strengths = report.strengths
     .map((s) => ({ ...s, citations: validCitations(s.citations, messages) }))

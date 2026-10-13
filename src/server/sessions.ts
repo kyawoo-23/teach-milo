@@ -25,8 +25,9 @@ import {
   readyForCheck,
   validateStudent,
 } from "@/lib/controller";
-import { validateBoardInputs } from "@/lib/boards";
+import { lessonBoard } from "@/lib/boards";
 import { modelMessages, publicMessages, validatePng } from "./board-media";
+import { verifyBoardSubmission } from "./calculation";
 import { finalizeReport } from "@/lib/assessment";
 import { AppError } from "@/lib/errors";
 import {
@@ -45,6 +46,9 @@ import {
 import { gemini, Model } from "./model";
 import { sessionOperation } from "./operations";
 import { CallContext, event } from "./usage";
+
+const numericFields = (lesson: Lesson) =>
+  lesson.transfer.numeric?.fields ?? [];
 
 export async function createSession(
   id: string,
@@ -248,11 +252,15 @@ export async function publicSession(
         session.ledger.evidence.find((e) => e.objectiveId === o.id)
           ?.understanding || "missing",
     })),
-    ...(teaching ? { board: lesson.board } : {}),
+    ...(teaching ? { board: lessonBoard(lesson) } : {}),
     ...(session.phase === "transfer"
       ? {
           transferQuestion: lesson.transfer.question,
-          numericalCheck: lesson.transfer.arithmetic === "cnn",
+          numericFields: numericFields(lesson).map(({ id, label, unit }) => ({
+            id,
+            label,
+            unit,
+          })),
         }
       : {}),
     ...(session.phase === "report" ? { report: session.report } : {}),
@@ -303,6 +311,7 @@ export async function submitTurn(
         ctx.ownerId,
       );
       responseLesson = lesson;
+      const board = lessonBoard(lesson);
       const learner: Message = {
         id: input.operationId,
         role: "learner",
@@ -312,8 +321,8 @@ export async function submitTurn(
         kind: "teaching",
         ...(input.board
           ? {
-              board: validateBoardInputs(
-                lesson.board,
+              board: await verifyBoardSubmission(
+                board,
                 input.board,
                 lesson.teachingLanguage,
               ),
@@ -359,9 +368,9 @@ export async function submitTurn(
           ledger: session.ledger,
           messages: modelMessages(messages),
           teachingBoard: {
-            kind: lesson.board.kind,
-            title: lesson.board.title,
-            instruction: lesson.board.instruction,
+            title: board.title,
+            instruction: board.instruction,
+            controls: board.state.map((s) => s.label),
             tools: ["sketch", "concept_map", "matching", "table"],
           },
         },
@@ -418,7 +427,7 @@ export async function submitTurn(
           event(id, "board_shared", input.operationId),
           event(
             id,
-            `board_shared_${input.board.version === 2 ? input.board.state.kind : "activity"}`,
+            `board_shared_${input.board.version === 2 ? input.board.state.kind : "board"}`,
             input.operationId,
           ),
         ]
@@ -433,8 +442,9 @@ async function evaluate(
   skipped: boolean,
   ctx: CallContext,
   model: Model,
-  parameters?: { small: number; large: number },
+  answers?: Record<string, number>,
 ) {
+  const fields = numericFields(lesson);
   const raw = await model.generate(
     ReportGeneratedSchema,
     EVALUATE_PROMPT + languageInstruction(lesson.teachingLanguage),
@@ -444,21 +454,33 @@ async function evaluate(
       objectives: lesson.objectives,
       concerns: lesson.concerns,
       misconceptionCorrection: lesson.misconceptionCorrection,
-      transfer: lesson.transfer,
+      transfer: {
+        question: lesson.transfer.question,
+        expected: lesson.transfer.expected,
+        criteria: lesson.transfer.criteria,
+      },
       messages: modelMessages(messages),
       ledger: session.ledger,
       skipped,
-      arithmetic:
-        lesson.transfer.arithmetic === "cnn"
-          ? { expectedParameters: 204, submitted: parameters ?? null }
-          : {
-              verification:
-                "No vetted deterministic numeric key; withhold uncertain factual judgments.",
-            },
+      numericCheck: fields.length
+        ? {
+            fields: fields.map(({ id, label, unit, expected, tolerance }) => ({
+              id,
+              label,
+              unit,
+              expected,
+              tolerance,
+              submitted: answers?.[id] ?? null,
+            })),
+          }
+        : {
+            verification:
+              "No verified numeric key; withhold uncertain factual judgments.",
+          },
     },
     ctx,
   );
-  const report = finalizeReport(raw, lesson, messages, skipped, parameters);
+  const report = finalizeReport(raw, lesson, messages, skipped, answers);
   if (session.ledger.unresolvedError) {
     report.criticalMisconception = true;
     if (report.overallLabel === "strong_evidence")
@@ -577,15 +599,15 @@ export async function submitTransfer(
         ctx.ownerId,
       );
       responseLesson = lesson;
+      const fields = numericFields(lesson);
       if (
-        lesson.transfer.arithmetic === "cnn" &&
         !input.skip &&
-        !input.parameters
+        fields.length &&
+        (!input.answers ||
+          Object.keys(input.answers).length !== fields.length ||
+          fields.some((f) => input.answers![f.id] === undefined))
       )
-        throw new AppError(
-          "NUMBERS_REQUIRED",
-          "Enter the parameter count for each input.",
-        );
+        throw new AppError("NUMBERS_REQUIRED", "Enter a value for each field.");
       const learner: Message = {
         id: input.operationId,
         role: "learner",
@@ -604,7 +626,7 @@ export async function submitTransfer(
           pendingAnswer: {
             answer: input.answer,
             skip: input.skip,
-            parameters: input.parameters ?? null,
+            answers: input.answers ?? null,
           },
         });
       const messages = [
@@ -618,7 +640,7 @@ export async function submitTransfer(
         input.skip,
         ctx,
         model,
-        input.parameters,
+        input.skip || !fields.length ? undefined : input.answers,
       );
       return {
         session: {
