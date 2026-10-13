@@ -26,7 +26,7 @@ import {
   SessionPublic,
   SessionReport,
 } from "@/lib/contracts";
-import { api, ErrorNotice, Modal } from "./ui";
+import { api, ErrorNotice, Modal, ModalFooter } from "./ui";
 
 const skills: Record<Dimension, { label: string; hint: string }> = {
   accuracy: { label: "Getting the facts right", hint: "Concept accuracy" },
@@ -485,29 +485,31 @@ export function ReportView({
             "This removes its conversation, board submissions, and report. Your original document was already discarded after extraction.",
           )}
         </p>
-        <div className="modal-actions">
-          <button
-            className="danger-button"
-            disabled={deleting}
-            onClick={async () => {
-              setDeleting(true);
-              try {
-                await api(`/api/sessions/${session.id}`, {}, "DELETE");
-                clearBoardDrafts(undefined, session.id);
-                window.location.assign("/");
-              } catch (e) {
-                setError(e instanceof Error ? e : "Please try again.");
-                setRemove(false);
-                setDeleting(false);
-              }
-            }}
-          >
-            {t("Delete session")}
-          </button>
-          <button className="quiet-button" onClick={() => setRemove(false)}>
-            {t("Keep session")}
-          </button>
-        </div>
+        <ModalFooter>
+          <div className="modal-actions confirmation-actions">
+            <button
+              className="danger-button"
+              disabled={deleting}
+              onClick={async () => {
+                setDeleting(true);
+                try {
+                  await api(`/api/sessions/${session.id}`, {}, "DELETE");
+                  clearBoardDrafts(undefined, session.id);
+                  window.location.assign("/");
+                } catch (e) {
+                  setError(e instanceof Error ? e : "Please try again.");
+                  setRemove(false);
+                  setDeleting(false);
+                }
+              }}
+            >
+              {t("Delete session")}
+            </button>
+            <button className="quiet-button" onClick={() => setRemove(false)}>
+              {t("Keep session")}
+            </button>
+          </div>
+        </ModalFooter>
       </Modal>
     </div>
   );

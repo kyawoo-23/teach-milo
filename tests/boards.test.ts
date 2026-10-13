@@ -4,6 +4,8 @@ import {
   emptyTool,
   ToolStateSchema,
   DraftToolStateSchema,
+  uniqueConceptLinks,
+  conceptPairsAvailable,
 } from "@/lib/board-tools";
 import { compileBoard } from "@/lib/board-catalog";
 import {
@@ -106,7 +108,11 @@ describe("interactive board contracts", () => {
   it("makes a localized example fallback without supplying facts", () => {
     const board = exampleBoard("Literary themes", "ja");
     expect(compileBoard(board).fatal).toBe(false);
-    expect(board.suggestedTool.columns).toEqual(["概念", "例", "当てはまる理由"]);
+    expect(board.suggestedTool.columns).toEqual([
+      "概念",
+      "例",
+      "当てはまる理由",
+    ]);
     expect(suggestedTool(board)).toMatchObject({
       kind: "table",
       rows: [{ cells: ["Literary themes", "", ""] }],
@@ -294,5 +300,18 @@ describe("bounded sketch media", () => {
       verified: true,
       display: [{ label: "Distance", value: "200", unit: "m" }],
     });
+  });
+  it("keeps one direction between a pair of concepts", () => {
+    const links = uniqueConceptLinks([
+      { id: "forward", from: "a", to: "b", label: "causes" },
+      { id: "reverse", from: "b", to: "a", label: "follows" },
+    ]);
+    expect(links.map((link) => link.id)).toEqual(["forward"]);
+    expect(conceptPairsAvailable([{ id: "a" }, { id: "b" }], links)).toBe(
+      false,
+    );
+    expect(
+      conceptPairsAvailable([{ id: "a" }, { id: "b" }, { id: "c" }], links),
+    ).toBe(true);
   });
 });

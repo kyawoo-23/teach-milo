@@ -1,0 +1,755 @@
+.workspace {
+  container: teaching-board / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  min-width: 0;
+  overflow: clip;
+}
+.workspace:global(.board-workspace) > :global(.workspace-heading) {
+  margin: -16px -16px 0;
+}
+.workspace:global(.board-workspace)
+  > :global(
+    :is(.tool-field, .workspace-editor, .board-saving-notice, .error-notice)
+  ) {
+  margin: 0;
+  padding: 0;
+  max-width: none;
+}
+
+.workspace:global(.board-workspace) :global(button) {
+  min-height: 44px;
+}
+.workspace:global(.board-workspace) :global(.sketch-toolbar button) {
+  min-height: 36px;
+}
+.workspace :global(button) {
+  touch-action: manipulation;
+}
+.workspace
+  :global(
+    :is(
+        .workspace-heading,
+        .tool-actions,
+        .tool-add-row,
+        .tool-edit-row,
+        .board-shape-insert,
+        .board-reorder-controls:not(.sketch-toolbar),
+        .board-column-input,
+        .board-table
+      )
+      button
+  ) {
+  border: 1px solid var(--purple-dark);
+  background: var(--surface);
+  color: var(--purple-dark);
+  font-size: 14px;
+  font-weight: 600;
+}
+.workspace :global(.board-reorder-controls .icon-button),
+.workspace :global(.board-table button) {
+  color: var(--purple-dark);
+  background: var(--surface);
+}
+.workspace :global(button:disabled) {
+  opacity: 0.5;
+  cursor: default;
+}
+.workspace :global(button:focus-visible),
+.workspace :global(input:focus-visible),
+.workspace :global(textarea:focus-visible),
+.workspace :global(canvas:focus-visible) {
+  outline: 2px solid var(--purple-dark);
+  outline-offset: 3px;
+}
+.workspace :global(input:not([type="range"])),
+.workspace :global(textarea) {
+  font-size: 16px;
+  min-height: 44px;
+  scroll-margin-block: 80px;
+}
+.workspace :global(textarea) {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 8px;
+}
+.workspace :global(input[type="range"]) {
+  min-height: 44px;
+  width: 100%;
+  touch-action: pan-y;
+  accent-color: var(--purple);
+}
+.workspace :global(.workspace-heading button),
+.workspace :global(.tool-actions button),
+.workspace :global(.tool-add-row button),
+.workspace :global(.board-shape-insert button),
+.workspace :global(.sketch-toolbar button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.workspace :global(.workspace-heading) {
+  gap: 12px;
+}
+.workspace:global(.board-workspace) :global(.workspace-editor) {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+.workspace :global(.workspace-share),
+.workspace :global(.suggested-heading) {
+  margin: 0;
+}
+.workspace :global(.workspace-share) {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.workspace :global(.workspace-actions) {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);
+  gap: 12px;
+  align-items: stretch;
+}
+@container teaching-board (max-width: 520px) {
+  .workspace :global(.workspace-actions) {
+    grid-template-columns: 1fr;
+  }
+}
+.workspace :global(.sketch-board),
+.workspace :global(.comparison-table-editor),
+.workspace :global(.matching-editor),
+.workspace :global(.concept-map-editor) {
+  display: grid;
+  gap: 16px;
+}
+.workspace :global(.tool-hint),
+.workspace :global(.matching-toolbar),
+.workspace :global(.sketch-toolbar),
+.workspace :global(.sketch-stage),
+.workspace :global(.sketch-settings) {
+  margin: 0;
+}
+.workspace :global(.board-object-inspector .sketch-toolbar) {
+  margin: 0;
+}
+.workspace :global(.board-content) {
+  padding: 0;
+}
+.workspace :global(.teaching-board .workspace-share) {
+  padding-inline: 0;
+}
+.workspace :global(.tool-hint) {
+  font-size: 13px;
+}
+.workspace :global(.tool-edit-row > span) {
+  overflow-wrap: anywhere;
+}
+.workspace :global(.board-object-inspector) {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  margin: 0;
+  background: var(--lavender);
+}
+.workspace :global(.sketch-toolbar) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.workspace :global(.sketch-tool-group) {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: none;
+  border-radius: 10px;
+  background: light-dark(rgb(244 242 252), rgb(38 37 48));
+}
+.workspace :global(.sketch-toolbar button) {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 6px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--purple-dark);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: none;
+}
+.workspace
+  :global(
+    .sketch-toolbar button:hover:not(:disabled):not([aria-pressed="true"])
+  ) {
+  background: light-dark(rgb(255 255 255 / 0.55), rgb(255 255 255 / 0.07));
+}
+.workspace :global(.sketch-toolbar button[aria-pressed="true"]) {
+  background: var(--surface);
+  color: var(--purple-dark);
+  font-weight: 600;
+  box-shadow: 0 1px 2px light-dark(rgb(36 40 63 / 0.1), rgb(0 0 0 / 0.35));
+}
+.workspace :global(.sketch-toolbar button > svg) {
+  flex-shrink: 0;
+}
+.workspace :global(.sketch-stroke-settings) {
+  gap: 6px;
+  padding-inline: 6px;
+}
+.workspace :global(.sketch-stroke-color) {
+  display: flex;
+  align-items: center;
+}
+.workspace :global(.sketch-stroke-color .custom-select) {
+  min-width: 0;
+}
+.workspace :global(.sketch-stroke-color .custom-select-trigger) {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 6px;
+  justify-content: center;
+  gap: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  box-shadow: none;
+}
+.workspace
+  :global(.sketch-stroke-color .custom-select-trigger:hover:not(:disabled)),
+.workspace
+  :global(.sketch-stroke-color .custom-select-trigger[aria-expanded="true"]) {
+  background: light-dark(rgb(255 255 255 / 0.55), rgb(255 255 255 / 0.07));
+  border: none;
+  box-shadow: none;
+}
+.workspace :global(.sketch-stroke-color .custom-select-value),
+.workspace :global(.sketch-stroke-color .custom-select-chevron) {
+  display: none;
+}
+.workspace :global(.sketch-stroke-color .custom-select-icon) {
+  display: flex;
+}
+.workspace :global(.sketch-color-swatch) {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px
+    light-dark(rgb(36 40 63 / 0.18), rgb(255 255 255 / 0.2));
+}
+.workspace :global(.sketch-stroke-width) {
+  display: flex;
+  align-items: center;
+  margin: 0;
+}
+.workspace :global(.sketch-stroke-width input[type="range"]) {
+  width: 72px;
+  min-width: 72px;
+  height: 28px;
+  min-height: 28px;
+  margin: 0;
+  padding: 0;
+}
+.workspace :global(.sketch-board canvas[data-mode="select"]) {
+  cursor: grab;
+}
+.workspace :global(.sketch-handles) {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.workspace:global(.board-workspace) :global(.sketch-handle) {
+  position: absolute;
+  z-index: 1;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  padding: 0;
+  border: 2px solid var(--purple-dark);
+  border-radius: 3px;
+  background: var(--surface);
+  box-shadow: none;
+  transform: translate(-50%, -50%);
+  touch-action: none;
+  pointer-events: auto;
+}
+.workspace :global(.sketch-handle[data-handle="n"]),
+.workspace :global(.sketch-handle[data-handle="s"]) {
+  cursor: ns-resize;
+}
+.workspace :global(.sketch-handle[data-handle="e"]),
+.workspace :global(.sketch-handle[data-handle="w"]) {
+  cursor: ew-resize;
+}
+.workspace :global(.sketch-handle[data-handle="nw"]),
+.workspace :global(.sketch-handle[data-handle="se"]) {
+  cursor: nwse-resize;
+}
+.workspace :global(.sketch-handle[data-handle="ne"]),
+.workspace :global(.sketch-handle[data-handle="sw"]) {
+  cursor: nesw-resize;
+}
+.workspace :global(.sketch-handle[data-handle="rotate"]) {
+  border-radius: 50%;
+  cursor: grab;
+}
+.workspace :global(.board-shape-insert) {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.workspace :global(.board-shape-insert .tool-hint) {
+  flex: 1 1 180px;
+  margin: 0;
+}
+.workspace :global(.board-shape-insert button) {
+  background: var(--surface);
+  color: var(--purple-dark);
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+.workspace :global(.matching-columns button) {
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+.workspace :global(.matching-columns button > svg) {
+  float: right;
+  margin-inline-start: 4px;
+}
+.workspace :global(.matching-columns button[aria-pressed="true"]) {
+  background: var(--lavender);
+  box-shadow: inset 0 0 0 1px var(--purple-dark);
+}
+.workspace :global(.matching-column-label) {
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 13px;
+  color: var(--ink);
+}
+.workspace :global(.matching-next-step) {
+  margin: 0;
+  color: var(--purple-dark);
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.workspace :global(.matching-columns) {
+  margin: 0;
+  gap: 16px;
+}
+.workspace :global(.matching-choice) {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--surface);
+}
+.workspace :global(.matching-choice-content) {
+  flex: 1;
+  min-width: 0;
+}
+.workspace :global(.matching-pair-number) {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.workspace
+  :global(.matching-choice[data-connected="true"] .matching-pair-number),
+.workspace
+  :global(.matching-choice[aria-pressed="true"] .matching-pair-number) {
+  background: var(--purple-dark);
+  border-color: var(--purple-dark);
+  color: var(--surface);
+}
+.workspace :global(.matching-selected-label) {
+  color: var(--purple-dark);
+  font-weight: 600;
+}
+.workspace :global(.matching-choice[data-match-description]:disabled) {
+  opacity: 1;
+}
+.workspace :global(.matching-choice[data-ready="true"]:hover:not(:disabled)) {
+  border-color: var(--purple-dark);
+  background: var(--lavender);
+}
+.workspace :global(.board-selection-status) {
+  color: var(--purple-dark);
+  font-size: 13px;
+  background: var(--lavender);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-block: 10px;
+}
+.workspace :global(.matching-delete) {
+  width: 44px;
+  flex-shrink: 0;
+}
+.workspace :global(.board-reorder-controls:not(.sketch-toolbar)) {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.workspace :global(.board-reorder-controls:not(.sketch-toolbar) .icon-button),
+.workspace :global(.board-table button) {
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.workspace :global(.board-reorder-controls .board-drag-handle) {
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.workspace :global([data-dragging="true"]) {
+  opacity: 0.65;
+}
+.workspace :global([data-drop-target="true"]) {
+  outline: 2px solid var(--purple-dark);
+  outline-offset: -2px;
+  background: var(--lavender);
+}
+.workspace :global(.sequence-items li) {
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+}
+.workspace :global(.sequence-items li > span) {
+  flex: 1 1 120px;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+.workspace :global(.sequence-items small) {
+  font-size: 12px;
+}
+.workspace :global(.board-cell-label) {
+  display: none;
+}
+.workspace :global(.board-column-editor summary) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  padding: 10px 0;
+  min-height: 44px;
+  color: var(--purple-dark);
+}
+.workspace :global(.board-column-editor summary::-webkit-details-marker) {
+  display: none;
+}
+.workspace :global(.board-column-editor:not([open]) summary > svg) {
+  transform: rotate(-90deg);
+}
+.workspace :global(.board-column-editor summary > svg) {
+  flex-shrink: 0;
+}
+.workspace :global(.board-column-fields) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 12px;
+  padding-block: 12px;
+}
+.workspace :global(.board-column-input) {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.workspace :global(.board-column-input input) {
+  width: 100%;
+  min-width: 0;
+}
+.workspace :global(.board-column-input input:focus-visible) {
+  outline-offset: -2px;
+}
+.workspace :global(.board-table-scroll) {
+  min-width: 0;
+}
+.workspace :global(.board-column-input button) {
+  flex-shrink: 0;
+}
+.workspace :global(.board-table th) {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.workspace :global(.board-table th),
+.workspace :global(.board-table td) {
+  padding: 8px;
+}
+.workspace :global(.board-table th input) {
+  font-size: 16px;
+  padding: 8px;
+}
+.workspace :global(.board-table textarea) {
+  display: block;
+  min-width: 0;
+  font-size: 16px;
+  padding: 8px;
+  min-height: 100px;
+}
+.workspace :global(.board-table textarea:focus-visible) {
+  outline-offset: -2px;
+}
+.workspace :global(.board-table th:last-child),
+.workspace :global(.board-table td:last-child) {
+  width: 176px;
+}
+.workspace :global(.board-row-controls) {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.workspace :global(.board-row-actions .board-reorder-controls) {
+  margin: 0;
+}
+.workspace:global(.board-workspace)
+  :global(.board-row-actions .sketch-tool-group) {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  padding: 0;
+  background: transparent;
+}
+.workspace:global(.board-workspace) :global(.board-table .board-row-toggle) {
+  width: 100%;
+  justify-content: flex-start;
+  min-width: 0;
+  min-height: 36px;
+  height: 36px;
+  gap: 6px;
+  padding: 6px 4px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.workspace:global(.board-workspace)
+  :global(.board-table .board-row-toggle:hover) {
+  background: var(--lavender);
+}
+.workspace :global(.board-row-toggle[aria-expanded="false"] svg) {
+  transform: rotate(-90deg);
+}
+.workspace :global(.board-row-toggle:focus-visible) {
+  outline-offset: -2px;
+}
+.workspace :global(.board-cell-preview) {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-size: 14px;
+}
+.workspace :global(.board-row-collapsed-summary) {
+  display: none;
+}
+.workspace :global(.board-row-actions-heading) {
+  text-align: start;
+}
+.workspace:global(.board-workspace) :global(.board-row-controls button) {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 6px;
+  border-radius: 7px;
+}
+.workspace :global(.board-slider-value) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px;
+  align-items: center;
+  gap: 12px;
+}
+.workspace :global(.board-slider-value .board-number) {
+  width: 100%;
+  margin: 0;
+}
+.workspace :global(.board-nodes),
+.workspace :global(.board-stack),
+.workspace :global(.board-card) {
+  min-width: 0;
+}
+.workspace :global(.board-text),
+.workspace :global(.board-callout),
+.workspace :global(.board-instruction),
+.workspace :global(.comparison-items button),
+.workspace :global(.classification-items label) {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+.workspace :global(.comparison-items button > svg) {
+  float: right;
+}
+.workspace :global(.board-grid),
+.workspace :global(.board-chart svg) {
+  max-width: 100%;
+}
+.workspace :global(.workspace-actions .button) {
+  min-height: 48px;
+}
+.workspace :global(.board-spinner) {
+  animation: board-spin 1s linear infinite;
+}
+@keyframes board-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace :global(.board-spinner) {
+    animation: none;
+  }
+}
+
+/* Respond to the board's available space, including the desktop sidebar. */
+@container teaching-board (max-width: 800px) {
+  .workspace :global(.board-table),
+  .workspace :global(.board-table thead),
+  .workspace :global(.board-table tbody),
+  .workspace :global(.board-table tr),
+  .workspace :global(.board-table th),
+  .workspace :global(.board-table td) {
+    display: block;
+    width: 100%;
+  }
+  .workspace :global(.board-table thead) {
+    display: none;
+  }
+  .workspace :global(.board-table tbody tr) {
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid var(--line);
+    padding-block: 12px;
+  }
+  .workspace :global(.board-table td) {
+    border: 0;
+    padding-inline: 0;
+  }
+  .workspace :global(.board-cell-label) {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .workspace :global(.board-table th:last-child),
+  .workspace :global(.board-table td:last-child) {
+    width: 100%;
+  }
+  .workspace :global(.board-table .board-row-actions) {
+    order: -1;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+  .workspace :global(.board-row-actions .board-reorder-controls) {
+    flex-direction: row;
+    margin: 0;
+  }
+  .workspace:global(.board-workspace)
+    :global(.board-row-actions .board-row-toggle) {
+    flex: 1;
+    width: auto;
+    margin: 0;
+  }
+  .workspace
+    :global(
+      .board-table tr[data-collapsed="true"] > td:not(.board-row-actions)
+    ) {
+    display: none;
+  }
+  .workspace :global(.board-row-collapsed-summary) {
+    display: block;
+    flex-basis: 100%;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 14px;
+    color: var(--muted);
+  }
+}
+@container teaching-board (max-width: 380px) {
+  .workspace :global(.workspace-editor) {
+    padding-inline: 12px;
+  }
+  .workspace :global(.board-row) {
+    flex-direction: column;
+  }
+  .workspace :global(.board-row > *) {
+    flex-basis: auto;
+  }
+  .workspace :global(.tool-add-row) {
+    grid-template-columns: 1fr;
+  }
+  .workspace :global(.matching-toolbar) {
+    flex-wrap: wrap;
+  }
+  .workspace :global(.matching-toolbar > .sketch-toolbar) {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+:global(.board-expanded-modal) .workspace:global(.board-workspace) {
+  width: 100%;
+  margin-inline: 0;
+  padding: 0;
+}
+:global(.board-expanded-modal):has(.workspace) {
+  max-height: calc(
+    100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+  );
+}
+:global(.board-expanded-modal):has(.workspace) :global(.modal-body) {
+  scroll-padding-block: 24px;
+}
+@media (max-width: 600px) {
+  :global(.board-expanded-modal):has(.workspace) {
+    top: 0;
+    left: 0;
+    transform: none;
+    width: 100%;
+    max-width: 100%;
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 0;
+    padding: 16px 12px max(16px, env(safe-area-inset-bottom));
+  }
+}

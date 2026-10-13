@@ -1,0 +1,328 @@
+.editor {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.connections button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  min-width: 0;
+  border: 1px solid var(--purple-dark);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--purple-dark);
+  padding: 8px 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.connections button:hover:not(:disabled) {
+  background: var(--lavender);
+}
+.connections .addAction,
+.popup :global(.primary-button) {
+  background: var(--surface);
+  border: 1px solid var(--purple-dark);
+  color: var(--purple-dark);
+  box-shadow: none;
+}
+.connections .addAction:hover:not(:disabled),
+.popup :global(.primary-button:hover:not(:disabled)) {
+  background: var(--lavender);
+  box-shadow: none;
+}
+.popup :global(.secondary-button) {
+  background: var(--surface);
+  border-color: var(--purple-dark);
+  color: var(--purple-dark);
+}
+.popup :global(.danger-button) {
+  border: 1px solid light-dark(#a94d52, #ed9ba1);
+  background: var(--surface);
+  color: light-dark(#a94d52, #ed9ba1);
+}
+.popup :global(.danger-button:hover:not(:disabled)) {
+  background: light-dark(#fcf0f1, #35252c);
+}
+.summary {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 0;
+}
+.summary {
+  text-align: end;
+}
+.scene {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  min-height: 220px;
+  max-height: 440px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: light-dark(#faf9ff, #22232e);
+}
+.scene > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  color: var(--purple-dark);
+  pointer-events: none;
+}
+.scene polyline {
+  fill: none;
+  stroke: var(--purple-dark);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.leader {
+  stroke: var(--purple-dark);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.6;
+}
+.editor .node,
+.editor .relationship {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  max-width: 29%;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+}
+.editor .node {
+  z-index: 2;
+  border-color: var(--purple-dark);
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.editor .node:active {
+  cursor: grabbing;
+}
+.editor .node[aria-pressed="true"] {
+  background: var(--lavender);
+  box-shadow: 0 0 0 2px var(--purple-dark);
+}
+.editor .relationship {
+  z-index: 1;
+  max-width: 24%;
+  border-radius: 20px;
+  color: var(--purple-dark);
+  background: var(--lavender);
+  border-color: var(--purple-dark);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.relationship > svg {
+  flex-shrink: 0;
+}
+.node span,
+.relationship span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 13px;
+}
+.popup:global(.modal),
+.popup:global(.modal[open]) {
+  position: fixed;
+  inset: unset;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(480px, calc(100vw - 24px));
+  max-width: 480px;
+  height: auto;
+  max-height: min(680px, calc(100dvh - 24px));
+  padding: 20px;
+  margin: 0;
+  overflow: auto;
+}
+.popup :global(.modal-body) {
+  flex: 0 0 auto;
+  min-height: auto;
+  overflow: visible;
+}
+.popup :global(.modal-heading) {
+  margin-bottom: 16px;
+}
+.popup :global(.modal-heading h2) {
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+.form {
+  display: grid;
+  gap: 16px;
+}
+.body {
+  display: grid;
+  gap: 16px;
+}
+.footer {
+  margin-top: 8px;
+  padding-top: 0;
+  border-top: 0;
+}
+.field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.field > label {
+  font-size: 14px;
+  font-weight: 600;
+}
+.popup input {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  min-height: 44px;
+  font-size: 16px;
+  line-height: 22px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: none;
+}
+.popup input:focus,
+.popup input:focus-visible {
+  outline: none;
+  border-color: var(--purple-dark);
+  box-shadow: 0 0 0 2px var(--purple-dark);
+}
+.connections {
+  display: grid;
+  gap: 8px;
+}
+.connections > strong {
+  font-size: 14px;
+}
+.connections button {
+  flex-wrap: wrap;
+}
+.connections button small {
+  width: 100%;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.connections button span {
+  overflow-wrap: anywhere;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+  border-top: 0;
+  padding-top: 16px;
+}
+.popup .actions button {
+  min-height: 44px;
+  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 14px;
+}
+.actions .deleteButton {
+  margin-inline-end: auto;
+}
+.menu {
+  position: fixed;
+  inset: auto;
+  z-index: 1100;
+  display: grid;
+  gap: 2px;
+  width: max-content;
+  min-width: 180px;
+  max-width: calc(100vw - 16px);
+  height: auto;
+  margin: 0;
+  padding: 6px;
+  overflow: visible;
+  border: 1px solid light-dark(#dedaf0, #3d3457);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow:
+    0 8px 28px light-dark(#39306420, #0000005d),
+    0 2px 6px light-dark(#3930640a, #00000024);
+}
+.menu:popover-open {
+  display: grid;
+}
+.menu button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: start;
+  cursor: pointer;
+}
+.menu button:hover:not(:disabled),
+.menu button:focus-visible {
+  background: var(--lavender);
+  outline: none;
+}
+.menu button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.menuDelete {
+  color: light-dark(#a94d52, #ed9ba1);
+}
+.popup button:focus-visible {
+  outline: 2px solid var(--purple-dark);
+  outline-offset: 2px;
+}
+@media (max-width: 380px) {
+  .popup:global(.modal),
+  .popup:global(.modal[open]) {
+    padding: 16px;
+  }
+  .popup .actions button {
+    padding-inline: 10px;
+  }
+}

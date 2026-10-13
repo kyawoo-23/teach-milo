@@ -31,8 +31,7 @@ import {
 } from "@/lib/contracts";
 import { useAuth } from "./auth-context";
 import { lessonLanguage } from "@/lib/i18n/locales";
-import { LanguageSelector } from "./language-selector";
-import { ThemeSelector } from "./theme-selector";
+import { HeaderPreferences } from "./header-preferences";
 import { Brand } from "./brand";
 import { UserProfileMenu } from "./user-profile-menu";
 import { Milo } from "./milo";
@@ -49,6 +48,7 @@ import {
   draftStorage,
   ErrorNotice,
   Modal,
+  ModalFooter,
   Spinner,
   useOperationId,
 } from "./ui";
@@ -549,8 +549,7 @@ export function SessionExperience({ id }: { id: string }) {
             </span>
           </div>
           <nav className="session-header-actions" aria-label={t("Session")}>
-            <LanguageSelector />
-            <ThemeSelector />
+            <HeaderPreferences showTheme={!user} />
             {isTeaching && (
               <button
                 className="quiet-button"
@@ -1184,26 +1183,28 @@ export function SessionExperience({ id }: { id: string }) {
                 "You can try the independent check now, or finish with feedback on the explanations you’ve given. Skipped criteria will remain unscored.",
               )}
             </p>
-            <div className="modal-actions">
-              <button
-                className="primary-button"
-                onClick={() => action("start_transfer")}
-              >
-                {t("Try the independent check")}
-              </button>
-              <button
-                className="secondary-button"
-                onClick={() => action("end")}
-              >
-                {t("End and see my feedback")}
-              </button>
-              <button
-                className="quiet-button"
-                onClick={() => setEndOpen(false)}
-              >
-                {t("Keep teaching")}
-              </button>
-            </div>
+            <ModalFooter>
+              <div className="modal-actions">
+                <button
+                  className="primary-button"
+                  onClick={() => action("start_transfer")}
+                >
+                  {t("Try the independent check")}
+                </button>
+                <button
+                  className="secondary-button"
+                  onClick={() => action("end")}
+                >
+                  {t("End and see my feedback")}
+                </button>
+                <button
+                  className="quiet-button"
+                  onClick={() => setEndOpen(false)}
+                >
+                  {t("Keep teaching")}
+                </button>
+              </div>
+            </ModalFooter>
           </Modal>
         </main>
       )}

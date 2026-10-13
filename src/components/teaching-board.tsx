@@ -5,6 +5,7 @@ import { CustomSelect } from "./custom-select";
 import { useI18n } from "@/components/locale-context";
 import { useConfirmation } from "./confirmation";
 import { useId, useState } from "react";
+import { Maximize2 } from "lucide-react";
 import { Board, BoardSubmission } from "@/lib/contracts";
 import { validateWorkspaceSubmission } from "@/lib/boards";
 import type { Workspace } from "./use-board-workspace";
@@ -18,6 +19,9 @@ import { sketchPng } from "@/lib/sketch";
 import type { ToolState } from "@/lib/board-tools";
 import { api, ErrorNotice } from "./ui";
 import { BoardRenderer } from "./board-catalog/board-renderer";
+import { BoardAttachButton } from "./board-attach-button";
+import attachStyles from "./board-attach-button.module.css";
+import styles from "./board-editor.module.css";
 
 export function TeachingBoard({
   board,
@@ -46,6 +50,7 @@ export function TeachingBoard({
   const toolId = useId();
   const [error, setError] = useState<string | Error>("");
   const [attaching, setAttaching] = useState(false);
+  const [attachedState, setAttachedState] = useState<ToolState>();
   const confirm = useConfirmation();
   const state = workspace.tools[workspace.active];
   const updateTool = (value: ToolState) =>
@@ -62,16 +67,38 @@ export function TeachingBoard({
       return false;
     }
   };
+  const resetBoard = async () => {
+    if (
+      !(await confirm({
+        title: "Reset this board?",
+        description:
+          "Your current board settings will be lost and the initial settings restored.",
+        confirmLabel: "Reset board",
+        destructive: true,
+      }))
+    )
+      return;
+    const { initialWorkspace } = await import("./use-board-workspace");
+    const initial = initialWorkspace(board, teachingLanguage);
+    onChange({
+      ...workspace,
+      tools: {
+        ...workspace.tools,
+        [workspace.active]: initial.tools[workspace.active],
+      },
+    });
+  };
   return (
-    <div className="board-workspace">
-      <div className="workspace-heading">
-        <strong>{t("Teaching board")}</strong>
-        {onExpand && (
+    <div className={`board-workspace ${styles.workspace}`}>
+      {onExpand && (
+        <div className="workspace-heading">
+          <strong>{t("Teaching board")}</strong>
           <button type="button" onClick={onExpand}>
+            <Maximize2 size={16} aria-hidden="true" />
             {t("Expand board")}
           </button>
-        )}
-      </div>
+        </div>
+      )}
       <div className="tool-field">
         <label htmlFor={toolId}>{t("Board tool")}</label>
         <CustomSelect
@@ -151,78 +178,60 @@ export function TeachingBoard({
             />
           )}
           <div className="workspace-share">
-            <button
-              className="secondary-button full-width"
-              type="button"
-              disabled={disabled || attaching}
-              onClick={async () => {
-                setAttaching(true);
-                setError("");
-                try {
-                  const snapshot = {
-                    version: 2 as const,
-                    inputs: {},
-                    state: structuredClone(state),
-                    ...(state.kind === "sketch"
-                      ? { png: sketchPng(state) }
-                      : {}),
-                  };
-                  validateWorkspaceSubmission(snapshot);
-                  await attach(snapshot);
-                } catch (e) {
-                  setError(e as Error);
-                } finally {
-                  setAttaching(false);
-                }
-              }}
-            >
-              {t("Attach to explanation")}
-            </button>
+            <div className="workspace-actions">
+              <button
+                type="button"
+                className={`secondary-button full-width ${attachStyles.button} ${attachStyles.reset} workspace-reset`}
+                disabled={disabled}
+                onClick={() => void resetBoard()}
+              >
+                {t("Reset board")}
+              </button>
+              <BoardAttachButton
+                attaching={attaching}
+                attached={attachedState === state}
+                disabled={disabled}
+                onClick={async () => {
+                  setAttaching(true);
+                  setError("");
+                  try {
+                    const snapshot = {
+                      version: 2 as const,
+                      inputs: {},
+                      state: structuredClone(state),
+                      ...(state.kind === "sketch"
+                        ? { png: sketchPng(state) }
+                        : {}),
+                    };
+                    validateWorkspaceSubmission(snapshot);
+                    if ((await attach(snapshot)) !== false)
+                      setAttachedState(state);
+                  } catch (e) {
+                    setError(e as Error);
+                  } finally {
+                    setAttaching(false);
+                  }
+                }}
+              />
+            </div>
             <p className="board-footnote">
               {t("Add your own explanation when you send.")}
             </p>
           </div>
         </div>
       ) : (
-        <BoardRenderer
-          board={board}
-          teachingLanguage={teachingLanguage}
-          onAttach={attach}
-          disabled={disabled}
-          values={workspace.board}
-          onValuesChange={(values) => onChange({ ...workspace, board: values })}
-        />
-      )}
-      {state && workspace.active !== "sketch" && (
-        <button
-          className="workspace-reset"
-          type="button"
-          disabled={disabled}
-          onClick={async () => {
-            if (
-              await confirm({
-                title: "Reset this board?",
-                description:
-                  "Your current board settings will be lost and the initial settings restored.",
-                confirmLabel: "Reset board",
-                destructive: true,
-              })
-            ) {
-              const { initialWorkspace } =
-                await import("./use-board-workspace");
-              const initial = initialWorkspace(board, teachingLanguage);
-              onChange({
-                ...workspace,
-                tools: {
-                  ...workspace.tools,
-                  [workspace.active]: initial.tools[workspace.active],
-                },
-              });
+        <div className="workspace-editor">
+          <BoardRenderer
+            board={board}
+            teachingLanguage={teachingLanguage}
+            onAttach={attach}
+            disabled={disabled || attaching}
+            values={workspace.board}
+            onValuesChange={(values) =>
+              onChange({ ...workspace, board: values })
             }
-          }}
-        >
-          {t("Reset board")}
-        </button>
+          />
+        </div>
       )}
     </div>
   );
