@@ -1,47 +1,145 @@
 import { randomUUID } from "node:crypto";
 import {
+  Board,
   emptyLedger,
   Lesson,
   Message,
+  NumericTransfer,
   ReportGenerated,
   Session,
   StudentReply,
 } from "@/lib/contracts";
-import { CNN_BOARD, CNN_CARD, CNN_TRANSFER } from "@/content/cnn";
 export const ctx = { ownerId: "test-owner", network: "test-network" };
+export const KNOWLEDGE =
+  "At constant speed, distance = speed × time. Doubling the time doubles the distance; doubling the speed also doubles the distance. Units must match: metres per second times seconds gives metres.";
+export const DISTANCE_CODE =
+  "function calculate(inputs) { return { metrics: { distance: inputs.speed * inputs.time } }; }";
+export const boardFixture = (): Board => ({
+  version: 2,
+  title: "Distance at constant speed",
+  instruction: "Change speed and time. Tell Milo what happens to distance.",
+  assumptions: "Speed stays constant for the whole trip.",
+  state: [
+    {
+      id: "speed",
+      label: "Speed",
+      unit: "m/s",
+      type: "number",
+      initial: 10,
+      min: 1,
+      max: 30,
+      step: 1,
+      options: [],
+    },
+    {
+      id: "time",
+      label: "Time",
+      unit: "s",
+      type: "number",
+      initial: 10,
+      min: 0,
+      max: 60,
+      step: 5,
+      options: [],
+    },
+  ],
+  derived: [{ id: "distance", label: "Distance", unit: "m" }],
+  code: DISTANCE_CODE,
+  nodes: [
+    { id: "main", parentId: "", component: "Stack", props: [], items: [] },
+    {
+      id: "speed_slider",
+      parentId: "main",
+      component: "Slider",
+      props: [{ key: "bind", value: "speed" }],
+      items: [],
+    },
+    {
+      id: "time_slider",
+      parentId: "main",
+      component: "Slider",
+      props: [{ key: "bind", value: "time" }],
+      items: [],
+    },
+    {
+      id: "distance_metric",
+      parentId: "main",
+      component: "Metric",
+      props: [{ key: "value", value: "distance" }],
+      items: [],
+    },
+    {
+      id: "steps",
+      parentId: "main",
+      component: "SortableList",
+      props: [{ key: "label", value: "Method" }],
+      items: [
+        { id: "read", label: "Read speed and time", detail: "" },
+        { id: "multiply", label: "Multiply them", detail: "" },
+        { id: "units", label: "Check the units", detail: "" },
+      ],
+    },
+  ],
+  suggestedTool: { kind: "none", items: [], columns: [] },
+});
+export const numericFixture = (): NumericTransfer => ({
+  fields: [
+    {
+      id: "distance",
+      label: "Distance",
+      unit: "m",
+      expected: 150,
+      tolerance: 0.5,
+    },
+  ],
+  inputs: [
+    { id: "speed", value: 6 },
+    { id: "time", value: 25 },
+  ],
+  code: DISTANCE_CODE,
+});
 export function lessonFixture(): Lesson {
   return {
     id: randomUUID(),
     ownerId: ctx.ownerId,
     materialId: randomUUID(),
-    title: "CNN weight sharing",
-    scope: "Distinguish fixed convolution weights from spatial computation.",
+    title: "Distance at constant speed",
+    scope: "Relate distance to speed and time at constant speed.",
     level: "introductory",
     objectives: [
       {
         id: "o1",
-        label: "Explain reused weights",
-        criterion: "Weights are reused at spatial positions",
+        label: "Explain the relationship",
+        criterion: "Distance is speed multiplied by time",
         sourceIds: ["s1"],
       },
       {
         id: "o2",
-        label: "Compare image sizes",
-        criterion: "Fixed parameters with more operations",
+        label: "Predict changes",
+        criterion: "Doubling time or speed doubles distance",
         sourceIds: ["s1"],
       },
     ],
-    knowledge: CNN_CARD,
+    knowledge: KNOWLEDGE,
     concerns: [],
-    misconception:
-      "If the image gets bigger, do I need to learn more copies of the filter?",
+    misconception: "If I go twice as fast, do I cover four times the distance?",
     misconceptionCorrection:
-      "The same learned weights are reused at more positions.",
+      "At constant speed, distance grows in proportion to speed, so twice as fast covers twice the distance.",
     opening:
-      "Can you teach me why a bigger image doesn't necessarily need more convolution weights?",
-    transfer: CNN_TRANSFER,
-    board: CNN_BOARD,
-    sources: [{ id: "s1", label: "Notes", text: CNN_CARD, warnings: [] }],
+      "Can you teach me how distance depends on speed and time when the speed doesn't change?",
+    transfer: {
+      question:
+        "A cyclist rides at a constant 6 m/s for 25 s. How far do they travel, and what would change if they rode for twice as long? Explain why.",
+      expected:
+        "6 × 25 = 150 m. Riding twice as long at the same speed doubles the distance to 300 m, because distance is proportional to time at constant speed.",
+      criteria: [
+        "150 m",
+        "Doubling time doubles distance at constant speed",
+      ],
+      numeric: numericFixture(),
+    },
+    board: boardFixture(),
+    sources: [{ id: "s1", label: "Notes", text: KNOWLEDGE, warnings: [] }],
     confirmed: true,
     createdAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 86400000).toISOString(),
@@ -64,7 +162,7 @@ export function sessionFixture(lesson: Lesson): Session {
   };
 }
 export function messageFixture(
-  text = "The same weights are reused at every position, so both sizes have 224 parameters while the bigger image takes more multiplications.",
+  text = "Distance is speed times time, so 10 m/s for 10 s covers 100 m, and doubling the time to 20 s doubles the distance to 200 m.",
 ): Message {
   return {
     id: randomUUID(),
@@ -80,7 +178,7 @@ export function replyFixture(message: Message, complete = false): StudentReply {
   return {
     studentMessage: complete
       ? "Your example makes the difference clearer to me."
-      : "What actually gets reused when the filter moves?",
+      : "Why does doubling the time double the distance?",
     move: complete ? "acknowledge" : "probe_mechanism",
     evidence: ["o1", "o2"].map((objectiveId) => ({
       objectiveId,
@@ -92,7 +190,7 @@ export function replyFixture(message: Message, complete = false): StudentReply {
     misconceptionCorrection: complete ? [citation] : [],
     unresolvedError: false,
     unresolvedErrorDetail: "",
-    summary: "The learner distinguishes parameters from computation.",
+    summary: "The learner relates distance to speed and time.",
   };
 }
 export function reportFixture(
@@ -118,13 +216,13 @@ export function reportFixture(
     criticalMisconception: false,
     strengths: [
       {
-        text: "You distinguished reuse from increased computation.",
+        text: "You linked distance to both speed and time.",
         citations: [{ messageId: teaching.id, quote: teaching.text }],
       },
     ],
     nextSteps: [
       {
-        text: "Try an example with a different number of input channels.",
+        text: "Try an example where the speed changes partway through.",
         citations: [],
       },
     ],

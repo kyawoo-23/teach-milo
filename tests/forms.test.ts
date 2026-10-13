@@ -113,22 +113,26 @@ describe("client form validation", () => {
     ).toBe("Because weights are reused.");
     const values = {
       answer: " Because weights are reused. ",
-      small: "0",
-      large: "100",
+      numbers: { distance: "150", time: "-2.5" },
     };
-    expect(transferFormSchema(true).parse(values).answer).toBe(
-      "Because weights are reused.",
-    );
-    for (const small of ["", " ", "-1", "1.5", "Infinity", "9007199254740992"])
-      expect(
-        transferFormSchema(true).safeParse({ ...values, small }).success,
-      ).toBe(false);
+    const numeric = transferFormSchema(["distance", "time"]);
+    expect(numeric.parse(values).answer).toBe("Because weights are reused.");
+    for (const distance of ["", " ", "abc", "Infinity"]) {
+      const result = numeric.safeParse({
+        ...values,
+        numbers: { ...values.numbers, distance },
+      });
+      expect(result.success).toBe(false);
+      expect(result.error?.issues[0].path).toEqual(["numbers", "distance"]);
+    }
     expect(
-      transferFormSchema(false).safeParse({ ...values, small: "", large: "" })
-        .success,
+      numeric.safeParse({ ...values, numbers: { distance: "150" } }).success,
+    ).toBe(false);
+    expect(
+      transferFormSchema([]).safeParse({ ...values, numbers: {} }).success,
     ).toBe(true);
     expect(
-      transferFormSchema(false).safeParse({ ...values, answer: " " }).success,
+      transferFormSchema([]).safeParse({ ...values, answer: " " }).success,
     ).toBe(false);
   });
 

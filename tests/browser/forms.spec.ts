@@ -15,7 +15,13 @@ async function setup(page: Page, phase = "baseline", signedIn = true) {
     hintUsed: false,
     challengeUsed: false,
     expiresAt: new Date(Date.now() + 86400000).toISOString(),
-    numericalCheck: phase === "transfer",
+    numericFields:
+      phase === "transfer"
+        ? [
+            { id: "small", label: "Parameters at 20 × 20", unit: "" },
+            { id: "large", label: "Parameters at 40 × 40", unit: "" },
+          ]
+        : [],
     transferQuestion: "Explain what changes for larger images.",
     progress: [],
     lesson: {
@@ -27,26 +33,46 @@ async function setup(page: Page, phase = "baseline", signedIn = true) {
       objectives: [],
     },
     board: {
-      kind: "causal",
-      version: 1,
+      version: 2,
       title: "Try a value",
       instruction: "Change the input.",
       assumptions: "",
-      groups: [],
-      items: [],
-      code: "",
-      controls: [
+      state: [
         {
           id: "size",
           label: "Size",
+          unit: "",
+          type: "number",
+          initial: 4,
           min: 2,
           max: 10,
           step: 2,
-          initial: 4,
-          unit: "",
+          options: [],
         },
       ],
-      metrics: [],
+      derived: [],
+      code: "",
+      nodes: [
+        { id: "main", parentId: "", component: "Stack", props: [], items: [] },
+        {
+          id: "size_slider",
+          parentId: "main",
+          component: "Slider",
+          props: [{ key: "bind", value: "size" }],
+          items: [],
+        },
+        {
+          id: "size_number",
+          parentId: "main",
+          component: "NumberInput",
+          props: [
+            { key: "bind", value: "size" },
+            { key: "label", value: "Size (Numeric value)" },
+          ],
+          items: [],
+        },
+      ],
+      suggestedTool: { kind: "none", items: [], columns: [] },
     },
     messages: [
       {
@@ -196,19 +222,16 @@ test("material and extraction validation block bad submissions and recover after
     .toBe(1);
 });
 
-test("independent check rejects invalid parameters, preserves answers and permits explicit skipping", async ({
+test("independent check requires each numeric field, preserves answers and permits explicit skipping", async ({
   page,
 }) => {
   const sent = await setup(page, "transfer");
   await page.goto(`/session/${id}/transfer`);
   await page.getByRole("button", { name: "See my learning report" }).click();
-  await expect(
-    page.getByText("Enter a whole number of zero or more."),
-  ).toHaveCount(2);
+  await expect(page.getByText("Enter a number.")).toHaveCount(2);
   expect(
     sent.filter((request) => request.path.endsWith("/transfer")),
   ).toHaveLength(0);
-  await page.getByLabel("Parameters at 20 × 20").fill("1.5");
   await page.getByLabel("Parameters at 40 × 40").fill("0");
   await page
     .getByLabel("Explain your thinking")
@@ -217,7 +240,8 @@ test("independent check rejects invalid parameters, preserves answers and permit
   expect(
     sent.filter((request) => request.path.endsWith("/transfer")),
   ).toHaveLength(0);
-  await page.getByLabel("Parameters at 20 × 20").fill("0");
+  await expect(page.getByText("Enter a number.")).toHaveCount(1);
+  await page.getByLabel("Parameters at 20 × 20").fill("1.5");
   await page.getByRole("button", { name: "See my learning report" }).click();
   await expect
     .poll(
@@ -228,7 +252,7 @@ test("independent check rejects invalid parameters, preserves answers and permit
     sent.find((request) => request.path.endsWith("/transfer"))!.data,
   ).toMatchObject({
     answer: "The filter keeps its learned weights.",
-    parameters: { small: 0, large: 0 },
+    answers: { small: 1.5, large: 0 },
     skip: false,
   });
   await page.getByLabel("Parameters at 20 × 20").fill("");
