@@ -12,6 +12,12 @@ import {
 import { UserPublic } from "@/lib/contracts";
 import { api } from "./ui";
 import { clearBoardDrafts } from "@/lib/board-drafts";
+import { signInWithPasskey, syncPasskeys } from "@/lib/passkeys";
+import type { PasskeyList } from "@/lib/passkey-contracts";
+import { prepareLocalAuth } from "@/lib/local-auth";
+import { usePathname, useRouter } from "next/navigation";
+import { useI18n } from "./locale-context";
+import { NotificationToast } from "./notification-toast";
 
 type AuthContextType = {
   user: UserPublic | null;
@@ -27,6 +33,7 @@ type AuthContextType = {
   refreshUser: () => Promise<void>;
   updateProfile: (name: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
+  loginPasskey: (signal: AbortSignal, conditional?: boolean) => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
 };
@@ -34,11 +41,37 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { t, errorText } = useI18n();
+  const [notice, setNotice] = useState<{
+    message: string;
+    error: boolean;
+  } | null>(null);
+  const loggingOut = useRef(false);
+  const returningHome = useRef(false);
   const [user, setUser] = useState<UserPublic | null>(null);
   const [loading, setLoading] = useState(true);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (!notice || notice.error || (returningHome.current && pathname !== "/"))
+      return;
+    returningHome.current = false;
+    const timer = setTimeout(() => setNotice(null), 6000);
+    return () => clearTimeout(timer);
+  }, [notice, pathname]);
+
+  useEffect(() => {
+    if (loading || !user) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("signed-in") !== "1") return;
+    setNotice({ message: t("You’re signed in."), error: false });
+    url.searchParams.delete("signed-in");
+    window.history.replaceState(window.history.state, "", url);
+  }, [loading, user, t]);
 
   const authGeneration = useRef(0);
   const authRead = useRef<AbortController | null>(null);
@@ -64,19 +97,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void refreshUser();
+    let active = true;
+    const generation = authGeneration.current;
+    void prepareLocalAuth().then((ready) => {
+      if (active && ready && generation === authGeneration.current)
+        void refreshUser();
+    });
     return () => {
+      active = false;
       authGeneration.current++;
       authRead.current?.abort();
     };
   }, [refreshUser]);
 
-  const beginAuthChange = () => {
+  const beginAuthChange = useCallback(() => {
     authRead.current?.abort();
     setLoading(false);
     return ++authGeneration.current;
-  };
+  }, []);
   const openAuthModal = useCallback((mode: "login" | "signup" = "login") => {
+    // A protected page may request sign-in before the logout navigation commits.
+    if (returningHome.current) return;
     setAuthMode(mode);
     setAuthModalOpen(true);
   }, []);
@@ -103,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
     setUser(res.user);
     setAuthModalOpen(false);
+    setNotice({ message: t("You’re signed in."), error: false });
   };
 
   const signup = async (email: string, password: string, name: string) => {
@@ -116,16 +158,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
     setUser(res.user);
     setAuthModalOpen(false);
+    setNotice({ message: t("You’re signed in."), error: false });
   };
 
+  const loginPasskey = useCallback(
+    async (signal: AbortSignal, conditional = false) => {
+      const generation = beginAuthChange();
+      const res = await signInWithPasskey(signal, conditional);
+      signal.throwIfAborted();
+      if (generation !== authGeneration.current) return;
+      setLoading(false);
+      setUser(res.user);
+      setAuthModalOpen(false);
+      setNotice({ message: t("You’re signed in."), error: false });
+    },
+    [beginAuthChange, t],
+  );
+
   const logout = async () => {
+    if (loggingOut.current) return;
+    loggingOut.current = true;
     const generation = beginAuthChange();
-    await api("/api/auth/logout", {});
-    clearBoardDrafts(user?.id);
-    if (generation !== authGeneration.current) return;
-    setLoading(false);
-    setSessionModalOpen(false);
-    setUser(null);
+    try {
+      await api("/api/auth/logout", {});
+      clearBoardDrafts(user?.id);
+      if (generation !== authGeneration.current) return;
+      setLoading(false);
+      setAuthModalOpen(false);
+      setSessionModalOpen(false);
+      returningHome.current = true;
+      setUser(null);
+      setNotice({ message: t("You’re signed out."), error: false });
+      router.replace("/", { scroll: true });
+    } catch (error) {
+      if (generation === authGeneration.current)
+        setNotice({
+          message: errorText(
+            error instanceof Error
+              ? error
+              : new Error("Something went wrong. Please retry."),
+          ),
+          error: true,
+        });
+    } finally {
+      loggingOut.current = false;
+    }
   };
 
   const updateProfile = async (name: string) => {
@@ -135,7 +212,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       { name },
       "PATCH",
     );
-    if (generation === authGeneration.current) setUser(res.user);
+    if (generation === authGeneration.current) {
+      setUser(res.user);
+      // Refresh the account details held by password managers after a rename.
+      void api<PasskeyList>("/api/auth/passkeys")
+        .then(syncPasskeys)
+        .catch(() => {});
+    }
   };
 
   return (
@@ -154,11 +237,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refreshUser,
         updateProfile,
         login,
+        loginPasskey,
         signup,
         logout,
       }}
     >
       {children}
+      {notice && (
+        <NotificationToast
+          message={notice.message}
+          error={notice.error}
+          onClose={() => setNotice(null)}
+        />
+      )}
     </AuthContext.Provider>
   );
 }

@@ -1,13 +1,14 @@
 "use client";
 
 import { useI18n } from "@/components/locale-context";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   AlertCircle,
   Eye,
   EyeOff,
   Lock,
+  KeyRound,
   Mail,
   User as UserIcon,
 } from "lucide-react";
@@ -15,6 +16,11 @@ import { useAuth } from "./auth-context";
 import { Modal, Spinner } from "./ui";
 import { authFormSchema } from "@/lib/form-schemas";
 import { FieldError, useSchemaForm } from "./schema-form";
+import {
+  conditionalPasskeysSupported,
+  isPasskeyCancellation,
+  passkeysSupported,
+} from "@/lib/passkeys";
 
 export function AuthModal() {
   return (
@@ -33,6 +39,7 @@ function AuthModalContent() {
     authMode,
     setAuthMode,
     login,
+    loginPasskey,
     signup,
   } = useAuth();
   const pathname = usePathname();
@@ -55,11 +62,76 @@ function AuthModalContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+  const [passkeySupported, setPasskeySupported] = useState(false);
+  const [autofillAttempt, setAutofillAttempt] = useState(0);
+  const autofill = useRef<AbortController | null>(null);
+  const passkeyPrompt = useRef<AbortController | null>(null);
   const [error, setError] = useState<string | Error>("");
 
   const urlAuthError = searchParams.get("authError");
+  const modalOpen = authModalOpen || !!urlAuthError;
+  const working = busy || passkeyBusy;
+
+  useEffect(() => {
+    setPasskeySupported(passkeysSupported());
+  }, []);
+  useEffect(() => {
+    if (!modalOpen || authMode !== "login" || working) return;
+    const controller = new AbortController();
+    autofill.current = controller;
+    // Renew before the server challenge expires, even if autofill stays pending.
+    const timer = setTimeout(
+      () => setAutofillAttempt((value) => value + 1),
+      4 * 60_000,
+    );
+    void (async () => {
+      if (!(await conditionalPasskeysSupported()) || controller.signal.aborted)
+        return;
+      await loginPasskey(controller.signal, true);
+    })().catch((err) => {
+      if (!controller.signal.aborted && !isPasskeyCancellation(err))
+        setError(err instanceof Error ? err : "Authentication failed.");
+    });
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [modalOpen, authMode, working, autofillAttempt, loginPasskey]);
+  useEffect(
+    () => () => {
+      passkeyPrompt.current?.abort();
+    },
+    [modalOpen, authMode],
+  );
+
+  async function passkeyLogin() {
+    if (working || passkeyPrompt.current) return;
+    autofill.current?.abort();
+    const controller = new AbortController();
+    passkeyPrompt.current = controller;
+    setPasskeyBusy(true);
+    setError("");
+    try {
+      await loginPasskey(controller.signal);
+    } catch (err) {
+      if (!controller.signal.aborted)
+        setError(
+          isPasskeyCancellation(err)
+            ? "Passkey sign-in was cancelled. Try again or use another sign-in method."
+            : err instanceof Error
+              ? err
+              : "Authentication failed.",
+        );
+    } finally {
+      passkeyPrompt.current = null;
+      setPasskeyBusy(false);
+    }
+  }
 
   async function submit({ email, password, name }: typeof form.values) {
+    if (working) return;
+    autofill.current?.abort();
     setBusy(true);
     setError("");
     try {
@@ -78,14 +150,17 @@ function AuthModalContent() {
   }
 
   function handleGoogleLogin() {
+    autofill.current?.abort();
     const returnTo = encodeURIComponent(pathname || "/");
     window.location.href = `/api/auth/google?returnTo=${returnTo}`;
   }
 
   return (
     <Modal
-      open={authModalOpen || !!urlAuthError}
+      open={modalOpen}
       onClose={() => {
+        autofill.current?.abort();
+        passkeyPrompt.current?.abort();
         setShowPassword(false);
         setShowConfirmPassword(false);
         form.setValue("confirmPassword", "");
@@ -118,6 +193,7 @@ function AuthModalContent() {
           <button
             type="button"
             aria-pressed={authMode === "login"}
+            disabled={working}
             className={`auth-tab ${authMode === "login" ? "auth-tab-active" : ""}`}
             onClick={() => {
               setAuthMode("login");
@@ -129,6 +205,7 @@ function AuthModalContent() {
           <button
             type="button"
             aria-pressed={authMode === "signup"}
+            disabled={working}
             className={`auth-tab ${authMode === "signup" ? "auth-tab-active" : ""}`}
             onClick={() => {
               setAuthMode("signup");
@@ -154,7 +231,7 @@ function AuthModalContent() {
           type="button"
           className="google-button"
           onClick={handleGoogleLogin}
-          disabled={busy}
+          disabled={working}
         >
           <svg
             className="google-icon"
@@ -182,6 +259,24 @@ function AuthModalContent() {
           <span>{t("Continue with Google")}</span>
         </button>
 
+        {authMode === "login" && passkeySupported && (
+          <button
+            type="button"
+            className="secondary-button full-width"
+            onClick={() => void passkeyLogin()}
+            disabled={working}
+          >
+            {passkeyBusy ? (
+              <Spinner label={t("Signing In…")} />
+            ) : (
+              <>
+                <KeyRound size={18} aria-hidden="true" />
+                {t("Sign in with a passkey")}
+              </>
+            )}
+          </button>
+        )}
+
         <div className="auth-divider">
           <span>{t("or with email")}</span>
         </div>
@@ -200,7 +295,7 @@ function AuthModalContent() {
                   type="text"
                   required
                   placeholder={t("e.g. Marie Curie")}
-                  disabled={busy}
+                  disabled={working}
                 />
               </div>
               <FieldError id="auth-name" message={errors.name?.message} />
@@ -218,9 +313,11 @@ function AuthModalContent() {
                 spellCheck={false}
                 type="email"
                 required
-                autoComplete="email"
+                autoComplete={
+                  authMode === "login" ? "username webauthn" : "username"
+                }
                 placeholder="name@example.com"
-                disabled={busy}
+                disabled={working}
               />
             </div>
             <FieldError id="auth-email" message={errors.email?.message} />
@@ -248,7 +345,7 @@ function AuthModalContent() {
                     ? t("At least 8 characters")
                     : "••••••••"
                 }
-                disabled={busy}
+                disabled={working}
               />
               <button
                 type="button"
@@ -258,7 +355,7 @@ function AuthModalContent() {
                 }
                 aria-controls="auth-password"
                 onClick={() => setShowPassword((visible) => !visible)}
-                disabled={busy}
+                disabled={working}
               >
                 {showPassword ? (
                   <EyeOff size={18} aria-hidden="true" />
@@ -288,7 +385,7 @@ function AuthModalContent() {
                   autoComplete="new-password"
                   required
                   placeholder={t("Re-enter your password")}
-                  disabled={busy}
+                  disabled={working}
                 />
                 <button
                   type="button"
@@ -300,7 +397,7 @@ function AuthModalContent() {
                   }
                   aria-controls="auth-confirm-password"
                   onClick={() => setShowConfirmPassword((visible) => !visible)}
-                  disabled={busy}
+                  disabled={working}
                 >
                   {showConfirmPassword ? (
                     <EyeOff size={18} aria-hidden="true" />
@@ -320,7 +417,7 @@ function AuthModalContent() {
             type="submit"
             className="primary-button full-width"
             style={{ marginTop: "1rem" }}
-            disabled={busy}
+            disabled={working}
           >
             {busy ? (
               <Spinner

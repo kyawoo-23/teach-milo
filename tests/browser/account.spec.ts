@@ -33,6 +33,16 @@ async function setup(page: Page, hasPassword = true) {
       }
     }
     if (path === "/api/auth/me") return route.fulfill({ json: { user } });
+    if (path === "/api/auth/passkeys")
+      return route.fulfill({
+        json: {
+          passkeys: [],
+          rpId: "localhost",
+          userId: "YWRh",
+          name: user.email,
+          displayName: user.name,
+        },
+      });
     if (path === "/api/status")
       return route.fulfill({ json: { configured: true, missing: [] } });
     return route.fulfill({ json: {} });
@@ -42,6 +52,142 @@ async function setup(page: Page, hasPassword = true) {
   await page.getByRole("menuitem", { name: "Account settings" }).click();
   return sent;
 }
+
+test("password sign-in shows a toast only after success", async ({ page }) => {
+  let fail = true;
+  await page.route("**/api/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/auth/me") return route.fulfill({ json: { user: null } });
+    if (path === "/api/status")
+      return route.fulfill({ json: { configured: true, missing: [] } });
+    if (path === "/api/auth/login")
+      return route.fulfill(
+        fail
+          ? {
+              status: 401,
+              json: {
+                error: { message: "Something went wrong. Please retry." },
+              },
+            }
+          : {
+              json: {
+                user: {
+                  id: "account-learner",
+                  name: "Ada",
+                  email: "ada@example.test",
+                  hasPassword: true,
+                },
+              },
+            },
+      );
+    return route.fulfill({ json: {} });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Sign In to TeachBack" });
+  await dialog.getByLabel("Email Address").fill("ada@example.test");
+  await dialog.getByLabel("Password", { exact: true }).fill("valid-password");
+  await dialog
+    .locator("form")
+    .getByRole("button", { name: "Sign In", exact: true })
+    .click();
+  await expect(dialog.getByRole("alert")).toBeVisible();
+  await expect(page.locator(".notification-toast")).toHaveCount(0);
+  fail = false;
+  await dialog
+    .locator("form")
+    .getByRole("button", { name: "Sign In", exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    page.locator(".notification-toast").getByRole("status"),
+  ).toHaveText("You’re signed in.");
+  await page.getByRole("button", { name: "Close notification" }).click();
+  await expect(page.locator(".notification-toast")).toHaveCount(0);
+});
+
+test("Google sign-in return shows one toast after confirming the user", async ({
+  page,
+}) => {
+  await setup(page);
+  await expect(page.locator(".notification-toast")).toHaveCount(0);
+  await page.goto("/?signed-in=1&source=google");
+  await expect(
+    page.locator(".notification-toast").getByRole("status"),
+  ).toHaveText("You’re signed in.");
+  await expect(page).toHaveURL("/?source=google");
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Open account menu" }),
+  ).toBeVisible();
+  await expect(page.locator(".notification-toast")).toHaveCount(0);
+});
+
+test("logout returns to home with a toast and preserves sign-in on failure", async ({
+  page,
+}) => {
+  await setup(page);
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  const sessionId = "11111111-1111-4111-8111-111111111111";
+  await page.route(`**/api/sessions/${sessionId}`, (route) =>
+    route.fulfill({
+      status: 404,
+      json: { error: { code: "NOT_FOUND", message: "Session not found." } },
+    }),
+  );
+  await page.goto(`/session/${sessionId}`);
+  let failLogout = true;
+  await page.route("**/api/auth/logout", (route) =>
+    route.fulfill(
+      failLogout
+        ? {
+            status: 500,
+            json: { error: { message: "Something went wrong. Please retry." } },
+          }
+        : { json: { ok: true } },
+    ),
+  );
+  const signOut = async () => {
+    await page.getByRole("button", { name: "Open account menu" }).click();
+    await page.getByRole("menuitem", { name: "Log out" }).click();
+    await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  };
+  await signOut();
+  await expect(
+    page.locator(".notification-toast").getByRole("alert"),
+  ).toHaveText("Something went wrong. Please retry.");
+  await expect(page).toHaveURL(new RegExp(`/session/${sessionId}$`));
+  await expect(
+    page.getByRole("button", { name: "Open account menu" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Close notification" }).click();
+  await expect(page.locator(".notification-toast")).toHaveCount(0);
+  failLogout = false;
+  await signOut();
+  await expect(page).toHaveURL("/");
+  await expect(
+    page.getByRole("dialog", { name: "Sign In to TeachBack" }),
+  ).toHaveCount(0);
+  await expect(
+    page.locator(".notification-toast").getByRole("status"),
+  ).toHaveText("You’re signed out.");
+  await expect(
+    page.getByRole("button", { name: "Open account menu" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Sign In", exact: true }).first(),
+  ).toBeVisible();
+  expect(
+    (await new AxeBuilder({ page }).include(".notification-toast").analyze())
+      .violations,
+  ).toEqual([]);
+  await page.screenshot({
+    path: `/tmp/teachback-logout-${test.info().project.name}.png`,
+  });
+  await expect(page.locator(".notification-toast")).toHaveCount(0, {
+    timeout: 8000,
+  });
+});
 
 test("account settings save a name, lock email, validate and update password", async ({
   page,
@@ -102,12 +248,53 @@ test("account settings save a name, lock email, validate and update password", a
   await dialog
     .getByLabel("Current password", { exact: true })
     .fill("old-password");
-  await dialog.getByRole("button", { name: "Show password" }).click();
+  await expect(
+    dialog.getByRole("button", { name: /^Show password:/ }),
+  ).toHaveCount(3);
+  await dialog
+    .getByRole("button", { name: "Show password: New password", exact: true })
+    .click();
   await expect(
     dialog.getByLabel("New password", { exact: true }),
   ).toHaveAttribute("type", "text");
+  await expect(
+    dialog.getByLabel("Current password", { exact: true }),
+  ).toHaveAttribute("type", "password");
+  await expect(
+    dialog.getByLabel("Confirm Password", { exact: true }),
+  ).toHaveAttribute("type", "password");
+  await dialog
+    .getByRole("button", { name: "Hide password: New password", exact: true })
+    .click();
+  await expect(
+    dialog.getByLabel("New password", { exact: true }),
+  ).toHaveAttribute("type", "password");
+  await dialog
+    .getByRole("button", {
+      name: "Show password: Current password",
+      exact: true,
+    })
+    .click();
+  await expect(
+    dialog.getByLabel("Current password", { exact: true }),
+  ).toHaveAttribute("type", "text");
+  await dialog
+    .getByRole("button", {
+      name: "Show password: Confirm Password",
+      exact: true,
+    })
+    .click();
+  await expect(
+    dialog.getByLabel("Confirm Password", { exact: true }),
+  ).toHaveAttribute("type", "text");
+  await dialog.screenshot({
+    path: `/tmp/teachback-inline-password-${test.info().project.name}.png`,
+  });
   await dialog.getByRole("button", { name: "Update password" }).click();
   await expect(dialog.getByText("Password updated.")).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: /^Show password:/ }),
+  ).toHaveCount(3);
   await expect(
     dialog.getByLabel("Current password", { exact: true }),
   ).toHaveValue("");
@@ -165,6 +352,10 @@ test("settings tabs support keyboard navigation and preserve form drafts", async
     name: "Change password",
     exact: true,
   });
+  const passkeysTab = dialog.getByRole("tab", {
+    name: "Passkeys",
+    exact: true,
+  });
   await dialog.getByLabel("Display name").fill("Grace draft");
   await profileTab.focus();
   await page.keyboard.press("ArrowRight");
@@ -175,9 +366,13 @@ test("settings tabs support keyboard navigation and preserve form drafts", async
     .fill("draft-password");
   await passwordTab.focus();
   await page.keyboard.press("ArrowRight");
+  await expect(passkeysTab).toBeFocused();
+  await page.keyboard.press("ArrowRight");
   await expect(profileTab).toBeFocused();
   await expect(dialog.getByLabel("Display name")).toHaveValue("Grace draft");
   await page.keyboard.press("End");
+  await expect(passkeysTab).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
   await expect(passwordTab).toBeFocused();
   await expect(dialog.getByLabel("New password", { exact: true })).toHaveValue(
     "draft-password",
@@ -185,5 +380,5 @@ test("settings tabs support keyboard navigation and preserve form drafts", async
   await page.keyboard.press("Home");
   await expect(profileTab).toBeFocused();
   await page.keyboard.press("ArrowLeft");
-  await expect(passwordTab).toBeFocused();
+  await expect(passkeysTab).toBeFocused();
 });

@@ -8,6 +8,9 @@ import { useI18n } from "./locale-context";
 import { useAuth } from "./auth-context";
 import { FieldError, useSchemaForm } from "./schema-form";
 import { api, Modal, Spinner } from "./ui";
+import { PasskeySettings } from "./passkey-settings";
+
+const tabs = ["profile", "password", "passkeys"] as const;
 
 export function AccountSettings({
   user,
@@ -19,7 +22,7 @@ export function AccountSettings({
   const { t, errorText } = useI18n();
   const { updateProfile } = useAuth();
   const tabId = useId();
-  const [activeTab, setActiveTab] = useState<"profile" | "password">("profile");
+  const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("profile");
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const profile = useSchemaForm(UpdateProfileSchema, { name: user.name });
   const password = useSchemaForm(PasswordFormSchema, {
@@ -33,7 +36,11 @@ export function AccountSettings({
   const [passwordError, setPasswordError] = useState<Error | null>(null);
   const [profileSaved, setProfileSaved] = useState(false);
   const [passwordSaved, setPasswordSaved] = useState(false);
-  const [showPasswords, setShowPasswords] = useState(false);
+  const [showPasswords, setShowPasswords] = useState({
+    currentPassword: false,
+    newPassword: false,
+    confirmPassword: false,
+  });
 
   async function saveProfile(input: typeof profile.values) {
     if (saving.current) return;
@@ -69,7 +76,11 @@ export function AccountSettings({
         newPassword: input.newPassword,
       });
       password.reset();
-      setShowPasswords(false);
+      setShowPasswords({
+        currentPassword: false,
+        newPassword: false,
+        confirmPassword: false,
+      });
       setPasswordSaved(true);
     } catch (error) {
       setPasswordError(
@@ -117,7 +128,7 @@ export function AccountSettings({
           role="tablist"
           aria-label={t("Account settings")}
         >
-          {(["profile", "password"] as const).map((tab, index) => (
+          {tabs.map((tab, index) => (
             <button
               key={tab}
               ref={(element) => {
@@ -143,13 +154,22 @@ export function AccountSettings({
                   event.key === "Home"
                     ? 0
                     : event.key === "End"
-                      ? 1
-                      : 1 - index;
-                setActiveTab(next === 0 ? "profile" : "password");
+                      ? tabs.length - 1
+                      : (index +
+                          (event.key === "ArrowRight" ? 1 : -1) +
+                          tabs.length) %
+                        tabs.length;
+                setActiveTab(tabs[next]);
                 tabRefs.current[next]?.focus();
               }}
             >
-              {t(tab === "profile" ? "Profile" : "Change password")}
+              {t(
+                tab === "profile"
+                  ? "Profile"
+                  : tab === "password"
+                    ? "Change password"
+                    : "Passkeys",
+              )}
             </button>
           ))}
         </div>
@@ -253,9 +273,10 @@ export function AccountSettings({
                     <div className="input-with-icon">
                       <input
                         id={field.id}
+                        className="password-input"
                         {...password.register(field.name)}
                         {...password.a11y(field.name, field.id)}
-                        type={showPasswords ? "text" : "password"}
+                        type={showPasswords[field.name] ? "text" : "password"}
                         autoComplete={field.autoComplete}
                         autoCapitalize="none"
                         spellCheck={false}
@@ -263,6 +284,24 @@ export function AccountSettings({
                         minLength={field.name === "newPassword" ? 8 : undefined}
                         maxLength={1024}
                       />
+                      <button
+                        type="button"
+                        className="password-toggle"
+                        aria-label={`${t(showPasswords[field.name] ? "Hide password" : "Show password")}: ${t(field.label)}`}
+                        aria-controls={field.id}
+                        onClick={() =>
+                          setShowPasswords((visible) => ({
+                            ...visible,
+                            [field.name]: !visible[field.name],
+                          }))
+                        }
+                      >
+                        {showPasswords[field.name] ? (
+                          <EyeOff size={18} aria-hidden="true" />
+                        ) : (
+                          <Eye size={18} aria-hidden="true" />
+                        )}
+                      </button>
                     </div>
                     <FieldError
                       id={field.id}
@@ -270,19 +309,6 @@ export function AccountSettings({
                     />
                   </div>
                 ))}
-                <button
-                  type="button"
-                  className="secondary-button"
-                  aria-pressed={showPasswords}
-                  onClick={() => setShowPasswords((value) => !value)}
-                >
-                  {showPasswords ? (
-                    <EyeOff size={16} aria-hidden="true" />
-                  ) : (
-                    <Eye size={16} aria-hidden="true" />
-                  )}
-                  {showPasswords ? t("Hide password") : t("Show password")}
-                </button>
                 {passwordError && (
                   <p className="error-notice" role="alert">
                     {errorText(passwordError)}
@@ -312,6 +338,15 @@ export function AccountSettings({
               </p>
             </section>
           )}
+        </div>
+        <div
+          role="tabpanel"
+          id={`${tabId}-passkeys-panel`}
+          aria-labelledby={`${tabId}-passkeys-tab`}
+          hidden={activeTab !== "passkeys"}
+          tabIndex={0}
+        >
+          {activeTab === "passkeys" && <PasskeySettings />}
         </div>
       </div>
     </Modal>

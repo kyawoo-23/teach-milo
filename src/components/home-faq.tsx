@@ -39,7 +39,9 @@ export function HomeFaq() {
               <span>{t(question)}</span>
               <ChevronDown size={18} aria-hidden="true" />
             </summary>
-            <p>{t(answer)}</p>
+            <div className="home-faq-answer">
+              <p>{t(answer)}</p>
+            </div>
           </details>
         ))}
       </div>

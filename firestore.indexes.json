@@ -21,6 +21,12 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "passkey_challenges",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION" }]
+    },
+    {
       "collectionGroup": "extraction_cache",
       "fieldPath": "expiresAt",
       "ttl": true,
