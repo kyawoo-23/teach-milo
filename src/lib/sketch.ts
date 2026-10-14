@@ -8,7 +8,16 @@ import {
 
 export type Point = { x: number; y: number };
 export type Bounds = { minX: number; minY: number; maxX: number; maxY: number };
-export const resizeHandles = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const;
+export const resizeHandles = [
+  "nw",
+  "n",
+  "ne",
+  "e",
+  "se",
+  "s",
+  "sw",
+  "w",
+] as const;
 export type ResizeHandle = (typeof resizeHandles)[number];
 export type SketchHandle = ResizeHandle | "rotate";
 const FRAME_PAD = 12;
@@ -76,14 +85,26 @@ export function toLocal(object: SketchObject, point: Point): Point {
   const y = dx * Math.sin(rotation) + dy * Math.cos(rotation);
   return { x: center.x + x / scale, y: center.y + y / scale };
 }
-export function handleAnchor(object: SketchObject, handle: SketchHandle): Point {
+export function handleAnchor(
+  object: SketchObject,
+  handle: SketchHandle,
+): Point {
   const bounds = framedBounds(object);
   const midX = (bounds.minX + bounds.maxX) / 2;
   const midY = (bounds.minY + bounds.maxY) / 2;
-  if (handle === "rotate") return toWorld(object, { x: midX, y: bounds.minY - 26 });
+  if (handle === "rotate")
+    return toWorld(object, { x: midX, y: bounds.minY - 26 });
   return toWorld(object, {
-    x: handle.includes("w") ? bounds.minX : handle.includes("e") ? bounds.maxX : midX,
-    y: handle.includes("n") ? bounds.minY : handle.includes("s") ? bounds.maxY : midY,
+    x: handle.includes("w")
+      ? bounds.minX
+      : handle.includes("e")
+        ? bounds.maxX
+        : midX,
+    y: handle.includes("n")
+      ? bounds.minY
+      : handle.includes("s")
+        ? bounds.maxY
+        : midY,
   });
 }
 export function hitSketchObject(object: SketchObject, point: Point) {
@@ -101,7 +122,10 @@ export function wrapDegrees(degrees: number) {
   const wrapped = ((((degrees + 180) % 360) + 360) % 360) - 180;
   return Math.round(wrapped * 10) / 10;
 }
-export function rotateByDegrees(object: SketchObject, delta: number): SketchObject {
+export function rotateByDegrees(
+  object: SketchObject,
+  delta: number,
+): SketchObject {
   return { ...object, rotation: wrapDegrees(objectRotation(object) + delta) };
 }
 export function rotateByPointer(
@@ -237,7 +261,10 @@ function withObjectTransform(
   draw();
   ctx.restore();
 }
-export function paintSelection(canvas: HTMLCanvasElement, object: SketchObject) {
+export function paintSelection(
+  canvas: HTMLCanvasElement,
+  object: SketchObject,
+) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   const bounds = framedBounds(object);
@@ -318,7 +345,7 @@ export function drawSketch(canvas: HTMLCanvasElement, state: SketchState) {
   }
   ctx.restore();
 }
-export function sketchPng(state: SketchState): string {
+export async function sketchPng(state: SketchState): Promise<string> {
   const canvas = document.createElement("canvas");
   for (const width of [CANVAS_WIDTH, 768, 576, 480]) {
     canvas.width = width;

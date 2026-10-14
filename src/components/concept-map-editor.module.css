@@ -8,7 +8,8 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 44px;
+  height: auto;
+  min-height: 32px;
   min-width: 0;
   border: 1px solid var(--purple-dark);
   border-radius: 8px;
@@ -131,8 +132,8 @@
 .relationship > svg {
   flex-shrink: 0;
 }
-.node span,
-.relationship span {
+.node > span,
+.relationship > span {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -164,12 +165,12 @@
   max-height: min(680px, calc(100dvh - 24px));
   padding: 20px;
   margin: 0;
-  overflow: auto;
+  overflow: hidden;
 }
 .popup :global(.modal-body) {
-  flex: 0 0 auto;
-  min-height: auto;
-  overflow: visible;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
 }
 .popup :global(.modal-heading) {
   margin-bottom: 16px;
@@ -185,6 +186,7 @@
 .body {
   display: grid;
   gap: 16px;
+  padding: 4px;
 }
 .footer {
   margin-top: 8px;
@@ -200,7 +202,8 @@
   font-size: 14px;
   font-weight: 600;
 }
-.popup input {
+.popup input,
+.popup textarea {
   width: 100%;
   min-width: 0;
   height: 44px;
@@ -215,10 +218,17 @@
   box-shadow: none;
 }
 .popup input:focus,
-.popup input:focus-visible {
-  outline: none;
+.popup input:focus-visible,
+.popup textarea:focus,
+.popup textarea:focus-visible {
+  outline: 2px solid var(--purple-dark);
+  outline-offset: 2px;
   border-color: var(--purple-dark);
-  box-shadow: 0 0 0 2px var(--purple-dark);
+  box-shadow: none;
+}
+.popup textarea {
+  height: auto;
+  padding-block: 10px;
 }
 .connections {
   display: grid;
@@ -250,8 +260,9 @@
   padding-top: 16px;
 }
 .popup .actions button {
-  min-height: 44px;
-  padding: 8px 12px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -285,11 +296,24 @@
 .menu:popover-open {
   display: grid;
 }
+.connections .addAction {
+  height: 32px;
+  min-height: 32px;
+  padding-block: 0;
+}
+.popup :global(.modal-heading) :global(.icon-button) {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+}
 .menu button {
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 36px;
+  height: 32px;
+  min-height: 32px;
   padding: 6px 10px;
   border: 0;
   border-radius: 8px;

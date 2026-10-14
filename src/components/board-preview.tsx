@@ -1,4 +1,5 @@
 "use client";
+import { FormulaText } from "./formula-text";
 import type { BoardSubmission, BoardSnapshot, Board } from "@/lib/contracts";
 import { compileBoard } from "@/lib/board-catalog";
 import { boardDisplay } from "@/lib/boards";
@@ -29,10 +30,12 @@ export function BoardPreview({
         <dl>
           {display.map(({ label, value, unit }, index) => (
             <div key={index}>
-              <dt>{label}</dt>
+              <dt>
+                <FormulaText>{label}</FormulaText>
+              </dt>
               <dd>
-                {value}
-                {unit ? ` ${unit}` : ""}
+                <FormulaText>{value}</FormulaText>
+                <FormulaText>{unit ? ` ${unit}` : ""}</FormulaText>
               </dd>
             </div>
           ))}
@@ -60,11 +63,20 @@ export function BoardPreview({
       {state.kind === "concept_map" && (
         <>
           <strong>{t("Concept map")}</strong>
-          <p>{state.nodes.map((n) => n.label).join(" · ")}</p>
+          <p>
+            <FormulaText>
+              {state.nodes.map((n) => n.label).join(" · ")}
+            </FormulaText>
+          </p>
           {state.links.map((l) => (
             <p key={l.id}>
-              {state.nodes.find((n) => n.id === l.from)?.label} → {l.label} →{" "}
-              {state.nodes.find((n) => n.id === l.to)?.label}
+              <FormulaText>
+                {state.nodes.find((n) => n.id === l.from)?.label}
+              </FormulaText>{" "}
+              → <FormulaText>{l.label}</FormulaText> →{" "}
+              <FormulaText>
+                {state.nodes.find((n) => n.id === l.to)?.label}
+              </FormulaText>
             </p>
           ))}
         </>

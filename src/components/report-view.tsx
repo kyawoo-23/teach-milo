@@ -1,4 +1,5 @@
 "use client";
+import { FormulaText, FormulaBlock } from "./formula-text";
 
 import { lessonLanguage } from "@/lib/i18n/locales";
 import { useI18n } from "@/components/locale-context";
@@ -218,7 +219,9 @@ export function ReportView({
         onClick={() => showEvidence(c)}
       >
         <Quote size={13} />
-        <span>“{c.quote}”</span>
+        <span>
+          “<FormulaText>{c.quote}</FormulaText>”
+        </span>
         <ArrowRight size={13} />
       </button>
     ));
@@ -290,7 +293,9 @@ export function ReportView({
       <header className="report-intro">
         <span className="small-label">{t("Your learning report")}</span>
         <h1>{t("How did your teaching go?")}</h1>
-        <p>{session.lesson.title}</p>
+        <p>
+          <FormulaText>{session.lesson.title}</FormulaText>
+        </p>
       </header>
 
       <section className="rp-overview" aria-labelledby="rp-verdict">
@@ -358,9 +363,9 @@ export function ReportView({
                     />
                   </summary>
                   <div className="rp-skill-body">
-                    <p lang={lessonLanguage(session.lesson.teachingLanguage)}>
-                      {dimension.explanation}
-                    </p>
+                    <div lang={lessonLanguage(session.lesson.teachingLanguage)}>
+                      <FormulaBlock>{dimension.explanation}</FormulaBlock>
+                    </div>
                     {citations(dimension.citations)}
                   </div>
                 </details>
@@ -393,9 +398,9 @@ export function ReportView({
             <ul>
               {report.strengths.map((s, i) => (
                 <li key={i}>
-                  <p lang={lessonLanguage(session.lesson.teachingLanguage)}>
-                    {s.text}
-                  </p>
+                  <div lang={lessonLanguage(session.lesson.teachingLanguage)}>
+                    <FormulaBlock>{s.text}</FormulaBlock>
+                  </div>
                   {yourWords(s.citations)}
                 </li>
               ))}
@@ -415,9 +420,9 @@ export function ReportView({
           <ol>
             {report.nextSteps.map((s, i) => (
               <li key={i}>
-                <p lang={lessonLanguage(session.lesson.teachingLanguage)}>
-                  {s.text}
-                </p>
+                <div lang={lessonLanguage(session.lesson.teachingLanguage)}>
+                  <FormulaBlock>{s.text}</FormulaBlock>
+                </div>
                 {yourWords(s.citations)}
               </li>
             ))}
@@ -433,20 +438,20 @@ export function ReportView({
           <h2>{t("Independent check")}</h2>
           <StatusBadge status={transferStatus} />
         </div>
-        <p lang={lessonLanguage(session.lesson.teachingLanguage)}>
-          {report.scores.transfer.explanation}
-        </p>
+        <div lang={lessonLanguage(session.lesson.teachingLanguage)}>
+          <FormulaBlock>{report.scores.transfer.explanation}</FormulaBlock>
+        </div>
         <details className="rp-words">
           <summary>
             {t("See the expected reasoning")}
             <ChevronDown size={14} aria-hidden="true" />
           </summary>
-          <p
+          <div
             className="expected-explanation"
             lang={lessonLanguage(session.lesson.teachingLanguage)}
           >
-            {report.expectedTransferExplanation}
-          </p>
+            <FormulaBlock>{report.expectedTransferExplanation}</FormulaBlock>
+          </div>
         </details>
       </section>
 
@@ -468,7 +473,9 @@ export function ReportView({
         onClose={() => setEvidence(null)}
         title={t("Your original explanation")}
       >
-        <p className="evidence-original">{evidence?.text}</p>
+        <div className="evidence-original">
+          <FormulaBlock>{evidence?.text}</FormulaBlock>
+        </div>
         {evidence?.board && (
           <p className="muted">
             {t("A teaching-board snapshot accompanied this explanation.")}

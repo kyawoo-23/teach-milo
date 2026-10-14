@@ -634,7 +634,7 @@ test("failed turn survives refresh and retries the same operation", async ({
     page.getByRole("alert").filter({ hasText: "Temporary model failure" }),
   ).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel("Your explanation to Milo")).toHaveValue(
+  await expect(page.getByLabel("Your explanation to Milo")).toHaveText(
     "Filters reuse weights.",
   );
   await page.getByRole("button", { name: "Send explanation" }).click();
@@ -661,7 +661,7 @@ test("independent-check draft survives refresh without reopening aids", async ({
     .getByLabel("Explain your thinking")
     .fill("The same filter is applied at more locations.");
   await page.reload();
-  await expect(page.getByLabel("Explain your thinking")).toHaveValue(
+  await expect(page.getByLabel("Explain your thinking")).toHaveText(
     "The same filter is applied at more locations.",
   );
   await expect(page.getByLabel("Parameters at 20 × 20")).toHaveValue("204");
@@ -704,11 +704,11 @@ test("retrying a failed explanation clears the recovered draft", async ({
       .getByRole("alert")
       .filter({ hasText: "Please retry your explanation." }),
   ).toBeVisible();
-  await expect(page.getByLabel("Your explanation to Milo")).toHaveValue(
+  await expect(page.getByLabel("Your explanation to Milo")).toHaveText(
     "Filters reuse weights.",
   );
   await page.getByRole("button", { name: "Try again" }).click();
-  await expect(page.getByLabel("Your explanation to Milo")).toHaveValue("");
+  await expect(page.getByLabel("Your explanation to Milo")).toHaveText("");
   await expect(
     page
       .getByLabel("Teaching messages")
@@ -1301,7 +1301,7 @@ test("Milo follows typing, thinking, failed turns and new replies without reacti
     page.getByRole("alert").filter({ hasText: "Temporary model failure" }),
   ).toBeVisible();
   await expect(milo).toHaveAttribute("data-milo-state", "idle");
-  await expect(explanation).toHaveValue("The same weights are reused.");
+  await expect(explanation).toHaveText("The same weights are reused.");
   await page.getByRole("button", { name: "Send explanation" }).click();
   await expect(milo).toHaveAttribute("data-milo-state", "reply");
   await expect(milo).toHaveAttribute("data-milo-state", "idle");
@@ -2001,7 +2001,7 @@ test("confirmation modals guard unsent explanations during a session transition"
   await wrapUp
     .getByRole("button", { name: "Keep teaching", exact: true })
     .click();
-  await expect(draft).toHaveValue("I want to keep this unsent explanation.");
+  await expect(draft).toHaveText("I want to keep this unsent explanation.");
   await page.getByRole("button", { name: "End session", exact: true }).click();
   await wrapUp
     .getByRole("button", { name: "Try the independent check" })

@@ -119,7 +119,7 @@ for (const locale of locales) {
     const next: Locale = locale === "ja" ? "zh-CN" : "ja";
     await chooseLanguage(page, translate(locale, "Website language"), next);
     await expect(page.locator("html")).toHaveAttribute("lang", next);
-    await expect(page.locator("#notes")).toHaveValue(notes);
+    await expect(page.locator("#notes")).toHaveText(notes);
     await expect(page.locator("#topic")).toHaveValue("光");
     await expect(
       page.getByLabel(translate(next, "What language should Milo use?")),
@@ -196,7 +196,7 @@ test("teaching language stays independent through preparation and classroom UI c
   const draft = page.getByLabel(translate("ja", "Your explanation to Milo"));
   await draft.fill("我用自己的话解释。");
   await chooseLanguage(page, translate("ja", "Website language"), "en");
-  await expect(page.getByLabel("Your explanation to Milo")).toHaveValue(
+  await expect(page.getByLabel("Your explanation to Milo")).toHaveText(
     "我用自己的话解释。",
   );
   await expect(
@@ -206,7 +206,7 @@ test("teaching language stays independent through preparation and classroom UI c
     0,
   );
   await page.reload();
-  await expect(page.getByLabel("Your explanation to Milo")).toHaveValue(
+  await expect(page.getByLabel("Your explanation to Milo")).toHaveText(
     "我用自己的话解释。",
   );
 });

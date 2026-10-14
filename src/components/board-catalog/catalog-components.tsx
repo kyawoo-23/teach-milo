@@ -1,4 +1,6 @@
 "use client";
+import { FormulaText, FormulaBlock } from "../formula-text";
+import { interpolateBoardText } from "@/lib/formulas";
 import type { ReactNode } from "react";
 import { Check } from "lucide-react";
 import type { Board, BoardCompositeValue } from "@/lib/contracts";
@@ -73,26 +75,41 @@ export function BoardNodeView({
     case "Card":
       return (
         <section className="board-card">
-          {text(props.title) && <h4>{text(props.title)}</h4>}
+          {text(props.title) && (
+            <h4>
+              <FormulaText>{text(props.title)}</FormulaText>
+            </h4>
+          )}
           {children}
         </section>
       );
     case "Heading":
-      return <h4 className="board-subheading">{text(props.text)}</h4>;
+      return (
+        <h4 className="board-subheading">
+          <FormulaText>{text(props.text)}</FormulaText>
+        </h4>
+      );
     case "Text":
       return (
-        <p className="board-text">
-          {text(props.text)!.replace(/\{([^{}]*)\}/g, (_, id: string) => {
-            const { unit } = lookup(ctx, id);
-            return `${display(ctx, id)}${unit ? ` ${unit}` : ""}`;
-          })}
-        </p>
+        <div className="board-text">
+          <FormulaBlock>
+            {interpolateBoardText(
+              text(props.text)!,
+              Object.fromEntries(
+                [...ctx.board.state, ...ctx.board.derived].map(({ id }) => {
+                  const { unit } = lookup(ctx, id);
+                  return [id, `${display(ctx, id)}${unit ? ` ${unit}` : ""}`];
+                }),
+              ),
+            )}
+          </FormulaBlock>
+        </div>
       );
     case "Callout":
       return (
-        <p className={`board-callout ${text(props.tone) ?? "info"}`}>
-          {text(props.text)}
-        </p>
+        <div className={`board-callout ${text(props.tone) ?? "info"}`}>
+          <FormulaBlock>{text(props.text)}</FormulaBlock>
+        </div>
       );
     case "Slider":
     case "NumberInput": {
@@ -102,10 +119,12 @@ export function BoardNodeView({
       return (
         <div className="board-control">
           <div className="control-label">
-            <label htmlFor={fieldId}>{label}</label>
+            <label htmlFor={fieldId}>
+              <FormulaText>{label}</FormulaText>
+            </label>
             {node.component === "Slider" && (
               <output htmlFor={fieldId}>
-                {display(ctx, id)} {s.unit}
+                {display(ctx, id)} <FormulaText>{s.unit}</FormulaText>
               </output>
             )}
           </div>
@@ -140,7 +159,11 @@ export function BoardNodeView({
               />
             </div>
           ) : (
-            s.unit && <small className="board-unit">{s.unit}</small>
+            s.unit && (
+              <small className="board-unit">
+                <FormulaText>{s.unit}</FormulaText>
+              </small>
+            )
           )}
         </div>
       );
@@ -157,7 +180,11 @@ export function BoardNodeView({
           disabled={ctx.disabled}
           onClick={() => ctx.setState(id, on ? 0 : 1)}
         >
-          <span>{text(props.label) ?? lookup(ctx, id).label}</span>
+          <span>
+            <FormulaText>
+              {text(props.label) ?? lookup(ctx, id).label}
+            </FormulaText>
+          </span>
           <strong>{ctx.t(on ? "On" : "Off")}</strong>
         </button>
       );
@@ -169,7 +196,7 @@ export function BoardNodeView({
       return (
         <div className="board-control">
           <label className="control-label" htmlFor={fieldId}>
-            {label}
+            <FormulaText>{label}</FormulaText>
           </label>
           <CustomSelect
             id={fieldId}
@@ -192,14 +219,18 @@ export function BoardNodeView({
       return (
         <dl className="board-metrics">
           <div>
-            <dt>{text(props.label) ?? label}</dt>
+            <dt>
+              <FormulaText>{text(props.label) ?? label}</FormulaText>
+            </dt>
             <dd>
               {display(
                 ctx,
                 id,
                 typeof props.digits === "number" ? props.digits : undefined,
               )}{" "}
-              <small>{unit}</small>
+              <small>
+                <FormulaText>{unit}</FormulaText>
+              </small>
             </dd>
           </div>
         </dl>
@@ -217,9 +248,11 @@ export function BoardNodeView({
       return (
         <div className="board-bar">
           <div className="control-label">
-            <span>{name}</span>
+            <span>
+              <FormulaText>{name}</FormulaText>
+            </span>
             <output>
-              {display(ctx, id)} {unit}
+              {display(ctx, id)} <FormulaText>{unit}</FormulaText>
             </output>
           </div>
           <div
@@ -270,7 +303,9 @@ export function BoardNodeView({
               return <span key={n} className={lit ? "lit" : undefined} />;
             })}
           </div>
-          <figcaption>{caption}</figcaption>
+          <figcaption>
+            <FormulaText>{caption}</FormulaText>
+          </figcaption>
         </figure>
       );
     }
@@ -311,11 +346,13 @@ export function BoardNodeView({
             )}
           </svg>
           <figcaption>
-            {caption}
+            <FormulaText>{caption}</FormulaText>
             {points.length > 1 && (
               <span>
-                {xs.label}: {s.min}–{s.max} {xs.unit} · {ys.label}:{" "}
-                {display(ctx, y)} {ys.unit}
+                <FormulaText>{xs.label}</FormulaText>: {s.min}–{s.max}{" "}
+                <FormulaText>{xs.unit}</FormulaText> ·{" "}
+                <FormulaText>{ys.label}</FormulaText>: {display(ctx, y)}{" "}
+                <FormulaText>{ys.unit}</FormulaText>
               </span>
             )}
           </figcaption>
@@ -342,8 +379,12 @@ export function BoardNodeView({
           {order.map((id, index) => (
             <li key={id} data-reorder-item={id} data-reorder-index={index}>
               <span>
-                <strong>{item(id)?.label}</strong>
-                <small>{item(id)?.detail}</small>
+                <strong>
+                  <FormulaText>{item(id)?.label}</FormulaText>
+                </strong>
+                <small>
+                  <FormulaText>{item(id)?.detail}</FormulaText>
+                </small>
               </span>
               <BoardReorderControls
                 itemId={id}
@@ -366,20 +407,28 @@ export function BoardNodeView({
       return (
         <div className="classification-items">
           {text(props.label) && (
-            <p className="board-text">{text(props.label)}</p>
+            <p className="board-text">
+              <FormulaText>{text(props.label)}</FormulaText>
+            </p>
           )}
           <div className="classification-groups">
             {groups.map((group) => (
               <span key={group}>
-                {group} (
+                <FormulaText>{group}</FormulaText> (
                 {Object.values(assigned).filter((g) => g === group).length})
               </span>
             ))}
           </div>
           {node.items.map((item) => (
             <div key={item.id}>
-              <label htmlFor={`${fieldId}-${item.id}`}>{item.label}</label>
-              {item.detail && <p>{item.detail}</p>}
+              <label htmlFor={`${fieldId}-${item.id}`}>
+                <FormulaText>{item.label}</FormulaText>
+              </label>
+              {item.detail && (
+                <p>
+                  <FormulaText>{item.detail}</FormulaText>
+                </p>
+              )}
               <CustomSelect
                 id={`${fieldId}-${item.id}`}
                 label={item.label}
@@ -405,7 +454,9 @@ export function BoardNodeView({
       return (
         <div className="comparison-items" aria-label={text(props.label)}>
           {text(props.label) && (
-            <p className="board-text">{text(props.label)}</p>
+            <p className="board-text">
+              <FormulaText>{text(props.label)}</FormulaText>
+            </p>
           )}
           {node.items.map((item) => (
             <button
@@ -416,9 +467,15 @@ export function BoardNodeView({
               disabled={ctx.disabled}
               onClick={() => ctx.setComposite(node.id, item.id)}
             >
-              <strong>{item.label}</strong>
+              <strong>
+                <FormulaText>{item.label}</FormulaText>
+              </strong>
               {selected === item.id && <Check size={18} aria-hidden="true" />}
-              {item.detail && <p>{item.detail}</p>}
+              {item.detail && (
+                <p>
+                  <FormulaText>{item.detail}</FormulaText>
+                </p>
+              )}
             </button>
           ))}
         </div>

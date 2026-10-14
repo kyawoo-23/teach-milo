@@ -1,9 +1,11 @@
 "use client";
+import { MarkdownEditor } from "./markdown-editor";
 import {
   useCallback,
   useId,
   type SetStateAction,
   type InputHTMLAttributes,
+  type TextareaHTMLAttributes,
 } from "react";
 import {
   Controller,
@@ -92,10 +94,15 @@ export function useSchemaForm<T extends FieldValues>(
                   ?.querySelector<HTMLButtonElement>('[role="combobox"]')
                   ?.focus();
               } else {
-                control.focus();
+                const rich = control
+                  .closest(".md-editor")
+                  ?.querySelector<HTMLElement>(".md-rich");
+                (rich ?? control).focus();
               }
               if (
                 document.activeElement === control ||
+                control.closest(".md-editor")?.querySelector(".md-rich") ===
+                  document.activeElement ||
                 control
                   .closest(".custom-select")
                   ?.contains(document.activeElement)
@@ -135,7 +142,7 @@ export function BoardTextField({
   multiline = false,
   rows,
   ...props
-}: Omit<InputHTMLAttributes<HTMLInputElement>, "value" | "onChange"> & {
+}: Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange"> & {
   value: string;
   onChange: (value: string) => void;
   multiline?: boolean;
@@ -156,37 +163,37 @@ export function BoardTextField({
       control={form.control}
       name="value"
       render={({ field, fieldState }) => {
-        const shared = {
-          id,
-          name: id,
-          value: field.value,
-          onBlur: field.onBlur,
-          maxLength,
-          disabled: props.disabled,
-          "aria-invalid": !!fieldState.error,
-          "aria-describedby": fieldState.error
-            ? `${id}-error`
-            : props["aria-describedby"],
-          onChange: (
-            event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-          ) => {
-            field.onChange(event);
-            onChange(event.target.value);
-          },
-        };
         return (
           <>
-            {multiline ? (
-              <textarea
-                rows={rows}
-                aria-label={props["aria-label"]}
-                className={props.className}
-                ref={field.ref}
-                {...shared}
-              />
-            ) : (
-              <input {...props} ref={field.ref} {...shared} />
-            )}
+            <MarkdownEditor
+              {...props}
+              id={id}
+              compact
+              submitOnEnter={!multiline}
+              rows={rows ?? (multiline ? 3 : 1)}
+              value={field.value}
+              name={id}
+              onBlur={(event) => {
+                field.onBlur();
+                props.onBlur?.(event);
+              }}
+              inputRef={field.ref}
+              maxLength={maxLength}
+              disabled={props.disabled}
+              placeholder={props.placeholder}
+              className={props.className}
+              autoFocus={props.autoFocus}
+              autoComplete={props.autoComplete}
+              aria-label={props["aria-label"]}
+              invalid={!!fieldState.error}
+              describedBy={
+                fieldState.error ? `${id}-error` : props["aria-describedby"]
+              }
+              onChange={(value) => {
+                field.onChange(value);
+                onChange(value);
+              }}
+            />
             <FieldError id={id} message={fieldState.error?.message} />
           </>
         );

@@ -1,4 +1,6 @@
 "use client";
+import { FormulaText, FormulaBlock } from "./formula-text";
+import { MarkdownEditor } from "./markdown-editor";
 
 import { useI18n } from "@/components/locale-context";
 import { useConfirmation } from "./confirmation";
@@ -539,7 +541,9 @@ export function SessionExperience({ id }: { id: string }) {
         <div className="session-header-inner">
           <Brand />
           <div className="session-topic">
-            {session?.lesson.title || t("Your classroom")}
+            <FormulaText>
+              {session?.lesson.title || t("Your classroom")}
+            </FormulaText>
             <span>
               {session?.phase === "transfer"
                 ? t("Independent check")
@@ -564,12 +568,12 @@ export function SessionExperience({ id }: { id: string }) {
             {user && (
               <button
                 type="button"
-                className="quiet-button session-history-button"
+                className="header-nav-button"
                 onClick={openSessionModal}
-                title={t("My Sessions")}
+                title={t("View saved learning sessions")}
                 aria-label={t("My Sessions")}
               >
-                <History size={15} />
+                <History size={16} />
                 <span className="button-text">{t("My Sessions")}</span>
               </button>
             )}
@@ -633,7 +637,7 @@ export function SessionExperience({ id }: { id: string }) {
               className="transfer-question"
               lang={lessonLanguage(session.lesson.teachingLanguage)}
             >
-              {session.transferQuestion}
+              <FormulaBlock>{session.transferQuestion}</FormulaBlock>
             </div>
             <form
               noValidate
@@ -663,8 +667,10 @@ export function SessionExperience({ id }: { id: string }) {
                       key={field.id}
                       lang={lessonLanguage(session.lesson.teachingLanguage)}
                     >
-                      {field.label}
-                      {field.unit ? ` (${field.unit})` : ""}
+                      <FormulaText>{field.label}</FormulaText>
+                      <FormulaText>
+                        {field.unit ? ` (${field.unit})` : ""}
+                      </FormulaText>
                       <input
                         className="text-input"
                         type="number"
@@ -690,14 +696,28 @@ export function SessionExperience({ id }: { id: string }) {
                   ))}
                 </div>
               )}
-              <label className="field-label" htmlFor="transfer-answer">
+              <label
+                className="field-label"
+                id="transfer-answer-label"
+                onClick={() =>
+                  document.getElementById("transfer-answer")?.focus()
+                }
+              >
                 {t("Explain your thinking")}
               </label>
-              <textarea
+              <MarkdownEditor
+                compact
+                bar={false}
+                selectionToolbar
+                aria-labelledby="transfer-answer-label"
+                value={answer}
+                onChange={setAnswer}
+                name={transferForm.register("answer").name}
+                onBlur={transferForm.register("answer").onBlur}
+                inputRef={transferForm.register("answer").ref}
                 id="transfer-answer"
                 rows={7}
                 maxLength={4000}
-                {...transferForm.register("answer")}
                 {...transferForm.a11y("answer", "transfer-answer")}
                 required
                 placeholder={t("Here’s what I think happens, and why…")}
@@ -834,7 +854,9 @@ export function SessionExperience({ id }: { id: string }) {
                   <span>
                     {p.status === "supported" ? <Check size={12} /> : i + 1}
                   </span>
-                  <p>{p.label}</p>
+                  <p>
+                    <FormulaText>{p.label}</FormulaText>
+                  </p>
                 </div>
               ))}
             </div>
@@ -1047,13 +1069,18 @@ export function SessionExperience({ id }: { id: string }) {
                     <BoardPreview snapshot={board} definition={session.board} />
                   </div>
                 )}
-                <label className="visually-hidden" htmlFor="explanation">
+                <label id="explanation-label" className="visually-hidden">
                   {t("Your explanation to Milo")}
                 </label>
-                <textarea
-                  {...explanationForm.register("text")}
+                <MarkdownEditor
+                  compact
+                  bar={false}
+                  selectionToolbar
+                  aria-labelledby="explanation-label"
+                  value={text}
+                  name={explanationForm.register("text").name}
                   {...explanationForm.a11y("text", "explanation")}
-                  ref={(node) => {
+                  inputRef={(node) => {
                     composer.current = node;
                     explanationForm.register("text").ref(node);
                   }}
@@ -1061,13 +1088,11 @@ export function SessionExperience({ id }: { id: string }) {
                   rows={2}
                   maxLength={2000}
                   disabled={unavailable}
-                  onChange={(e) => {
-                    setText(e.target.value);
-                    setListening(e.target.value.trim().length > 0);
+                  onChange={(value) => {
+                    setText(value);
+                    setListening(value.trim().length > 0);
                   }}
-                  onFocus={(e) =>
-                    setListening(e.currentTarget.value.trim().length > 0)
-                  }
+                  onFocus={() => setListening(text.trim().length > 0)}
                   onBlur={(event) => {
                     setListening(false);
                     void explanationForm.register("text").onBlur(event);
@@ -1080,7 +1105,7 @@ export function SessionExperience({ id }: { id: string }) {
                       !e.nativeEvent.isComposing
                     ) {
                       e.preventDefault();
-                      e.currentTarget.form?.requestSubmit();
+                      e.currentTarget.closest("form")?.requestSubmit();
                     }
                   }}
                 />

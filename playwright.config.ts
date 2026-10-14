@@ -26,6 +26,20 @@ export default defineConfig({
       name: "mobile",
       use: { ...devices["iPhone 13"], defaultBrowserType: "chromium" },
     },
+    ...(process.env.FORMULA_CROSS_BROWSER === "1"
+      ? [
+          {
+            name: "formula-firefox",
+            testMatch: "formulas.spec.ts",
+            use: { ...devices["Desktop Firefox"] },
+          },
+          {
+            name: "formula-webkit",
+            testMatch: "formulas.spec.ts",
+            use: { ...devices["Desktop Safari"] },
+          },
+        ]
+      : []),
   ],
   webServer: {
     command: "pnpm dev",
