@@ -22,6 +22,7 @@ for (const collection of [
   "usage",
   "events",
   "user_sessions",
+  "passkey_challenges",
 ]) {
   let deleted = 0;
   while (true) {

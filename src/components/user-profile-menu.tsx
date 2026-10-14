@@ -31,6 +31,7 @@ export function UserProfileMenu({
   const [dropdownStyle, setDropdownStyle] = useState<CSSProperties>({});
   const profileRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const settingsTriggerRef = useRef<HTMLButtonElement>(null);
   const compact = variant === "session";
 
   useEffect(() => {
@@ -161,10 +162,13 @@ export function UserProfileMenu({
             <span className="user-profile-dropdown-email">{user.email}</span>
           </div>
           <div className="user-profile-dropdown-section">
-            <span className="user-profile-dropdown-section-label">{t("Theme")}</span>
+            <span className="user-profile-dropdown-section-label">
+              {t("Theme")}
+            </span>
             <ThemeInlinePicker />
           </div>
           <button
+            ref={settingsTriggerRef}
             type="button"
             role="menuitem"
             className="user-profile-dropdown-item"
@@ -200,7 +204,13 @@ export function UserProfileMenu({
         </div>
       )}
       {settingsOpen && (
-        <AccountSettings user={user} onClose={() => setSettingsOpen(false)} />
+        <AccountSettings
+          user={user}
+          onClose={() => {
+            setSettingsOpen(false);
+            requestAnimationFrame(() => settingsTriggerRef.current?.focus());
+          }}
+        />
       )}
     </div>
   );
