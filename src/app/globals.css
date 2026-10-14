@@ -3649,6 +3649,9 @@ input[type="range"] {
     max-width: 640px;
     gap: 32px;
   }
+  .home-faq {
+    margin-top: 48px;
+  }
   .home-intro h1 {
     font-size: clamp(2rem, 1.25rem + 4vw, 3rem);
   }
@@ -4588,6 +4591,12 @@ input[type="range"] {
 }
 
 /* Auth Modal */
+.modal-body:has(> .auth-modal-content),
+.account-settings-modal .modal-body {
+  /* Keep the shared 3px outline + 4px offset inside the scroll area. */
+  padding: 8px;
+  margin: -8px;
+}
 .account-settings-content {
   display: grid;
   gap: 24px;
@@ -4610,6 +4619,91 @@ input[type="range"] {
 }
 .account-settings-content .auth-tab {
   min-height: 44px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.passkey-settings {
+  display: grid;
+  gap: 16px;
+}
+.passkey-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.passkey-row {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.passkey-details {
+  flex: 1;
+  min-width: 0;
+}
+.passkey-symbol {
+  flex-shrink: 0;
+  margin-top: 13px;
+  color: var(--muted);
+}
+.passkey-heading,
+.passkey-rename {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-bottom: 4px;
+}
+.passkey-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.passkey-row .icon-button {
+  flex-shrink: 0;
+}
+.passkey-rename input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 16px;
+}
+.passkey-rename input:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 2px;
+}
+@media (max-width: 480px) {
+  .passkey-rename {
+    display: grid;
+    grid-template-columns: 1fr 44px 44px;
+  }
+  .passkey-rename input {
+    grid-column: 1 / -1;
+  }
+  .passkey-rename button[type="submit"] {
+    grid-column: 2;
+  }
+}
+.passkey-remove-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+.passkey-remove-confirm p {
+  flex-basis: 100%;
 }
 .account-settings-content .auth-tab:focus-visible,
 .account-settings-content [role="tabpanel"]:focus-visible {
@@ -4619,6 +4713,9 @@ input[type="range"] {
 .account-settings-content .input-with-icon input {
   padding: 12px 14px;
   font-size: 16px;
+}
+.account-settings-content .input-with-icon .password-input {
+  padding-right: 52px;
 }
 .account-settings-content input[readonly] {
   background: var(--surface);
@@ -4637,6 +4734,35 @@ input[type="range"] {
 }
 .account-settings-status:empty {
   display: none;
+}
+.notification-toast {
+  position: fixed;
+  inset: auto 16px calc(20px + env(safe-area-inset-bottom)) auto;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: min(420px, calc(100vw - 32px));
+  margin: 0;
+  padding: 8px 10px 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 6px 24px light-dark(#24263d1a, #00000040);
+}
+.notification-toast > svg {
+  flex-shrink: 0;
+  color: var(--purple);
+}
+.notification-toast p {
+  margin: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.notification-toast .icon-button {
+  flex-shrink: 0;
 }
 .auth-modal-content {
   padding: 10px 0 0;
@@ -4758,14 +4884,6 @@ input[type="range"] {
   background: var(--surface);
   font-size: 14px;
   color: var(--ink);
-  outline: none;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
-}
-.input-with-icon input:focus {
-  border-color: var(--purple);
-  box-shadow: 0 0 0 3px light-dark(rgba(101, 93, 204, 0.15), #a1a1fe26);
 }
 .input-with-icon .password-input {
   padding-right: 52px;
@@ -5924,10 +6042,6 @@ select[aria-invalid="true"],
   border-color: light-dark(#a82e43, #fe969e);
   outline-color: light-dark(#a82e43, #fe969e);
 }
-.input-with-icon input[aria-invalid="true"]:focus {
-  border-color: light-dark(#a82e43, #fe969e);
-  box-shadow: 0 0 0 3px light-dark(#a82e4326, #fe969e26);
-}
 .dropzone:has(input[aria-invalid="true"]) {
   border-color: light-dark(#a82e43, #fe969e);
 }
@@ -6148,6 +6262,10 @@ textarea.md-rich-source {
   list-style: none;
   font-size: 15px;
   font-weight: 600;
+  transition: color 0.2s ease;
+}
+.home-faq-item[open] summary {
+  color: light-dark(#3d3a52, #e8e6f4);
 }
 .home-faq-item summary::-webkit-details-marker {
   display: none;
@@ -6155,15 +6273,80 @@ textarea.md-rich-source {
 .home-faq-item summary svg {
   flex-shrink: 0;
   color: var(--muted);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .home-faq-item[open] summary svg {
   transform: rotate(180deg);
 }
-.home-faq-item p {
+.home-faq-answer {
+  overflow: hidden;
+  interpolate-size: allow-keywords;
+}
+.home-faq-answer p {
   margin: 0;
   padding-bottom: 20px;
   color: var(--muted);
   font-size: 14px;
   line-height: 1.75;
   overflow-wrap: anywhere;
+  opacity: 0;
+  transform: translate3d(0, -4px, 0);
+  transition:
+    opacity 0.28s ease,
+    transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.home-faq-item[open] .home-faq-answer p {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+@supports (selector(::details-content)) {
+  .home-faq-item::details-content {
+    block-size: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition:
+      block-size 0.34s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.26s ease,
+      content-visibility 0.34s allow-discrete;
+    transition-behavior: allow-discrete;
+    content-visibility: hidden;
+    interpolate-size: allow-keywords;
+  }
+  .home-faq-item[open]::details-content {
+    block-size: auto;
+    opacity: 1;
+    content-visibility: visible;
+  }
+  .home-faq-answer p {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+@supports not (selector(::details-content)) {
+  .home-faq-answer {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.34s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .home-faq-item[open] .home-faq-answer {
+    grid-template-rows: 1fr;
+  }
+  .home-faq-answer p {
+    min-height: 0;
+    overflow: hidden;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-faq-item summary,
+  .home-faq-item summary svg,
+  .home-faq-answer,
+  .home-faq-answer p,
+  .home-faq-item::details-content {
+    transition: none;
+  }
+  .home-faq-answer p {
+    opacity: 1;
+    transform: none;
+  }
 }
