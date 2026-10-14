@@ -334,6 +334,19 @@ describe("bounded material extraction", () => {
       "filters reuse",
     );
   });
+  it("preserves textual LaTeX and warns when a DOCX contains native equations", async () => {
+    const latex = String.raw`A worked example uses $\frac{1}{2}$ and explains the division in detail.`;
+    const bytes = zip({
+      "[Content_Types].xml":
+        '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>',
+      "word/document.xml": `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:body><w:p><w:r><w:t>${latex}</w:t></w:r><m:oMath><m:r><m:t>x</m:t></m:r></m:oMath></w:p></w:body></w:document>`,
+    });
+    const result = await extractInWorker(bytes, "docx");
+    expect(result.sources[0].text).toContain(latex);
+    expect(result.sources[0].warnings).toEqual([
+      "Native equations in this DOCX were not extracted. Add them as LaTeX during review, or upload a PDF.",
+    ]);
+  });
   it("rejects damaged and suspicious archives", async () => {
     await expect(
       extractInWorker(Buffer.from("not a zip"), "docx"),

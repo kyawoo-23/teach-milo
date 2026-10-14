@@ -1,4 +1,5 @@
 "use client";
+import { FormulaText } from "./formula-text";
 
 import { formatDate, type Locale } from "@/lib/i18n/locales";
 import { useI18n } from "@/components/locale-context";
@@ -281,7 +282,7 @@ export function SessionHistoryModal() {
                 href={href}
                 onClick={closeSessionModal}
               >
-                {title}
+                <FormulaText>{title}</FormulaText>
               </Link>
             </Heading>
             <div className="session-card-summary">
@@ -329,7 +330,11 @@ export function SessionHistoryModal() {
               <LevelIcon level={item.level} size={14} />
               {localizeText(item.level)}
             </span>
-            {item.scope && <p className="session-card-scope">{item.scope}</p>}
+            {item.scope && (
+              <p className="session-card-scope">
+                <FormulaText>{item.scope}</FormulaText>
+              </p>
+            )}
             <div className="session-card-more-footer">
               <div className="session-meta">
                 {item.progress.length > 0 && (

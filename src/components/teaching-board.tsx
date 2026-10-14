@@ -1,4 +1,5 @@
 "use client";
+import { FormulaText } from "./formula-text";
 
 import { lessonLanguage, type TeachingLanguage } from "@/lib/i18n/locales";
 import { CustomSelect } from "./custom-select";
@@ -95,7 +96,7 @@ export function TeachingBoard({
           <strong>{t("Teaching board")}</strong>
           <button type="button" onClick={onExpand}>
             <Maximize2 size={16} aria-hidden="true" />
-            {t("Expand board")}
+            {t("Expand")}
           </button>
         </div>
       )}
@@ -138,8 +139,12 @@ export function TeachingBoard({
               className="suggested-heading"
               lang={lessonLanguage(teachingLanguage)}
             >
-              <h3>{board.title}</h3>
-              <p>{board.instruction}</p>
+              <h3>
+                <FormulaText>{board.title}</FormulaText>
+              </h3>
+              <p>
+                <FormulaText>{board.instruction}</FormulaText>
+              </p>
             </div>
           )}
           {state.kind === "sketch" && (
@@ -200,7 +205,7 @@ export function TeachingBoard({
                       inputs: {},
                       state: structuredClone(state),
                       ...(state.kind === "sketch"
-                        ? { png: sketchPng(state) }
+                        ? { png: await sketchPng(state) }
                         : {}),
                     };
                     validateWorkspaceSubmission(snapshot);

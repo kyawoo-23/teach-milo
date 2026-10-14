@@ -67,16 +67,35 @@ describe("board catalog", () => {
       ]),
     );
     expect(compiled.fatal).toBe(false);
-    expect(compiled.board.nodes.map((n) => n.id)).toEqual(["main", "slider"]);
+    expect(compiled.board.nodes.map((n) => n.id)).toEqual([
+      "main",
+      "slider",
+      "text",
+    ]);
     expect(compiled.board.nodes[1].props).toEqual([
       { key: "bind", value: "speed" },
     ]);
     expect(compiled.diagnostics.join("\n")).toMatch(/unknown prop colour/);
-    expect(compiled.diagnostics.join("\n")).toMatch(/unknown component Chart3D/);
+    expect(compiled.diagnostics.join("\n")).toMatch(
+      /unknown component Chart3D/,
+    );
     expect(compiled.diagnostics.join("\n")).toMatch(/child: parent bad/);
     expect(compiled.diagnostics.join("\n")).toMatch(/Metric requires value/);
     expect(compiled.diagnostics.join("\n")).toMatch(/Toggle requires bind/);
-    expect(compiled.diagnostics.join("\n")).toMatch(/Text requires text/);
+    expect(
+      compiled.tree[0].children.find((n) => n.id === "text")?.props.text,
+    ).toBe("Speed is {speed} and {nope}");
+  });
+  it("keeps formula braces and code in board text during compilation", () => {
+    const text = String.raw`Speed {speed}: $\frac{x}{2}$ and \(\sqrt{x}\).`;
+    const compiled = compileBoard(
+      withNodes([
+        node("text", "Text", { text }),
+        node("slider", "Slider", { bind: "speed" }),
+      ]),
+    );
+    expect(compiled.diagnostics).toEqual([]);
+    expect(compiled.tree[0].children[0].props.text).toBe(text);
   });
   it("enforces nesting depth, cycles and children only in layouts", () => {
     const compiled = compileBoard(
@@ -212,9 +231,11 @@ describe("server calculation", () => {
   });
   it("rejects invalid code before running it and non-finite results", async () => {
     await expect(
-      runCalculation("function calculate(inputs) { while (true) {} }", { x: 1 }, [
-        "y",
-      ]),
+      runCalculation(
+        "function calculate(inputs) { while (true) {} }",
+        { x: 1 },
+        ["y"],
+      ),
     ).rejects.toThrow();
     await expect(
       runCalculation(
@@ -253,9 +274,12 @@ describe("server calculation", () => {
     ).toBe(false);
   });
   it("keeps a numeric key only when its calculation reproduces it", async () => {
-    await expect(verifyNumericTransfer(numericFixture())).resolves.toMatchObject(
-      { outcome: "verified", numeric: { fields: [{ expected: 150 }] } },
-    );
+    await expect(
+      verifyNumericTransfer(numericFixture()),
+    ).resolves.toMatchObject({
+      outcome: "verified",
+      numeric: { fields: [{ expected: 150 }] },
+    });
     const wrong = numericFixture();
     wrong.fields[0].expected = 160;
     await expect(verifyNumericTransfer(wrong)).resolves.toEqual({

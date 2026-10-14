@@ -97,6 +97,14 @@ export function ConceptMap({ state, onChange, disabled }: MapProps) {
       const target = event.target;
       if (!(target instanceof Node)) return;
       if (selectionControls.current?.contains(target)) return;
+      // Controls can resize/recentre an expanded board when selection clears.
+      // Keep them in place through pointerup/click so their action can activate.
+      if (
+        target instanceof Element &&
+        target.closest("button, input, textarea, select, [role='combobox']") &&
+        scene.current?.closest(".board-workspace")?.contains(target)
+      )
+        return;
       if (
         target instanceof Element &&
         (target.closest("[data-concept-context-menu]") ||
@@ -386,40 +394,44 @@ export function ConceptMap({ state, onChange, disabled }: MapProps) {
   };
   return (
     <div className={`concept-map-editor ${styles.editor}`}>
-      <p className="tool-hint">
-        {t(
-          "Select a concept to move or edit it. Right-click for more actions. Click outside to deselect.",
-        )}
-      </p>
-      <div
-        className="sketch-toolbar"
-        role="group"
-        aria-label={t("Concept map actions")}
-      >
-        <div className="sketch-tool-group">
-          <button
-            ref={addButton}
-            type="button"
-            title={t("Add concept")}
-            aria-label={t("Add concept")}
-            disabled={disabled || state.nodes.length >= 10}
-            onClick={(event) => open({ kind: "concept" }, event.currentTarget)}
-          >
-            <Plus size={TOOLBAR_ICON_SIZE} aria-hidden="true" />
-            <span className="visually-hidden">{t("Add concept")}</span>
-          </button>
-          <button
-            type="button"
-            title={t("Add relationship")}
-            aria-label={t("Add relationship")}
-            disabled={disabled || !canConnect}
-            onClick={(event) =>
-              open({ kind: "relationship" }, event.currentTarget)
-            }
-          >
-            <Link2 size={TOOLBAR_ICON_SIZE} aria-hidden="true" />
-            <span className="visually-hidden">{t("Add relationship")}</span>
-          </button>
+      <div className="matching-toolbar">
+        <p className="tool-hint">
+          {t(
+            "Select a concept to move or edit it. Right-click for more actions. Click outside to deselect.",
+          )}
+        </p>
+        <div
+          className="sketch-toolbar"
+          role="group"
+          aria-label={t("Concept map actions")}
+        >
+          <div className="sketch-tool-group">
+            <button
+              ref={addButton}
+              type="button"
+              title={t("Add concept")}
+              aria-label={t("Add concept")}
+              disabled={disabled || state.nodes.length >= 10}
+              onClick={(event) =>
+                open({ kind: "concept" }, event.currentTarget)
+              }
+            >
+              <Plus size={TOOLBAR_ICON_SIZE} aria-hidden="true" />
+              <span className="visually-hidden">{t("Add concept")}</span>
+            </button>
+            <button
+              type="button"
+              title={t("Add relationship")}
+              aria-label={t("Add relationship")}
+              disabled={disabled || !canConnect}
+              onClick={(event) =>
+                open({ kind: "relationship" }, event.currentTarget)
+              }
+            >
+              <Link2 size={TOOLBAR_ICON_SIZE} aria-hidden="true" />
+              <span className="visually-hidden">{t("Add relationship")}</span>
+            </button>
+          </div>
         </div>
       </div>
       <div
@@ -608,10 +620,7 @@ export function ConceptMap({ state, onChange, disabled }: MapProps) {
         )}
       </div>
       {selectedNode && (
-        <fieldset
-          ref={selectionControls}
-          className="board-object-inspector"
-        >
+        <fieldset ref={selectionControls} className="board-object-inspector">
           <legend className="visually-hidden">{t("Selected concept")}</legend>
           <label className="tool-field">
             {t("Selected concept")}
@@ -668,7 +677,14 @@ export function ConceptMap({ state, onChange, disabled }: MapProps) {
                     title={t(label)}
                     disabled={
                       disabled ||
-                      (point.x === selectedNode.x && point.y === selectedNode.y)
+                      (Math.abs(point.x - selectedNode.x) *
+                        ((scene.current?.clientWidth ?? CANVAS_WIDTH) /
+                          CANVAS_WIDTH) <
+                        0.5 &&
+                        Math.abs(point.y - selectedNode.y) *
+                          ((scene.current?.clientHeight ?? CANVAS_HEIGHT) /
+                            CANVAS_HEIGHT) <
+                          0.5)
                     }
                     aria-label={t(label)}
                     onClick={() => move(selectedNode.id, point)}
@@ -806,9 +822,7 @@ function ContextMenuItems({
         <button
           type="button"
           role="menuitem"
-          disabled={
-            disabled || !conceptHasOpenPair(target.id, nodes, links)
-          }
+          disabled={disabled || !conceptHasOpenPair(target.id, nodes, links)}
           onClick={() => onAddRelationship(target.id)}
         >
           {t("Add relationship")}
@@ -919,7 +933,9 @@ function MapContextMenu({
             '[role="menuitem"]:not(:disabled)',
           ),
         ];
-        const index = items.indexOf(document.activeElement as HTMLButtonElement);
+        const index = items.indexOf(
+          document.activeElement as HTMLButtonElement,
+        );
         const next =
           event.key === "ArrowDown"
             ? (index + 1) % items.length
@@ -1005,6 +1021,7 @@ function ConceptPopup({
   const node = state.nodes.find((node) => node.id === nodeId);
   const form = useSchemaForm(ConceptFormSchema, { name: node?.label ?? "" });
   const field = form.register("name");
+  const [name, setName] = form.state("name");
   const firstInput = useRef<HTMLInputElement>(null);
   const position =
     at ??
@@ -1048,8 +1065,12 @@ function ConceptPopup({
               {t(node ? "Concept" : "New concept")}
             </label>
             <input
+              type="text"
+              value={name}
+              onChange={(event) => setName(event.currentTarget.value)}
+              name={field.name}
+              onBlur={field.onBlur}
               id={`${id}-name`}
-              {...field}
               {...form.a11y("name", `${id}-name`)}
               ref={(element) => {
                 field.ref(element);
@@ -1162,6 +1183,7 @@ function RelationshipPopup({
     },
   );
   const [from] = form.state("from");
+  const [relation, setRelation] = form.state("relation");
   const firstInput = useRef<HTMLButtonElement>(null);
   const formId = `${id}-relationship`;
   return (
@@ -1272,12 +1294,18 @@ function RelationshipPopup({
           <div className={styles.field}>
             <label htmlFor={`${id}-relation`}>{t("Relationship")}</label>
             <input
+              type="text"
+              value={relation}
+              onChange={(event) => setRelation(event.currentTarget.value)}
+              name={form.register("relation").name}
+              onBlur={form.register("relation").onBlur}
+              ref={form.register("relation").ref}
               id={`${id}-relation`}
-              {...form.register("relation")}
               {...form.a11y("relation", `${id}-relation`)}
               maxLength={300}
               disabled={disabled}
               enterKeyHint="done"
+              autoComplete="off"
             />
             <FieldError
               id={`${id}-relation`}
