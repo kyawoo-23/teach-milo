@@ -111,6 +111,14 @@ TTL policies cover parent records and message/operation subcollections because d
 
 Large source, lesson, evidence, report, board, and pending-operation payloads are exempt from indexing because the app does not query those fields. Ownership, email, message-sequence, and cleanup expiry indexes remain available.
 
+### Content Security Policy
+
+`next.config.ts` sends an enforced starter `Content-Security-Policy` on all routes. Resources default to the app's own origin; plugins, base tags, external form submissions, and embedding the app are blocked. HTTPS images remain allowed for Google avatars and Markdown content. Fonts and browser API requests stay same-origin; Gemini, Firestore, and Google OAuth token requests run on the server and need no browser allowlist.
+
+Inline scripts remain allowed for Next.js hydration, and inline styles for React and KaTeX. This is a compatibility baseline, not a strict XSS policy. Development additionally permits `unsafe-eval` and WebSocket scheme sources for Next.js debugging and hot reload; these exceptions are omitted in production. The board calculator's `srcdoc` frame inherits the page policy, so blob workers are allowed; its existing inner policy still denies network access.
+
+For stricter script protection, first adapt the calculator and Next.js rendering to per-request nonces or script hashes, then validate a candidate policy in report-only mode before enforcing it. Trusted Types also requires checking React/KaTeX HTML sinks first. CSP changes take effect after restarting development or rebuilding production. Browser regression coverage lives in `tests/browser/csp.spec.ts`, alongside the board and formula fixtures.
+
 ## Cloud Run preparation
 
 The Dockerfile builds Next's standalone server and includes the extraction worker's production dependencies. This environment uses Webpack because Turbopack's CSS subprocess requires local port permissions unavailable in the task sandbox.
