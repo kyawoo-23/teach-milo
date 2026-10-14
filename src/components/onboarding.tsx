@@ -1,4 +1,5 @@
 "use client";
+import { FormulaText } from "./formula-text";
 
 import { useI18n } from "@/components/locale-context";
 import { Controller } from "react-hook-form";
@@ -510,12 +511,20 @@ export function Onboarding() {
                     inert={mode !== "paste" ? true : undefined}
                   >
                     <div className="paste-field">
-                      <label htmlFor="notes" className="visually-hidden">
+                      <label id="notes-label" className="visually-hidden">
                         {t("Your learning notes")}
                       </label>
-                      <textarea
+                      <MarkdownEditor
+                        compact
+                        bar={false}
+                        selectionToolbar
+                        value={notes}
+                        onChange={setNotes}
+                        name={materialForm.register("notes").name}
+                        onBlur={materialForm.register("notes").onBlur}
+                        inputRef={materialForm.register("notes").ref}
                         id="notes"
-                        {...materialForm.register("notes")}
+                        aria-labelledby="notes-label"
                         {...materialForm.a11y("notes", "notes")}
                         autoComplete="off"
                         minLength={30}
@@ -807,13 +816,13 @@ export function Onboarding() {
                     tabIndex={-1}
                     lang={lessonLanguage(lesson.teachingLanguage)}
                   >
-                    {lesson.title}
+                    <FormulaText>{lesson.title}</FormulaText>
                   </h1>
                   <p
                     className="section-description"
                     lang={lessonLanguage(lesson.teachingLanguage)}
                   >
-                    {lesson.scope}
+                    <FormulaText>{lesson.scope}</FormulaText>
                   </p>
                   <p className="muted">
                     {t("Teaching language: {language}", {
@@ -837,7 +846,7 @@ export function Onboarding() {
                         <span>
                           <Check size={15} />
                         </span>
-                        {o.label}
+                        <FormulaText>{o.label}</FormulaText>
                       </li>
                     ))}
                   </ul>
@@ -854,7 +863,7 @@ export function Onboarding() {
                           key={i}
                           lang={lessonLanguage(lesson.teachingLanguage)}
                         >
-                          {c}
+                          <FormulaText>{c}</FormulaText>
                         </p>
                       ))}
                     </div>

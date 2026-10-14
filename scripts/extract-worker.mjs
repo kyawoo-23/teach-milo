@@ -46,6 +46,7 @@ function reliableText(items, text) {
 
 async function inspectDocx(bytes) {
   const yauzl = require("yauzl");
+  let nativeEquations = false;
   await new Promise((resolve, reject) => {
     yauzl.fromBuffer(
       bytes,
@@ -78,7 +79,10 @@ async function inspectDocx(bytes) {
           zip.openReadStream(entry, (error, stream) => {
             if (error || !stream)
               return fail("This document archive is damaged.");
+            const xml = [];
+            const isWordXml = /^word\/.*\.xml$/.test(entry.fileName);
             stream.on("data", (chunk) => {
+              if (isWordXml) xml.push(chunk);
               inflated += chunk.length;
               if (inflated > 25000000) {
                 stream.destroy();
@@ -88,7 +92,16 @@ async function inspectDocx(bytes) {
               }
             });
             stream.on("error", () => fail("This document archive is damaged."));
-            stream.on("end", () => zip.readEntry());
+            stream.on("end", () => {
+              if (
+                isWordXml &&
+                /<(?:[\w.-]+:)?oMath(?:Para)?(?=[\s/>])/.test(
+                  Buffer.concat(xml).toString("utf8"),
+                )
+              )
+                nativeEquations = true;
+              zip.readEntry();
+            });
           });
         });
         zip.on("end", () =>
@@ -100,6 +113,7 @@ async function inspectDocx(bytes) {
       },
     );
   });
+  return nativeEquations;
 }
 async function extract() {
   const bytes = Buffer.from(workerData.bytes);
@@ -230,8 +244,12 @@ async function extract() {
     }
   }
   let text;
+  const warnings = [];
   if (workerData.extension === "docx") {
-    await inspectDocx(bytes);
+    if (await inspectDocx(bytes))
+      warnings.push(
+        "Native equations in this DOCX were not extracted. Add them as LaTeX during review, or upload a PDF.",
+      );
     const mammoth = require("mammoth");
     const result = await mammoth.extractRawText({ buffer: bytes });
     text = result.value.trim();
@@ -254,7 +272,8 @@ async function extract() {
     );
   if (text.length < 30)
     throw new Error(
-      "This document has too little readable text. Paste at least a short paragraph instead.",
+      warnings[0] ??
+        "This document has too little readable text. Paste at least a short paragraph instead.",
     );
   const paragraphs = text.split(/\n\s*\n/);
   const sources = [];
@@ -265,7 +284,7 @@ async function extract() {
         id: `s${sources.length + 1}`,
         label: `Section ${sources.length + 1}`,
         text: block.trim(),
-        warnings: [],
+        warnings,
       });
       block = "";
     }
@@ -276,7 +295,7 @@ async function extract() {
       id: `s${sources.length + 1}`,
       label: `Section ${sources.length + 1}`,
       text: block.trim(),
-      warnings: [],
+      warnings,
     });
   return { sources, chunks: [] };
 }

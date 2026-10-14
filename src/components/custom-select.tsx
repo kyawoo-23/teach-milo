@@ -1,4 +1,5 @@
 "use client";
+import { FormulaText } from "./formula-text";
 
 import {
   useEffect,
@@ -280,7 +281,7 @@ export function CustomSelect({
           className={`custom-select-value${selected < 0 ? " is-placeholder" : ""}`}
           lang={options[selected]?.lang}
         >
-          {options[selected]?.label ?? placeholder}
+          <FormulaText>{options[selected]?.label ?? placeholder}</FormulaText>
         </span>
         <ChevronDown
           size={15}
@@ -317,7 +318,9 @@ export function CustomSelect({
                       {option.icon}
                     </span>
                   )}
-                  <span>{option.label}</span>
+                  <span>
+                    <FormulaText>{option.label}</FormulaText>
+                  </span>
                 </span>
                 <Check
                   size={16}

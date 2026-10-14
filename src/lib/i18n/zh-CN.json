@@ -462,7 +462,7 @@
   "Concept map": "概念图",
   "Matching pairs": "配对",
   "Comparison table": "对比表",
-  "Expand board": "展开教学板",
+  "Expand": "展开",
   "Attach to explanation": "附加到讲解",
   "Browser saving is unavailable. Keep this page open to preserve your board.": "浏览器无法保存。请保持此页面打开，以保留教学板。",
   "Pen": "画笔",
@@ -650,5 +650,8 @@
   "Click a term, then click its description to connect them.": "点击一个术语，再点击其描述进行连接。",
   "Use one row for each idea or example. Fill in the columns to explain and compare them.": "每一行填写一个想法或例子。在各列中补充说明并进行比较。",
   "Rename or remove columns": "重命名或删除列",
-  "Name a key idea from your lesson": "写下课程中的一个关键想法"
+  "Name a key idea from your lesson": "写下课程中的一个关键想法",
+  "Display formula": "独立公式",
+  "This formula could not be drawn. Retry or edit the label.": "无法绘制此公式。请重试或编辑标签。",
+  "Native equations in this DOCX were not extracted. Add them as LaTeX during review, or upload a PDF.": "此 DOCX 中包含无法提取的原生公式。请在检查时以 LaTeX 补充，或上传 PDF。"
 }

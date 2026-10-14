@@ -1,9 +1,7 @@
 "use client";
-import { CustomSelect } from "./custom-select";
 import { useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown, Pencil, Plus, Trash2 } from "lucide-react";
 import { BoardReorderControls } from "./board-reorder-controls";
-import { BoardTextField } from "./schema-form";
 import { useI18n } from "./locale-context";
 import { type MatchingState, type TableState } from "@/lib/board-tools";
 export { ConceptMap } from "./concept-map-editor";
@@ -31,15 +29,27 @@ export function MatchingBoard({
       refocus.current = "";
     }
   }, [active, id]);
-  const descriptions = [...state.pairs].sort((a, b) => hash(a.id) - hash(b.id));
+  const shuffledDescriptions = [...state.pairs].sort(
+    (a, b) => hash(a.id) - hash(b.id),
+  );
   if (
-    descriptions.length > 1 &&
-    descriptions.every((p, n) => p.id === state.pairs[n].id)
+    shuffledDescriptions.length > 1 &&
+    shuffledDescriptions.every((p, n) => p.id === state.pairs[n].id)
   )
-    descriptions.push(descriptions.shift()!);
+    shuffledDescriptions.push(shuffledDescriptions.shift()!);
+  const descriptionItems = editing ? state.pairs : shuffledDescriptions;
   const numbers = new Map(state.pairs.map((p, n) => [p.id, n + 1]));
+  const filled = (value: string) => value.trim().length > 0;
   const match = (term: string, description: string) => {
-    if (!state.pairs.some((p) => p.id === term)) return;
+    const termPair = state.pairs.find((p) => p.id === term);
+    const descriptionPair = state.pairs.find((p) => p.id === description);
+    if (
+      !termPair ||
+      !descriptionPair ||
+      !filled(termPair.term) ||
+      !filled(descriptionPair.description)
+    )
+      return;
     onChange({
       ...state,
       matches: {
@@ -71,7 +81,12 @@ export function MatchingBoard({
           onKeyDown={(e) => {
             // Enter or Escape finishes editing; Shift+Enter adds a line break.
             if (e.nativeEvent.isComposing) return;
-            if (e.key === "Escape" || (e.key === "Enter" && !e.shiftKey)) {
+            if (
+              e.key === "Escape" ||
+              (e.key === "Enter" &&
+                !e.shiftKey &&
+                e.target instanceof HTMLTextAreaElement)
+            ) {
               e.preventDefault();
               e.stopPropagation();
               refocus.current = key;
@@ -83,22 +98,22 @@ export function MatchingBoard({
               setActive((current) => (current === key ? "" : current));
           }}
         >
-          <BoardTextField
+          <textarea
             id={`${id}-${key}`}
             aria-label={label}
-            multiline
             rows={side === "term" ? 2 : 3}
             maxLength={300}
             disabled={disabled}
             value={p[side]}
-            onChange={(value) =>
+            onChange={(event) => {
+              const value = event.currentTarget.value;
               onChange({
                 ...state,
                 pairs: state.pairs.map((a) =>
                   a.id === p.id ? { ...a, [side]: value } : a,
                 ),
-              })
-            }
+              });
+            }}
           />
         </div>
       );
@@ -243,13 +258,16 @@ export function MatchingBoard({
               <div className="matching-term-row" key={p.id}>
                 <button
                   type="button"
-                  disabled={disabled}
+                  disabled={disabled || !filled(p.term)}
                   className="matching-choice"
                   data-connected={Boolean(state.matches[p.id])}
                   aria-label={p.term || t("Term")}
                   aria-describedby={`${id}-next-step${state.matches[p.id] ? ` ${id}-${p.id}-connection` : ""}`}
                   aria-pressed={selected === p.id}
-                  onClick={() => setSelected(selected === p.id ? "" : p.id)}
+                  onClick={() => {
+                    if (!filled(p.term)) return;
+                    setSelected(selected === p.id ? "" : p.id);
+                  }}
                 >
                   <span className="matching-pair-number" aria-hidden="true">
                     {numbers.get(p.id)}
@@ -283,7 +301,7 @@ export function MatchingBoard({
               {editing ? t("Descriptions") : t("2. Choose its description")}
             </p>
           )}
-          {descriptions.map((p) =>
+          {descriptionItems.map((p) =>
             editing ? (
               <div key={p.id}>{editable(p, "description")}</div>
             ) : (
@@ -294,10 +312,12 @@ export function MatchingBoard({
                 data-match-description={p.id}
                 data-connected={Object.values(state.matches).includes(p.id)}
                 data-ready={Boolean(selected)}
-                disabled={disabled || !selected}
+                disabled={disabled || !selected || !filled(p.description)}
                 aria-label={p.description || t("Description")}
                 aria-describedby={`${id}-next-step${Object.values(state.matches).includes(p.id) ? ` ${id}-${p.id}-matched-term` : ""}`}
-                onClick={() => selected && match(selected, p.id)}
+                onClick={() => {
+                  if (selected && filled(p.description)) match(selected, p.id);
+                }}
               >
                 <span className="matching-pair-number" aria-hidden="true">
                   {numbers.get(
@@ -382,35 +402,43 @@ export function ComparisonTable({
           "Use one row for each idea or example. Fill in the columns to explain and compare them.",
         )}
       </p>
-      <details
-        className="board-column-editor"
-        open={editingColumns}
-        onToggle={(event) => setEditingColumns(event.currentTarget.open)}
-      >
-        <summary>
+      <section className="board-column-editor">
+        <button
+          type="button"
+          className="board-disclosure-toggle"
+          aria-expanded={editingColumns}
+          onClick={() => setEditingColumns((open) => !open)}
+        >
           <ChevronDown size={16} aria-hidden="true" />
           {t("Rename or remove columns")}
-        </summary>
-        <div className="board-column-fields">
+        </button>
+        <div
+          className="board-disclosure-panel"
+          data-collapsed={editingColumns ? "false" : "true"}
+          aria-hidden={!editingColumns}
+        >
+          <div className="board-column-fields">
           {state.columns.map((column, index) => (
             <div className="tool-field" key={index}>
               <label htmlFor={`${tableId}-column-${index}`}>
                 {t("Column {number}", { number: index + 1 })}
               </label>
               <div className="board-column-input">
-                <BoardTextField
+                <input
                   id={`${tableId}-column-${index}`}
+                  type="text"
                   value={column}
                   maxLength={60}
                   disabled={disabled}
-                  onChange={(value) =>
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
                     onChange({
                       ...state,
                       columns: state.columns.map((column, i) =>
                         i === index ? value : column,
                       ),
-                    })
-                  }
+                    });
+                  }}
                 />
                 <button
                   type="button"
@@ -435,8 +463,9 @@ export function ComparisonTable({
               </div>
             </div>
           ))}
+          </div>
         </div>
-      </details>
+      </section>
       <div className="board-table-scroll">
         <table className="board-table" role="table">
           <caption className="visually-hidden">{t("Comparison table")}</caption>
@@ -463,7 +492,7 @@ export function ComparisonTable({
                 role="row"
                 data-reorder-item={r.id}
                 data-reorder-index={n}
-                data-collapsed={collapsedRows.has(r.id)}
+                data-collapsed={collapsedRows.has(r.id) ? "true" : "false"}
               >
                 {r.cells.map((c, i) => (
                   <td key={i} role="cell">
@@ -473,11 +502,12 @@ export function ComparisonTable({
                     </span>
                     <div
                       id={`${tableId}-${r.id}-cell-${i}`}
-                      hidden={collapsedRows.has(r.id)}
+                      className="board-cell-editor"
+                      data-collapsed={collapsedRows.has(r.id) ? "true" : "false"}
+                      aria-hidden={collapsedRows.has(r.id)}
                     >
-                      <BoardTextField
+                      <textarea
                         id={`${tableId}-${r.id}-${i}`}
-                        multiline
                         rows={2}
                         aria-label={t("Row {row}, {column}", {
                           row: n + 1,
@@ -488,7 +518,8 @@ export function ComparisonTable({
                         maxLength={300}
                         disabled={disabled}
                         value={c}
-                        onChange={(value) =>
+                        onChange={(event) => {
+                          const value = event.currentTarget.value;
                           onChange({
                             ...state,
                             rows: state.rows.map((a) =>
@@ -501,8 +532,8 @@ export function ComparisonTable({
                                   }
                                 : a,
                             ),
-                          })
-                        }
+                          });
+                        }}
                       />
                     </div>
                     {collapsedRows.has(r.id) && (
@@ -590,7 +621,8 @@ export function ComparisonTable({
             });
           }}
         >
-          <Plus size={16} aria-hidden="true" /> {t("Add row")}
+          <Plus size={16} aria-hidden="true" />
+          <span className="tool-action-label">{t("Add row")}</span>
         </button>
         <button
           type="button"
@@ -605,7 +637,8 @@ export function ComparisonTable({
             });
           }}
         >
-          <Plus size={16} aria-hidden="true" /> {t("Add column")}
+          <Plus size={16} aria-hidden="true" />
+          <span className="tool-action-label">{t("Add column")}</span>
         </button>
       </div>
       <p className="tool-hint">{t("Up to 10 rows and 5 columns.")}</p>

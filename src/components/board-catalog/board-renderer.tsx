@@ -1,4 +1,5 @@
 "use client";
+import { FormulaText } from "../formula-text";
 import { useId, useMemo, useState } from "react";
 import type { Board, BoardSubmission } from "@/lib/contracts";
 import { compileBoard } from "@/lib/board-catalog";
@@ -86,16 +87,20 @@ export function BoardRenderer({
         <p className="small-label">
           {t("A space to make your thinking visible")}
         </p>
-        <h3 lang={lessonLanguage(teachingLanguage)}>{board.title}</h3>
+        <h3 lang={lessonLanguage(teachingLanguage)}>
+          <FormulaText>{board.title}</FormulaText>
+        </h3>
         <p
           className="board-instruction"
           lang={unavailable ? locale : lessonLanguage(teachingLanguage)}
         >
-          {unavailable
-            ? t(
-                "This visualization isn't available. You can still teach Milo with a written example in the conversation.",
-              )
-            : board.instruction}
+          <FormulaText>
+            {unavailable
+              ? t(
+                  "This visualization isn't available. You can still teach Milo with a written example in the conversation.",
+                )
+              : board.instruction}
+          </FormulaText>
         </p>
         {calculation.enabled && (
           <iframe
@@ -120,7 +125,9 @@ export function BoardRenderer({
           </div>
         )}
         {board.assumptions && (
-          <p className="board-assumptions">{board.assumptions}</p>
+          <p className="board-assumptions">
+            <FormulaText>{board.assumptions}</FormulaText>
+          </p>
         )}
         {error && <ErrorNotice message={error} />}
       </div>

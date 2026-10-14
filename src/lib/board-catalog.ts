@@ -335,8 +335,9 @@ function parseProp(
       return value && value.length <= (spec.max ?? 300) ? value : undefined;
     case "template": {
       if (!value) return;
-      const slots = [...value.matchAll(/\{([^{}]*)\}/g)].map((m) => m[1]);
-      return slots.every(known) ? value : undefined;
+      // Unknown braces and LaTeX groups are literal; runtime interpolation
+      // replaces only actual state/derived identifiers outside math and code.
+      return value;
     }
     case "number": {
       const n = Number(value);

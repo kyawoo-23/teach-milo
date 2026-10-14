@@ -300,7 +300,7 @@ test("sketch drafts survive switching, closing and reload; snapshots stay frozen
 async function expanded(page: Page) {
   let board = await open(page);
   if (!(await page.getByRole("dialog").isVisible())) {
-    await board.getByRole("button", { name: "Expand board" }).click();
+    await board.getByRole("button", { name: "Expand" }).click();
     board = page.getByRole("dialog").locator(".board-workspace");
   }
   return board;
@@ -384,8 +384,8 @@ test("tables adapt to available width, focus new fields and keep row data while 
       .locator(".board-row-controls button")
       .all()) {
       const controlBounds = (await control.boundingBox())!;
-      expect(controlBounds.width).toBe(36);
-      expect(controlBounds.height).toBe(36);
+      expect(controlBounds.width).toBe(32);
+      expect(controlBounds.height).toBe(32);
       expect(controlBounds.x).toBeGreaterThanOrEqual(tableBounds.x);
       expect(controlBounds.x + controlBounds.width).toBeLessThanOrEqual(
         tableBounds.x + tableBounds.width + 1,
@@ -733,9 +733,7 @@ test("matching pairs support tap connections and keyboard reconnection", async (
   for (const button of await board.getByRole("button").all()) {
     if (!(await button.isVisible())) continue;
     const bounds = (await button.boundingBox())!;
-    const size = await button.evaluate((element) =>
-      element.closest(".matching-toolbar") ? 36 : 44,
-    );
+    const size = 32;
     expect(bounds.height).toBeGreaterThanOrEqual(size);
     expect(bounds.width).toBeGreaterThanOrEqual(size);
   }

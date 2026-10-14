@@ -12,7 +12,7 @@ import { createPortal } from "react-dom";
 import { Controller } from "react-hook-form";
 import { CustomSelect } from "./custom-select";
 import { z } from "zod";
-import { BoardTextField, useSchemaForm } from "./schema-form";
+import { useSchemaForm } from "./schema-form";
 import {
   ArrowDown,
   ArrowLeft,
@@ -199,8 +199,7 @@ export function SketchBoard({
           .find((object) =>
             hitSketchObject(object, canvasPoint(event.clientX, event.clientY)),
           );
-    const object =
-      hit ?? state.objects.find((item) => item.id === selected);
+    const object = hit ?? state.objects.find((item) => item.id === selected);
     if (!object) return;
     if (hit) {
       setSelected(hit.id);
@@ -379,12 +378,7 @@ export function SketchBoard({
   };
   const placeTextLabel = () => {
     const text = textLabelDraft.trim();
-    if (
-      !text ||
-      !textLabelDialog ||
-      disabled ||
-      state.objects.length >= 150
-    )
+    if (!text || !textLabelDialog || disabled || state.objects.length >= 150)
       return;
     const objectId = crypto.randomUUID();
     commit({
@@ -592,146 +586,146 @@ export function SketchBoard({
         </div>
       )}
       <div className="sketch-stage" onContextMenu={showContextMenu}>
-      <canvas
-        ref={canvas}
-        width={CANVAS_WIDTH}
-        height={CANVAS_HEIGHT}
-        tabIndex={disabled ? -1 : 0}
-        role="img"
-        aria-label={t("Sketch canvas")}
-        aria-describedby={helpId}
-        data-mode={mode}
-        onKeyDown={(e) => {
-          if (disabled) return;
-          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
-            e.preventDefault();
-            if (e.shiftKey && history.future.length)
-              onChange(history.future[0], {
-                past: [...history.past, state],
-                future: history.future.slice(1),
-              });
-            else if (!e.shiftKey && history.past.length)
-              onChange(history.past.at(-1)!, {
-                past: history.past.slice(0, -1),
-                future: [state, ...history.future],
-              });
-            return;
-          }
-          const d: Record<string, [number, number]> = {
-            ArrowLeft: [-10, 0],
-            ArrowRight: [10, 0],
-            ArrowUp: [0, -10],
-            ArrowDown: [0, 10],
-          };
-          if (d[e.key] && selected) {
-            e.preventDefault();
-            moveSelected(...d[e.key]);
-          }
-        }}
-        onPointerDown={(e) => {
-          if (disabled || e.button !== 0 || !e.isPrimary || gesture.current)
-            return;
-          const p = canvasPoint(e.clientX, e.clientY);
-          if (mode === "select") {
-            const object = [...state.objects]
-              .reverse()
-              .find((o) => o.type !== "eraser" && hitSketchObject(o, p));
-            setSelected(object?.id);
-            if (!object) return;
-            gesture.current = {
-              object: structuredClone(object),
-              original: object,
-              start: p,
-              pointerId: e.pointerId,
+        <canvas
+          ref={canvas}
+          width={CANVAS_WIDTH}
+          height={CANVAS_HEIGHT}
+          tabIndex={disabled ? -1 : 0}
+          role="img"
+          aria-label={t("Sketch canvas")}
+          aria-describedby={helpId}
+          data-mode={mode}
+          onKeyDown={(e) => {
+            if (disabled) return;
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+              e.preventDefault();
+              if (e.shiftKey && history.future.length)
+                onChange(history.future[0], {
+                  past: [...history.past, state],
+                  future: history.future.slice(1),
+                });
+              else if (!e.shiftKey && history.past.length)
+                onChange(history.past.at(-1)!, {
+                  past: history.past.slice(0, -1),
+                  future: [state, ...history.future],
+                });
+              return;
+            }
+            const d: Record<string, [number, number]> = {
+              ArrowLeft: [-10, 0],
+              ArrowRight: [10, 0],
+              ArrowUp: [0, -10],
+              ArrowDown: [0, 10],
             };
-          } else if (mode === "text") {
-            if (state.objects.length >= 150) return;
-            setTextLabelDraft("");
-            setTextLabelDialog(p);
-          } else {
-            if (state.objects.length >= 150) return;
-            gesture.current = {
-              object: {
-                id: crypto.randomUUID(),
-                type: mode,
-                color,
-                width: mode === "eraser" ? Math.max(12, width) : width,
-                points: ["arrow", "rectangle", "circle"].includes(mode)
-                  ? [p, p]
-                  : [p],
-                text: "",
-              },
-              start: p,
-              pointerId: e.pointerId,
-            };
-          }
-          e.currentTarget.setPointerCapture(e.pointerId);
-        }}
-        onPointerMove={(e) => {
-          const g = gesture.current;
-          if (!g || g.pointerId !== e.pointerId) return;
-          updateGesture(
-            canvasPoint(e.clientX, e.clientY, !gesture.current?.handle),
-          );
-        }}
-        onPointerUp={finish}
-        onPointerCancel={cancelGesture}
-        onLostPointerCapture={() => {
-          if (gesture.current) {
-            gesture.current = null;
-            setLive(null);
-          }
-        }}
-      />
-      {mode === "select" && selectedObject && (
-        <div className="sketch-handles">
-          {([...resizeHandles, "rotate"] as const).map((handle) => {
-            const target =
-              live && live.id === selectedObject.id ? live : selectedObject;
-            const anchor = handleAnchor(target, handle);
-            return (
-              <button
-                key={handle}
-                type="button"
-                className="sketch-handle"
-                data-handle={handle}
-                aria-label={t(handleLabels[handle])}
-                disabled={disabled}
-                style={{
-                  left: `${(anchor.x / CANVAS_WIDTH) * 100}%`,
-                  top: `${(anchor.y / CANVAS_HEIGHT) * 100}%`,
-                }}
-                onPointerDown={(event) => {
-                  if (
-                    disabled ||
-                    event.button !== 0 ||
-                    !event.isPrimary ||
-                    gesture.current
-                  )
-                    return;
-                  event.stopPropagation();
-                  gesture.current = {
-                    object: structuredClone(selectedObject),
-                    original: selectedObject,
-                    start: canvasPoint(event.clientX, event.clientY),
-                    pointerId: event.pointerId,
-                    handle,
-                  };
-                  event.currentTarget.setPointerCapture(event.pointerId);
-                }}
-                onPointerMove={(event) => {
-                  if (gesture.current?.pointerId !== event.pointerId) return;
-                  updateGesture(
-                    canvasPoint(event.clientX, event.clientY, false),
-                  );
-                }}
-                onPointerUp={finish}
-                onPointerCancel={cancelGesture}
-              />
+            if (d[e.key] && selected) {
+              e.preventDefault();
+              moveSelected(...d[e.key]);
+            }
+          }}
+          onPointerDown={(e) => {
+            if (disabled || e.button !== 0 || !e.isPrimary || gesture.current)
+              return;
+            const p = canvasPoint(e.clientX, e.clientY);
+            if (mode === "select") {
+              const object = [...state.objects]
+                .reverse()
+                .find((o) => o.type !== "eraser" && hitSketchObject(o, p));
+              setSelected(object?.id);
+              if (!object) return;
+              gesture.current = {
+                object: structuredClone(object),
+                original: object,
+                start: p,
+                pointerId: e.pointerId,
+              };
+            } else if (mode === "text") {
+              if (state.objects.length >= 150) return;
+              setTextLabelDraft("");
+              setTextLabelDialog(p);
+            } else {
+              if (state.objects.length >= 150) return;
+              gesture.current = {
+                object: {
+                  id: crypto.randomUUID(),
+                  type: mode,
+                  color,
+                  width: mode === "eraser" ? Math.max(12, width) : width,
+                  points: ["arrow", "rectangle", "circle"].includes(mode)
+                    ? [p, p]
+                    : [p],
+                  text: "",
+                },
+                start: p,
+                pointerId: e.pointerId,
+              };
+            }
+            e.currentTarget.setPointerCapture(e.pointerId);
+          }}
+          onPointerMove={(e) => {
+            const g = gesture.current;
+            if (!g || g.pointerId !== e.pointerId) return;
+            updateGesture(
+              canvasPoint(e.clientX, e.clientY, !gesture.current?.handle),
             );
-          })}
-        </div>
-      )}
+          }}
+          onPointerUp={finish}
+          onPointerCancel={cancelGesture}
+          onLostPointerCapture={() => {
+            if (gesture.current) {
+              gesture.current = null;
+              setLive(null);
+            }
+          }}
+        />
+        {mode === "select" && selectedObject && (
+          <div className="sketch-handles">
+            {([...resizeHandles, "rotate"] as const).map((handle) => {
+              const target =
+                live && live.id === selectedObject.id ? live : selectedObject;
+              const anchor = handleAnchor(target, handle);
+              return (
+                <button
+                  key={handle}
+                  type="button"
+                  className="sketch-handle"
+                  data-handle={handle}
+                  aria-label={t(handleLabels[handle])}
+                  disabled={disabled}
+                  style={{
+                    left: `${(anchor.x / CANVAS_WIDTH) * 100}%`,
+                    top: `${(anchor.y / CANVAS_HEIGHT) * 100}%`,
+                  }}
+                  onPointerDown={(event) => {
+                    if (
+                      disabled ||
+                      event.button !== 0 ||
+                      !event.isPrimary ||
+                      gesture.current
+                    )
+                      return;
+                    event.stopPropagation();
+                    gesture.current = {
+                      object: structuredClone(selectedObject),
+                      original: selectedObject,
+                      start: canvasPoint(event.clientX, event.clientY),
+                      pointerId: event.pointerId,
+                      handle,
+                    };
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                  }}
+                  onPointerMove={(event) => {
+                    if (gesture.current?.pointerId !== event.pointerId) return;
+                    updateGesture(
+                      canvasPoint(event.clientX, event.clientY, false),
+                    );
+                  }}
+                  onPointerUp={finish}
+                  onPointerCancel={cancelGesture}
+                />
+              );
+            })}
+          </div>
+        )}
       </div>
       <p id={helpId} className="tool-hint">
         {t(
@@ -762,14 +756,16 @@ export function SketchBoard({
         <fieldset className="board-object-inspector">
           <legend className="visually-hidden">{t("Selected object")}</legend>
           {selectedObject.type === "text" && (
-            <label className="tool-field">
-              {t("Edit label")}
-              <BoardTextField
+            <div className="tool-field">
+              <label htmlFor={`${helpId}-edit-label`}>{t("Edit label")}</label>
+              <input
                 id={`${helpId}-edit-label`}
+                type="text"
                 value={selectedObject.text}
                 disabled={disabled}
                 maxLength={200}
-                onChange={(text) => {
+                onChange={(event) => {
+                  const text = event.currentTarget.value;
                   if (text.trim())
                     commit({
                       ...state,
@@ -779,7 +775,7 @@ export function SketchBoard({
                     });
                 }}
               />
-            </label>
+            </div>
           )}
           <div
             className="sketch-toolbar"
@@ -822,7 +818,9 @@ export function SketchBoard({
                 />
               </div>
               <label className="sketch-stroke-width">
-                <span className="visually-hidden">{t("Object line width")}</span>
+                <span className="visually-hidden">
+                  {t("Object line width")}
+                </span>
                 <input
                   type="range"
                   min={1}
@@ -956,16 +954,19 @@ export function SketchBoard({
             placeTextLabel();
           }}
         >
-          <label className="tool-field" htmlFor={`${helpId}-new-text-label`}>
-            {t("Text label")}
-            <BoardTextField
+          <div className="tool-field">
+            <label htmlFor={`${helpId}-new-text-label`}>
+              {t("Text label")}
+            </label>
+            <input
               id={`${helpId}-new-text-label`}
+              type="text"
               value={textLabelDraft}
               maxLength={200}
-              onChange={setTextLabelDraft}
+              onChange={(event) => setTextLabelDraft(event.currentTarget.value)}
               disabled={disabled}
             />
-          </label>
+          </div>
         </form>
         <ModalFooter>
           <div className="modal-actions confirmation-actions">

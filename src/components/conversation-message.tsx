@@ -1,4 +1,5 @@
 "use client";
+import { FormulaBlock } from "./formula-text";
 
 import { lessonLanguage, type TeachingLanguage } from "@/lib/i18n/locales";
 import { useI18n } from "@/components/locale-context";
@@ -57,7 +58,7 @@ export const ConversationMessage = memo(function ConversationMessage({
                   : undefined
               }
             >
-              {message.text}
+              <FormulaBlock>{message.text}</FormulaBlock>
             </div>
           </div>
           {message.role === "student" && (

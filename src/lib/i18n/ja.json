@@ -462,7 +462,7 @@
   "Concept map": "概念マップ",
   "Matching pairs": "組み合わせ",
   "Comparison table": "比較表",
-  "Expand board": "ボードを拡大",
+  "Expand": "拡大",
   "Attach to explanation": "説明に添付",
   "Browser saving is unavailable. Keep this page open to preserve your board.": "ブラウザーに保存できません。作業を保つには、このページを開いたままにしてください。",
   "Pen": "ペン",
@@ -650,5 +650,8 @@
   "Click a term, then click its description to connect them.": "用語をクリックし、次にその説明をクリックしてつなげます。",
   "Use one row for each idea or example. Fill in the columns to explain and compare them.": "1行に1つの考えや例を記入しましょう。各列に説明を書いて比較します。",
   "Rename or remove columns": "列名の変更・列の削除",
-  "Name a key idea from your lesson": "レッスンの重要な考えを入力"
+  "Name a key idea from your lesson": "レッスンの重要な考えを入力",
+  "Display formula": "別行の数式",
+  "This formula could not be drawn. Retry or edit the label.": "数式を描画できませんでした。再試行するか、ラベルを編集してください。",
+  "Native equations in this DOCX were not extracted. Add them as LaTeX during review, or upload a PDF.": "この DOCX のネイティブ数式は抽出されませんでした。確認画面で LaTeX を追加するか、PDF をアップロードしてください。"
 }

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import "katex/dist/katex.min.css";
 import "./globals.css";
 import { LocaleProvider } from "@/components/locale-context";
 import { getLocale } from "@/lib/i18n/server";
