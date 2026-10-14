@@ -650,5 +650,14 @@
   "Click a term, then click its description to connect them.": "点击一个术语，再点击其描述进行连接。",
   "Use one row for each idea or example. Fill in the columns to explain and compare them.": "每一行填写一个想法或例子。在各列中补充说明并进行比较。",
   "Rename or remove columns": "重命名或删除列",
-  "Name a key idea from your lesson": "写下课程中的一个关键想法"
+  "Name a key idea from your lesson": "写下课程中的一个关键想法",
+  "Frequently asked questions": "常见问题",
+  "Who is Milo?": "Milo 是谁？",
+  "Milo is an AI student. You teach by explaining in your own words, while Milo asks questions that help you spot gaps in your understanding.": "Milo 是一位 AI 学生。你用自己的话讲解，Milo 会通过提问帮助你发现理解中的不足。",
+  "What learning materials can I use?": "我可以使用哪些学习材料？",
+  "Upload a PDF, DOCX, or TXT file smaller than 10 MB, or paste your notes. You can review the extracted text before preparing your lesson.": "上传小于 10 MB 的 PDF、DOCX 或 TXT 文件，或粘贴笔记。准备课程前，你可以检查提取的文本。",
+  "What happens in a session?": "学习过程中会发生什么？",
+  "Explain the lesson to Milo, respond to questions, then try a fresh example on your own. Your report highlights what you demonstrated and what to work on next.": "向 Milo 讲解课程并回答问题，然后独立尝试一个新例子。报告会说明你展示了哪些理解，以及接下来需要改进的地方。",
+  "Can I return to my sessions?": "我可以重新查看学习记录吗？",
+  "Sign in to save and revisit your sessions from history. Sessions expire after the retention period, which is 7 days by default. You can also delete a session anytime.": "登录后可以保存学习记录，并从历史记录中重新查看。记录会在保留期结束后过期，默认保留 7 天。你也可以随时删除记录。"
 }

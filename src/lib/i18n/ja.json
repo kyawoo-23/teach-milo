@@ -650,5 +650,14 @@
   "Click a term, then click its description to connect them.": "用語をクリックし、次にその説明をクリックしてつなげます。",
   "Use one row for each idea or example. Fill in the columns to explain and compare them.": "1行に1つの考えや例を記入しましょう。各列に説明を書いて比較します。",
   "Rename or remove columns": "列名の変更・列の削除",
-  "Name a key idea from your lesson": "レッスンの重要な考えを入力"
+  "Name a key idea from your lesson": "レッスンの重要な考えを入力",
+  "Frequently asked questions": "よくある質問",
+  "Who is Milo?": "Milo とは？",
+  "Milo is an AI student. You teach by explaining in your own words, while Milo asks questions that help you spot gaps in your understanding.": "Milo は AI の生徒です。自分の言葉で説明すると、Milo が質問して、理解が足りない部分を見つける手助けをします。",
+  "What learning materials can I use?": "どんな学習資料を使えますか？",
+  "Upload a PDF, DOCX, or TXT file smaller than 10 MB, or paste your notes. You can review the extracted text before preparing your lesson.": "10 MB 未満の PDF、DOCX、TXT ファイルをアップロードするか、ノートを貼り付けてください。レッスンを準備する前に、抽出されたテキストを確認できます。",
+  "What happens in a session?": "セッションでは何をしますか？",
+  "Explain the lesson to Milo, respond to questions, then try a fresh example on your own. Your report highlights what you demonstrated and what to work on next.": "Milo にレッスンを説明し、質問に答えた後、新しい例に自分で取り組みます。レポートには、示せた理解と次に取り組む内容がまとめられます。",
+  "Can I return to my sessions?": "セッションを後から見返せますか？",
+  "Sign in to save and revisit your sessions from history. Sessions expire after the retention period, which is 7 days by default. You can also delete a session anytime.": "ログインするとセッションを保存し、履歴から見返せます。保存期間が過ぎると期限切れになります。標準の保存期間は 7 日です。いつでも削除できます。"
 }

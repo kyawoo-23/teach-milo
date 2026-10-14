@@ -650,5 +650,14 @@
   "Click a term, then click its description to connect them.": "용어를 클릭한 다음 설명을 클릭해 연결하세요.",
   "Use one row for each idea or example. Fill in the columns to explain and compare them.": "각 행에 하나의 생각이나 예시를 쓰세요. 각 열을 채워 설명하고 비교하세요.",
   "Rename or remove columns": "열 이름 변경 또는 삭제",
-  "Name a key idea from your lesson": "수업의 핵심 아이디어를 입력하세요"
+  "Name a key idea from your lesson": "수업의 핵심 아이디어를 입력하세요",
+  "Frequently asked questions": "자주 묻는 질문",
+  "Who is Milo?": "Milo는 누구인가요?",
+  "Milo is an AI student. You teach by explaining in your own words, while Milo asks questions that help you spot gaps in your understanding.": "Milo는 AI 학생입니다. 자신의 말로 설명하면 Milo가 질문을 통해 이해가 부족한 부분을 찾도록 도와줍니다.",
+  "What learning materials can I use?": "어떤 학습 자료를 사용할 수 있나요?",
+  "Upload a PDF, DOCX, or TXT file smaller than 10 MB, or paste your notes. You can review the extracted text before preparing your lesson.": "10 MB 미만의 PDF, DOCX, TXT 파일을 업로드하거나 노트를 붙여 넣으세요. 수업을 준비하기 전에 추출된 텍스트를 확인할 수 있습니다.",
+  "What happens in a session?": "세션은 어떻게 진행되나요?",
+  "Explain the lesson to Milo, respond to questions, then try a fresh example on your own. Your report highlights what you demonstrated and what to work on next.": "Milo에게 수업 내용을 설명하고 질문에 답한 다음, 새로운 예제를 혼자 풀어 보세요. 보고서는 보여 준 이해와 다음에 보완할 부분을 정리합니다.",
+  "Can I return to my sessions?": "세션을 다시 볼 수 있나요?",
+  "Sign in to save and revisit your sessions from history. Sessions expire after the retention period, which is 7 days by default. You can also delete a session anytime.": "로그인하면 세션을 저장하고 기록에서 다시 볼 수 있습니다. 보관 기간이 지나면 만료되며 기본 보관 기간은 7일입니다. 언제든 세션을 삭제할 수도 있습니다."
 }
