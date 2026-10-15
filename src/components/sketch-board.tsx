@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { SketchObjectSchema } from "@/lib/board-tools";
 import { useI18n } from "./locale-context";
+import { useTheme } from "./theme-context";
 import { useConfirmation } from "./confirmation";
 import { Modal, ModalFooter } from "./ui";
 import {
@@ -117,6 +118,7 @@ export function SketchBoard({
   disabled: boolean;
 }) {
   const { t } = useI18n();
+  const { theme } = useTheme();
   const confirm = useConfirmation();
   const helpId = useId();
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -176,7 +178,7 @@ export function SketchBoard({
         ? shown.objects.find((object) => object.id === selected)
         : undefined;
     if (overlay) paintSelection(canvas.current, overlay);
-  }, [state, live, selected, mode]);
+  }, [state, live, selected, mode, theme]);
   const canvasPoint = (clientX: number, clientY: number, clamp = true) => {
     const bounds = canvas.current?.getBoundingClientRect();
     if (!bounds?.width || !bounds.height) return { x: 0, y: 0 };
