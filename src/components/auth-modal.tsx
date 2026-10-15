@@ -182,8 +182,8 @@ function AuthModalContent() {
       }}
       title={
         authMode === "login"
-          ? t("Sign In to TeachBack")
-          : t("Create TeachBack Account")
+          ? t("Sign In to Teach Milo")
+          : t("Create Teach Milo Account")
       }
     >
       <div className="auth-modal-content">

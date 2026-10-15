@@ -62,7 +62,7 @@ async function startLesson(page: Page, upload = false) {
     page.getByRole("heading", { name: "Does this look right?" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("dialog", { name: "Sign In to TeachBack" }),
+    page.getByRole("dialog", { name: "Sign In to Teach Milo" }),
   ).toHaveCount(0);
   await page
     .getByRole("button", { name: "Looks right. Find my lesson" })
@@ -154,7 +154,9 @@ test("real signup transfers the open guest session and browser draft without cha
     .getByRole("button", { name: "Create Account", exact: true })
     .first()
     .click();
-  const dialog = page.getByRole("dialog", { name: "Create TeachBack Account" });
+  const dialog = page.getByRole("dialog", {
+    name: "Create Teach Milo Account",
+  });
   await dialog.getByLabel("Your Name").fill("Hackathon Judge");
   await dialog.getByLabel("Email Address").fill(`${randomUUID()}@judge.test`);
   await dialog

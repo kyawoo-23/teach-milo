@@ -53,7 +53,7 @@ async function setup(page: Page, signedIn = true) {
     if (path === "/api/auth/passkeys") return route.fulfill({ json: list() });
     if (path === "/api/auth/passkeys/registration/options") {
       const options = await generateRegistrationOptions({
-        rpName: "TeachBack AI",
+        rpName: "Teach Milo",
         rpID: "localhost",
         userName: user.email,
         userID: new TextEncoder().encode(user.id),
@@ -212,7 +212,7 @@ test("native WebAuthn enrollment, rename, email-free login and removal with a vi
     .getByRole("button", { name: "Sign In", exact: true })
     .first()
     .click();
-  const dialog = page.getByRole("dialog", { name: "Sign In to TeachBack" });
+  const dialog = page.getByRole("dialog", { name: "Sign In to Teach Milo" });
   await expect(dialog.getByLabel("Email Address")).toHaveAttribute(
     "autocomplete",
     "username webauthn",
@@ -250,7 +250,7 @@ test("cancelling a passkey prompt leaves password login available", async ({
     .getByRole("button", { name: "Sign In", exact: true })
     .first()
     .click();
-  const dialog = page.getByRole("dialog", { name: "Sign In to TeachBack" });
+  const dialog = page.getByRole("dialog", { name: "Sign In to Teach Milo" });
   await dialog.getByRole("button", { name: "Sign in with a passkey" }).click();
   await expect(dialog.getByRole("alert")).toContainText(
     "Passkey sign-in was cancelled.",

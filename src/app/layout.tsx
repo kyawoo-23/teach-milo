@@ -26,8 +26,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
   return {
     title: {
-      default: translate(locale, "TeachBack AI — Learn by teaching"),
-      template: "%s | TeachBack AI",
+      default: translate(locale, "Teach Milo — Learn by teaching"),
+      template: "%s | Teach Milo",
     },
     description: translate(
       locale,

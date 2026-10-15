@@ -84,7 +84,7 @@ test("password sign-in shows a toast only after success", async ({ page }) => {
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Sign In", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Sign In to TeachBack" });
+  const dialog = page.getByRole("dialog", { name: "Sign In to Teach Milo" });
   await dialog.getByLabel("Email Address").fill("ada@example.test");
   await dialog.getByLabel("Password", { exact: true }).fill("valid-password");
   await dialog
@@ -166,7 +166,7 @@ test("logout returns to home with a toast and preserves sign-in on failure", asy
   await signOut();
   await expect(page).toHaveURL("/");
   await expect(
-    page.getByRole("dialog", { name: "Sign In to TeachBack" }),
+    page.getByRole("dialog", { name: "Sign In to Teach Milo" }),
   ).toHaveCount(0);
   await expect(
     page.locator(".notification-toast").getByRole("status"),
