@@ -1,5 +1,7 @@
 "use client";
 
+import { AnimatedTabs } from "./animated-tabs";
+
 import { useI18n } from "@/components/locale-context";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -185,7 +187,8 @@ function AuthModalContent() {
       }
     >
       <div className="auth-modal-content">
-        <div
+        <AnimatedTabs
+          activeKey={authMode}
           className="auth-tabs"
           role="group"
           aria-label={t("Account access")}
@@ -214,7 +217,7 @@ function AuthModalContent() {
           >
             {t("Create Account")}
           </button>
-        </div>
+        </AnimatedTabs>
 
         {(error || urlAuthError) && (
           <div

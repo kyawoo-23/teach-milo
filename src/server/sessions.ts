@@ -37,6 +37,7 @@ import {
   languageInstruction,
 } from "@/content/prompts";
 import {
+  assertGuestWritable,
   assertOwned,
   database,
   decode,
@@ -105,28 +106,33 @@ export async function createSession(
     expiresAt: expiry,
   };
   const f = database();
-  const batch = f.batch();
-  batch.create(f.collection("sessions").doc(id), encode(session));
-  batch.update(f.collection("lessons").doc(lessonId), {
-    confirmed: true,
-    expiresAt: encode({ expiresAt: expiry }).expiresAt,
+  await f.runTransaction(async (batch) => {
+    await assertGuestWritable(batch, ownerId);
+    const currentLesson = await batch.get(
+      f.collection("lessons").doc(lessonId),
+    );
+    assertOwned(decode<Lesson>(currentLesson.data()), ownerId);
+    batch.create(f.collection("sessions").doc(id), encode(session));
+    batch.update(f.collection("lessons").doc(lessonId), {
+      confirmed: true,
+      expiresAt: encode({ expiresAt: expiry }).expiresAt,
+    });
+    const greeting: Message = {
+      id: randomUUID(),
+      role: "student",
+      text:
+        mode === "correct"
+          ? openWithMisconception(lesson)
+          : greetLearner(lesson.opening, lesson.teachingLanguage),
+      createdAt: now,
+      sequence: 0,
+      kind: "teaching",
+    };
+    batch.create(
+      f.collection("sessions").doc(id).collection("messages").doc(greeting.id),
+      encode({ ...greeting, expiresAt: expiry }),
+    );
   });
-  const greeting: Message = {
-    id: randomUUID(),
-    role: "student",
-    text:
-      mode === "correct"
-        ? openWithMisconception(lesson)
-        : greetLearner(lesson.opening, lesson.teachingLanguage),
-    createdAt: now,
-    sequence: 0,
-    kind: "teaching",
-  };
-  batch.create(
-    f.collection("sessions").doc(id).collection("messages").doc(greeting.id),
-    encode({ ...greeting, expiresAt: expiry }),
-  );
-  await batch.commit();
   await event(id, "session_started", id);
   return id;
 }
@@ -202,6 +208,7 @@ async function maybePromoteReady(
   };
   const ref = database().collection("sessions").doc(id);
   return database().runTransaction(async (tx) => {
+    await assertGuestWritable(tx, session.ownerId);
     const snap = await tx.get(ref);
     const current = snap.exists ? decode<Session>(snap.data()) : undefined;
     assertOwned(current, session.ownerId);
@@ -347,12 +354,9 @@ export async function submitTurn(
       };
       if (learner.board?.version === 2 && learner.board.png)
         validatePng(learner.board.png);
-      await database()
-        .collection("sessions")
-        .doc(id)
-        .collection("operations")
-        .doc(input.operationId)
-        .update({ pendingTurn: learner });
+      await savePendingOperation(ctx.ownerId, id, input.operationId, {
+        pendingTurn: learner,
+      });
       const messages = [
         ...(await evidenceMessages(session, await readMessages(id, 12))),
         learner,
@@ -647,18 +651,13 @@ export async function submitTransfer(
         kind: "transfer",
       };
       // Save the answer before evaluation. Retrying the same operation overwrites this pending record, never adds a turn.
-      await database()
-        .collection("sessions")
-        .doc(id)
-        .collection("operations")
-        .doc(input.operationId)
-        .update({
-          pendingAnswer: {
-            answer: input.answer,
-            skip: input.skip,
-            answers: input.answers ?? null,
-          },
-        });
+      await savePendingOperation(ctx.ownerId, id, input.operationId, {
+        pendingAnswer: {
+          answer: input.answer,
+          skip: input.skip,
+          answers: input.answers ?? null,
+        },
+      });
       const messages = [
         ...(await evidenceMessages(session, await readMessages(id, 20))),
         ...(input.skip ? [] : [learner]),
@@ -690,4 +689,25 @@ export async function submitTransfer(
     event(id, "session_completed", input.operationId),
   ]);
   return { session: committed, lesson: responseLesson };
+}
+
+async function savePendingOperation(
+  ownerId: string,
+  id: string,
+  operationId: string,
+  updates: object,
+) {
+  const ref = database().collection("sessions").doc(id);
+  await database().runTransaction(async (tx) => {
+    await assertGuestWritable(tx, ownerId);
+    const doc = await tx.get(ref);
+    assertOwned(doc.exists ? decode<Session>(doc.data()) : undefined, ownerId);
+    if (doc.get("activeOperation.id") !== operationId)
+      throw new AppError(
+        "STALE_REQUEST",
+        "A newer request has replaced this one.",
+        409,
+      );
+    tx.update(ref.collection("operations").doc(operationId), updates);
+  });
 }

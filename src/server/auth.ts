@@ -9,6 +9,12 @@ import {
 import { cookies } from "next/headers";
 import { AppError } from "@/lib/errors";
 import { database, decode, encode } from "./db";
+import {
+  bindGuest,
+  guestCookieId,
+  guestClaimState,
+  GUEST_COOKIE_NAME,
+} from "./guests";
 
 export const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 
@@ -132,10 +138,11 @@ export async function createUserSession(
   const id = hash(secret);
   const expiryDate = new Date(Date.now() + SESSION_EXPIRY_DAYS * 86_400_000);
   const expiry = expiryDate.toISOString();
-  await database()
-    .collection("user_sessions")
-    .doc(id)
-    .set(
+  const guestId = await guestCookieId();
+  await database().runTransaction(async (tx) => {
+    await bindGuest(tx, guestId, userId);
+    tx.set(
+      database().collection("user_sessions").doc(id),
       encode({
         id,
         userId,
@@ -144,6 +151,7 @@ export async function createUserSession(
         expiresAt: expiry,
       }),
     );
+  });
 
   jar.set(AUTH_COOKIE_NAME, secret, {
     httpOnly: true,
@@ -175,6 +183,15 @@ export async function getAuthenticatedUser(): Promise<User | null> {
   return user && (session.authVersion ?? 0) === (user.authVersion ?? 0)
     ? user
     : null;
+}
+
+export async function finishSignIn(user: User) {
+  await createUserSession(user.id, user.authVersion ?? 0);
+  return {
+    user: toPublicUser(user),
+    guest: null,
+    claim: await guestClaimState(user.id),
+  };
 }
 
 export async function updateProfile(
@@ -269,6 +286,7 @@ export async function clearUserSession(): Promise<void> {
     }
   }
   jar.delete(AUTH_COOKIE_NAME);
+  jar.delete(GUEST_COOKIE_NAME);
 }
 
 export function getGoogleOAuthUrl(origin: string, state: string): string {

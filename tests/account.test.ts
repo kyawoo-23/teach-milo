@@ -53,6 +53,8 @@ vi.mock("@/server/db", () => {
           get: async (ref: { key: string }) => snapshot(ref.key),
           getAll: async (...refs: { key: string }[]) =>
             refs.map((ref) => snapshot(ref.key)),
+          set: (ref: { key: string }, value: Record<string, unknown>) =>
+            writes.push(() => store.docs.set(ref.key, value)),
           update: (ref: { key: string }, value: Record<string, unknown>) =>
             writes.push(() =>
               store.docs.set(ref.key, { ...store.docs.get(ref.key), ...value }),

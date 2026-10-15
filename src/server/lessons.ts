@@ -16,6 +16,7 @@ import { lessonLanguage, type TeachingLanguage } from "@/lib/i18n/locales";
 import { verifyNumericTransfer } from "./calculation";
 import { PREPARE_PROMPT, languageInstruction } from "@/content/prompts";
 import {
+  assertGuestWritable,
   assertOwned,
   database,
   decode,
@@ -121,7 +122,10 @@ export async function prepareLesson(
     createdAt: new Date().toISOString(),
     expiresAt: expiresAt(),
   };
-  await database().collection("lessons").doc(id).create(encode(lesson));
+  await database().runTransaction(async (tx) => {
+    await assertGuestWritable(tx, ctx.ownerId);
+    tx.create(database().collection("lessons").doc(id), encode(lesson));
+  });
   await Promise.all([
     event(id, `board_prepared_${boardOutcome}`, id),
     ...(numeric.outcome === "none"

@@ -76,7 +76,11 @@ export function initialWorkspace(
     },
   };
 }
-function restoredValues(board: Board, saved: BoardValues, initial: BoardValues) {
+function restoredValues(
+  board: Board,
+  saved: BoardValues,
+  initial: BoardValues,
+) {
   try {
     return validateBoardValues(board, compileBoard(board), {
       version: 3,
@@ -206,9 +210,11 @@ export function useBoardWorkspace({
       }
     };
     const timer = setTimeout(save, 150);
+    window.addEventListener("teachback-board-migrating", save);
     window.addEventListener("pagehide", save);
     return () => {
       clearTimeout(timer);
+      window.removeEventListener("teachback-board-migrating", save);
       window.removeEventListener("pagehide", save);
     };
   }, [key, workspace, expiresAt, terminal, attachment, explanation]);

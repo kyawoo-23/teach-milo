@@ -3,7 +3,7 @@ import { Id, Session } from "@/lib/contracts";
 import { readOwned } from "@/server/db";
 import {
   assertOrigin,
-  requireUserId,
+  requireLearningOwnerId,
   json,
   respond,
   route,
@@ -19,7 +19,7 @@ export async function POST(
     await readOwned<Pick<Session, "ownerId" | "expiresAt">>(
       "sessions",
       id,
-      await requireUserId(),
+      await requireLearningOwnerId(),
       [],
     );
     const input = await json(

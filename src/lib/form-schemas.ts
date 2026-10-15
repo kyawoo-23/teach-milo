@@ -48,8 +48,8 @@ export const LearningFileSchema = z
     (file) =>
       typeof File !== "undefined" &&
       file instanceof File &&
-      /\.(pdf|docx|txt)$/i.test(file.name),
-    "Choose a PDF, DOCX, or TXT file.",
+      /\.(pdf|docx|pptx|txt)$/i.test(file.name),
+    "Choose a PDF, DOCX, PPTX, or TXT file.",
   )
   .refine(
     (file) =>

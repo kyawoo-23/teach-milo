@@ -429,6 +429,13 @@ export const UserPublicSchema = z.object({
 });
 export type UserPublic = z.infer<typeof UserPublicSchema>;
 
+export type GuestPublic = { id: string; expiresAt: string };
+export type AuthIdentity = {
+  user: UserPublic | null;
+  guest: GuestPublic | null;
+  claim?: { fromOwnerId: string; status: "pending" | "complete" };
+};
+
 export const SessionSummarySchema = z.object({
   id: z.string(),
   title: z.string(),

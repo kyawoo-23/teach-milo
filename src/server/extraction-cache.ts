@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { SourceSchema, type Source } from "@/lib/contracts";
 import { AppError } from "@/lib/errors";
-import { database, decode, encode, expiresAt } from "./db";
+import { assertGuestWritable, database, decode, encode, expiresAt } from "./db";
 
 const Sources = z
   .array(SourceSchema)
@@ -56,6 +56,7 @@ export async function withExtractionCache(
   const ref = f.collection("extraction_cache").doc(key);
   const token = randomUUID();
   const reservation = await f.runTransaction(async (tx) => {
+    await assertGuestWritable(tx, ownerId);
     const doc = await tx.get(ref);
     const existing = doc.exists ? decode<Entry>(doc.data()) : undefined;
     const valid =
@@ -104,6 +105,7 @@ export async function withExtractionCache(
         422,
       );
     await f.runTransaction(async (tx) => {
+      await assertGuestWritable(tx, ownerId);
       const doc = await tx.get(ref);
       const entry = doc.exists ? decode<Entry>(doc.data()) : undefined;
       if (
@@ -132,6 +134,7 @@ export async function withExtractionCache(
   } catch (error) {
     await f
       .runTransaction(async (tx) => {
+        await assertGuestWritable(tx, ownerId);
         const doc = await tx.get(ref);
         if (doc.get("token") === token)
           tx.update(ref, { status: "partial", until: 0 });

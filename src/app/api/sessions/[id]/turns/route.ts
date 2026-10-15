@@ -1,7 +1,7 @@
 import { Id, TurnSchema } from "@/lib/contracts";
 import {
   assertOrigin,
-  requireUserId,
+  requireLearningOwnerId,
   json,
   respond,
   route,
@@ -15,7 +15,7 @@ export async function POST(
 ) {
   return route(async () => {
     assertOrigin(request);
-    const owner = await requireUserId();
+    const owner = await requireLearningOwnerId();
     const id = Id.parse((await context.params).id);
     const input = await json(request, TurnSchema);
     const snapshot = await submitTurn(id, input, callContext(owner, request));
