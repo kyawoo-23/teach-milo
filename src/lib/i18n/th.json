@@ -642,7 +642,7 @@
   "{concepts}/10 concepts · {relationships}/20 relationships": "แนวคิด {concepts}/10 · ความสัมพันธ์ {relationships}/20",
   "Save changes": "บันทึกการเปลี่ยนแปลง",
   "Select concept {name}": "เลือกแนวคิด {name}",
-  "Select a concept to move or edit it. Right-click for more actions. Click outside to deselect.": "เลือกแนวคิดเพื่อย้ายหรือแก้ไข คลิกขวาเพื่อดูการทำงานเพิ่มเติม คลิกด้านนอกเพื่อยกเลิกการเลือก",
+  "Select a concept to move or edit it. Delete or Backspace removes the selected concept. Right-click for more actions. Click outside to deselect.": "เลือกแนวคิดเพื่อย้ายหรือแก้ไข กด Delete หรือ Backspace เพื่อลบแนวคิดที่เลือก คลิกขวาเพื่อดูการทำงานเพิ่มเติม คลิกด้านนอกเพื่อยกเลิกการเลือก",
   "All pairs connected. Explain why they belong together.": "เชื่อมครบทุกคู่แล้ว อธิบายว่าทำไมแต่ละคู่จึงสัมพันธ์กัน",
   "Choose a term to start. Select a connected term to change its match.": "เลือกคำศัพท์เพื่อเริ่ม เลือกคำศัพท์ที่เชื่อมแล้วเพื่อเปลี่ยนคู่",
   "1. Choose a term": "1. เลือกคำศัพท์",

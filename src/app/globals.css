@@ -134,8 +134,8 @@
   width: 100%;
   height: auto;
   aspect-ratio: 3 / 2;
-  background: white;
-  border: 1px solid #c7cad9;
+  background: var(--sketch-canvas);
+  border: 1px solid light-dark(#c7cad9, #3a3d52);
   border-radius: 8px;
   touch-action: none;
   cursor: crosshair;
@@ -600,7 +600,7 @@
   width: 100%;
 }
 @media (pointer: coarse) {
-  .board-workspace button {
+  .board-workspace button:not(.sketch-handle) {
     min-height: 44px;
   }
 }
@@ -618,6 +618,7 @@
   --line: light-dark(#e8e8f0, #2f3244);
   --blue: light-dark(#426da9, #7c9fd6);
   --surface: light-dark(#fff, #1b1d2a);
+  --sketch-canvas: light-dark(#fff, #1f1f1f);
   --background: light-dark(#f8f9fc, #12131c);
   --radius: 18px;
   --page-gutter: clamp(1rem, 3vw, 3.125rem);
@@ -633,6 +634,11 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
+  --sketch-canvas: #1f1f1f;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --sketch-canvas: #fff;
 }
 * {
   box-sizing: border-box;

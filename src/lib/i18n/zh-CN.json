@@ -642,7 +642,7 @@
   "{concepts}/10 concepts · {relationships}/20 relationships": "{concepts}/10 个概念 · {relationships}/20 条关系",
   "Save changes": "保存更改",
   "Select concept {name}": "选择概念 {name}",
-  "Select a concept to move or edit it. Right-click for more actions. Click outside to deselect.": "选择概念以移动或编辑。右键可打开更多操作。点击外部可取消选择。",
+  "Select a concept to move or edit it. Delete or Backspace removes the selected concept. Right-click for more actions. Click outside to deselect.": "选择概念以移动或编辑。按 Delete 或 Backspace 可删除所选概念。右键可打开更多操作。点击外部可取消选择。",
   "All pairs connected. Explain why they belong together.": "所有配对已连接。请解释它们为什么相互对应。",
   "Choose a term to start. Select a connected term to change its match.": "先选择一个术语。选择已连接的术语可更改配对。",
   "1. Choose a term": "1. 选择术语",

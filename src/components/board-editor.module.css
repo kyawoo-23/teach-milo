@@ -358,18 +358,34 @@
 .workspace:global(.board-workspace) :global(.sketch-handle) {
   position: absolute;
   z-index: 1;
-  width: 16px;
-  height: 16px;
-  min-width: 16px;
-  min-height: 16px;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  max-width: 20px;
+  max-height: 20px;
   padding: 0;
-  border: 2px solid var(--purple-dark);
-  border-radius: 3px;
-  background: var(--surface);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   box-shadow: none;
   transform: translate(-50%, -50%);
   touch-action: none;
   pointer-events: auto;
+  cursor: inherit;
+}
+.workspace:global(.board-workspace) :global(.sketch-handle::before) {
+  content: "";
+  display: block;
+  box-sizing: border-box;
+  width: 8px;
+  height: 8px;
+  margin: 6px auto;
+  border: 1.5px solid var(--purple);
+  border-radius: 50%;
+  background: light-dark(#fff, rgb(38 37 48));
+  box-shadow: 0 0 0 1px light-dark(rgb(36 40 63 / 0.1), rgb(0 0 0 / 0.4));
 }
 .workspace :global(.sketch-handle[data-handle="n"]),
 .workspace :global(.sketch-handle[data-handle="s"]) {
@@ -388,8 +404,35 @@
   cursor: nesw-resize;
 }
 .workspace :global(.sketch-handle[data-handle="rotate"]) {
-  border-radius: 50%;
   cursor: grab;
+}
+.workspace:global(.board-workspace)
+  :global(.sketch-handle[data-handle="rotate"]::before) {
+  width: 9px;
+  height: 9px;
+  margin: 5.5px auto;
+  border-color: var(--purple-dark);
+}
+@media (pointer: coarse) {
+  .workspace:global(.board-workspace) :global(.sketch-handle) {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    max-width: 28px;
+    max-height: 28px;
+  }
+  .workspace:global(.board-workspace) :global(.sketch-handle::before) {
+    width: 10px;
+    height: 10px;
+    margin: 9px auto;
+  }
+  .workspace:global(.board-workspace)
+    :global(.sketch-handle[data-handle="rotate"]::before) {
+    width: 11px;
+    height: 11px;
+    margin: 8.5px auto;
+  }
 }
 .workspace :global(.board-shape-insert) {
   display: flex;

@@ -380,6 +380,32 @@ export function ConceptMap({ state, onChange, disabled }: MapProps) {
       addButton.current?.focus({ preventScroll: true }),
     );
   };
+  useEffect(() => {
+    if (disabled || !selected || editor) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Backspace" && event.key !== "Delete") return;
+      if (
+        event.repeat ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.isComposing
+      )
+        return;
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest(
+          "input, textarea, select, [contenteditable='true'], [data-concept-context-menu]",
+        )
+      )
+        return;
+      event.preventDefault();
+      deleteConcept(selected);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [disabled, selected, editor, state, onChange]);
   const move = (nodeId: string, point: { x: number; y: number }) =>
     onChange({
       ...state,
@@ -397,7 +423,7 @@ export function ConceptMap({ state, onChange, disabled }: MapProps) {
       <div className="matching-toolbar">
         <p className="tool-hint">
           {t(
-            "Select a concept to move or edit it. Right-click for more actions. Click outside to deselect.",
+            "Select a concept to move or edit it. Delete or Backspace removes the selected concept. Right-click for more actions. Click outside to deselect.",
           )}
         </p>
         <div
@@ -650,6 +676,20 @@ export function ConceptMap({ state, onChange, disabled }: MapProps) {
               >
                 <Pencil size={TOOLBAR_ICON_SIZE} aria-hidden="true" />
                 <span className="visually-hidden">{t("Edit")}</span>
+              </button>
+              <button
+                type="button"
+                disabled={disabled}
+                title={t("Delete concept {name}", {
+                  name: selectedNode.label,
+                })}
+                aria-label={t("Delete concept {name}", {
+                  name: selectedNode.label,
+                })}
+                onClick={() => deleteConcept(selectedNode.id)}
+              >
+                <Trash2 size={TOOLBAR_ICON_SIZE} aria-hidden="true" />
+                <span className="visually-hidden">{t("Delete")}</span>
               </button>
             </div>
             <div
