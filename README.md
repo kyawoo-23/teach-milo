@@ -1,4 +1,4 @@
-# TeachBack AI
+# Teach Milo
 
 Learn by teaching Milo, a curious AI student. Bring PDF, DOCX, PPTX, TXT, or pasted notes; review extraction; confirm a focused lesson; teach with an interactive board; and optionally take an independent application check before receiving evidence-linked feedback.
 
@@ -79,7 +79,7 @@ DOCX archives undergo streamed ZIP preflight (500 entries / 25 MB decompressed m
 
 ### Boards
 
-Lesson preparation composes each board, in the same Gemini call, from a catalog of 17 components that TeachBack owns (`src/lib/board-catalog.ts`): layout (Stack, Row, Card), content (Heading, Text, Callout), inputs (Slider, NumberInput, Toggle, Select), displays (Metric, Bar, Grid, LineChart), and composites (SortableList, Buckets, CompareCards). The board section of the prompt is generated from that registry. A board declares named, typed state (up to 8 variables), derived values, and at most one `calculate(inputs)` function; components bind to state and derived ids, never to inline expressions. Boards without interactive components can instead seed a concept map, matching pairs, or a table. The board is frozen with the lesson.
+Lesson preparation composes each board, in the same Gemini call, from a catalog of 17 components that Teach Milo owns (`src/lib/board-catalog.ts`): layout (Stack, Row, Card), content (Heading, Text, Callout), inputs (Slider, NumberInput, Toggle, Select), displays (Metric, Bar, Grid, LineChart), and composites (SortableList, Buckets, CompareCards). The board section of the prompt is generated from that registry. A board declares named, typed state (up to 8 variables), derived values, and at most one `calculate(inputs)` function; components bind to state and derived ids, never to inline expressions. Boards without interactive components can instead seed a concept map, matching pairs, or a table. The board is frozen with the lesson.
 
 `compileBoard` validates every node against the catalog. It drops unknown components and invalid props with diagnostics and enforces limits of 40 nodes, 8 state variables, and 4 levels of nesting. A board with a fatal problem gets one repair call that includes the diagnostics, then falls back to an editable example table. Calculations use a deliberately small JavaScript language: arithmetic, approved Math functions, locals, and conditionals. Imports, loops, recursion, strings, constructors, arbitrary property access, and globals are rejected by AST validation.
 

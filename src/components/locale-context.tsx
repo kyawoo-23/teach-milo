@@ -39,7 +39,7 @@ export function LocaleProvider({
   );
   useEffect(() => {
     document.documentElement.lang = locale;
-    document.title = translate(locale, "TeachBack AI — Learn by teaching");
+    document.title = translate(locale, "Teach Milo — Learn by teaching");
     const description = document.querySelector('meta[name="description"]');
     if (description)
       description.setAttribute(

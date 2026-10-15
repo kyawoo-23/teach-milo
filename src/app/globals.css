@@ -925,12 +925,6 @@ input::placeholder {
   height: 100%;
   object-fit: contain;
 }
-.brand-ai {
-  font-size: 15px;
-  font-weight: 550;
-  color: light-dark(#69647d, #b4afcb);
-  letter-spacing: -0.2px;
-}
 .site-header {
   min-height: 98px;
   max-width: 1280px;
@@ -3795,9 +3789,6 @@ input[type="range"] {
     font-size: 16px;
     gap: 6px;
   }
-  .session-header .brand-ai {
-    display: none;
-  }
   .rp-columns {
     grid-template-columns: 1fr;
     gap: 0;
@@ -3897,9 +3888,6 @@ input[type="range"] {
       max(16px, env(safe-area-inset-right)) 8px
       max(16px, env(safe-area-inset-left));
     gap: 4px 8px;
-  }
-  .session-header .brand-ai {
-    display: none;
   }
   .session-header .brand {
     font-size: 15px;

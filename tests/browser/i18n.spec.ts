@@ -103,7 +103,7 @@ for (const locale of locales) {
     await page.goto("/");
     await expect(page.locator("html")).toHaveAttribute("lang", locale);
     await expect(page).toHaveTitle(
-      dictionaries[locale]["TeachBack AI — Learn by teaching"],
+      dictionaries[locale]["Teach Milo — Learn by teaching"],
     );
     await page
       .getByRole("button", {
@@ -253,7 +253,7 @@ test("the selected teaching language survives a sign-in redirect", async ({
   await chooseLanguage(page, "What language should Milo use?", "ja");
   await page.getByRole("button", { name: "Prepare my lesson" }).click();
   await expect(
-    page.getByRole("dialog", { name: "Sign In to TeachBack" }),
+    page.getByRole("dialog", { name: "Sign In to Teach Milo" }),
   ).toBeVisible();
   expect(
     await page.evaluate(
