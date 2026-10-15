@@ -1,4 +1,6 @@
 "use client";
+
+import { AnimatedTabs } from "./animated-tabs";
 import { FormulaText } from "./formula-text";
 
 import { useI18n } from "@/components/locale-context";
@@ -25,6 +27,7 @@ import {
   Check,
   CheckCircle2,
   ChevronLeft,
+  ChevronRight,
   FileText,
   Lightbulb,
   LockKeyhole,
@@ -105,6 +108,7 @@ export function Onboarding() {
   const [material, setMaterial] = useState<MaterialResult | null>(null);
   const reviewForm = useSchemaForm(LessonReviewFormSchema, { sources: [] });
   const [sources, setSources] = reviewForm.state("sources");
+  const [sourceIndex, setSourceIndex] = useState(0);
   const [lesson, setLesson] = useState<LessonPublic | null>(null);
   const [sessionMode, setSessionMode] = useState<SessionMode>("correct");
   const [busy, setBusy] = useState("");
@@ -112,23 +116,33 @@ export function Onboarding() {
   const [help, setHelp] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [missing, setMissing] = useState<string[]>([]);
-  const { user, loading, authModalOpen, openAuthModal } = useAuth();
+  const {
+    user,
+    ownerId,
+    loading,
+    authModalOpen,
+    ensureLearningIdentity,
+    refreshUser,
+  } = useAuth();
+  const submittingIdentity = useRef(false);
   const mounted = useRef(true);
-  const currentOwner = useRef(user?.id);
-  currentOwner.current = user?.id;
+  const currentOwner = useRef(ownerId);
+  currentOwner.current = ownerId;
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
     };
   }, []);
+  const previousOwner = useRef(ownerId);
   useEffect(() => {
-    busyRef.current = false;
-    setBusy("");
-  }, [user?.id]);
+    if (previousOwner.current && previousOwner.current !== ownerId) {
+      busyRef.current = false;
+      setBusy("");
+    }
+    previousOwner.current = ownerId;
+  }, [ownerId]);
 
-  // Set when the learner submitted material while signed out; the submission resumes after sign-in.
-  const [resume, setResume] = useState(false);
   useEffect(() => {
     takeDraft().then((saved) => {
       if (!saved || !mounted.current) return;
@@ -146,21 +160,48 @@ export function Onboarding() {
       setFile(saved.file);
       if (saved.draft.mode === "upload" && !saved.file)
         setError("Choose your file again to continue.");
-      else setResume(true);
+      else if (saved.draft.flow && saved.draft.flow.step !== "material") {
+        setMaterial(saved.draft.flow.material);
+        setSources(saved.draft.flow.sources);
+        setLesson(saved.draft.flow.lesson);
+        setSessionMode(saved.draft.flow.sessionMode);
+        setStep(saved.draft.flow.step);
+      }
     });
   }, []);
+  const savedForSignIn = useRef(false);
   useEffect(() => {
-    if (!resume || loading) return;
-    if (user) {
-      setResume(false);
-      void clearDraft();
-      void readMaterial();
-    } else if (!authModalOpen) {
-      setResume(false);
+    if (authModalOpen) {
+      savedForSignIn.current = true;
+      void saveDraft(
+        {
+          mode,
+          notes,
+          topic,
+          level,
+          teachingLanguage,
+          flow: { step, material, sources, lesson, sessionMode },
+        },
+        file,
+      );
+    } else if (savedForSignIn.current) {
+      savedForSignIn.current = false;
       void clearDraft();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resume, user, loading, authModalOpen]);
+  }, [
+    authModalOpen,
+    mode,
+    notes,
+    topic,
+    level,
+    teachingLanguage,
+    step,
+    material,
+    sources,
+    lesson,
+    sessionMode,
+    file,
+  ]);
   useEffect(() => {
     const controller = new AbortController();
     api<{ missing: string[] }>("/api/status", undefined, "GET", {
@@ -192,8 +233,11 @@ export function Onboarding() {
       if (options?.holdBusy && isCurrent()) hold = true;
     } catch (e) {
       if (!isCurrent()) return;
-      if (e instanceof ApiError && e.code === "AUTH_REQUIRED")
-        openAuthModal("login");
+      if (
+        e instanceof ApiError &&
+        ["GUEST_ACCESS_REQUIRED", "GUEST_CHANGED"].includes(e.code)
+      )
+        void refreshUser();
       setError(e instanceof Error ? e : "Please try again.");
     } finally {
       if (isCurrent() && !hold) {
@@ -230,18 +274,22 @@ export function Onboarding() {
     setError("");
   }
   async function submitMaterial() {
-    if (busyRef.current || loading) return;
-    if (!user) {
-      setError("");
-      await saveDraft({ mode, notes, topic, level, teachingLanguage }, file);
-      setResume(true);
-      openAuthModal("login");
-      return;
+    if (busyRef.current || submittingIdentity.current || loading) return;
+    if (!(await materialForm.trigger(undefined, { shouldFocus: true }))) return;
+    submittingIdentity.current = true;
+    setError("");
+    try {
+      currentOwner.current = await ensureLearningIdentity();
+      await clearDraft();
+      await readMaterial();
+    } catch (e) {
+      setError(e instanceof Error ? e : "Please try again.");
+    } finally {
+      submittingIdentity.current = false;
     }
-    await readMaterial();
   }
   async function readMaterial() {
-    if (!(await materialForm.trigger())) return;
+    if (!(await materialForm.trigger(undefined, { shouldFocus: true }))) return;
     await run(
       mode === "upload" && file?.name.toLowerCase().endsWith(".pdf")
         ? "Reading your pages, including scanned content…"
@@ -268,6 +316,7 @@ export function Onboarding() {
         if (!isCurrent()) return;
         setMaterial(result);
         setSources(result.sources);
+        setSourceIndex(0);
         setStep("review");
       },
     );
@@ -314,7 +363,8 @@ export function Onboarding() {
       <NavHeader
         extraActions={
           <button className="quiet-button" onClick={() => setHelp(true)}>
-            {t("How it works")} <MessageCircle size={16} />
+            <span className="button-text">{t("How it works")}</span>
+            <MessageCircle size={16} />
           </button>
         }
       />
@@ -340,6 +390,13 @@ export function Onboarding() {
                   "Meet Milo, your curious AI student. Bring what you’re learning, explain it in your own words, and discover what really clicks.",
                 )}
               </p>
+              {!user && (
+                <p className="muted">
+                  {t(
+                    "No account needed. Guest sessions stay in this browser for seven days. Sign in to access them across devices.",
+                  )}
+                </p>
+              )}
               <div className="milo-introduction">
                 <div className="milo-orbit">
                   <span className="orbit-star star-one">✦</span>
@@ -394,11 +451,11 @@ export function Onboarding() {
                 onSubmit={(event) => {
                   event.preventDefault();
                   if (busyRef.current || loading) return;
-                  if (!user) void submitMaterial();
-                  else void materialForm.handleSubmit(submitMaterial)(event);
+                  void submitMaterial();
                 }}
               >
-                <div
+                <AnimatedTabs
+                  activeKey={mode}
                   className="segmented"
                   role="group"
                   aria-label={t("Material input method")}
@@ -421,7 +478,7 @@ export function Onboarding() {
                     <FileText size={17} aria-hidden="true" />
                     <span className="segmented-label">{t("Paste notes")}</span>
                   </button>
-                </div>
+                </AnimatedTabs>
                 <div className="material-source">
                   <div
                     className={`material-source-panel ${mode === "upload" ? "is-active" : ""}`}
@@ -451,7 +508,7 @@ export function Onboarding() {
                         id="material-file"
                         type="file"
                         className="visually-hidden"
-                        accept=".pdf,.docx,.txt"
+                        accept=".pdf,.docx,.pptx,.txt"
                         onChange={(e) => chooseFile(e.target.files?.[0])}
                       />
                       {file ? (
@@ -494,7 +551,9 @@ export function Onboarding() {
                             {t("Choose a file")}{" "}
                             <span>{t("or drop it here")}</span>
                           </label>
-                          <span>{t("PDF, DOCX, or TXT · Up to 10 MB")}</span>
+                          <span>
+                            {t("PDF, DOCX, PPTX, or TXT · Up to 10 MB")}
+                          </span>
                           <span className="ocr-note">
                             {t("Scanned PDFs welcome. We’ll read those too.")}
                           </span>
@@ -642,7 +701,7 @@ export function Onboarding() {
                 <p className="privacy-note">
                   <LockKeyhole size={13} />{" "}
                   {t(
-                    "Private to your account. Material is processed with Gemini.",
+                    "Private to this browser or your account. Material is processed with Gemini.",
                   )}
                 </p>
               </form>
@@ -690,7 +749,15 @@ export function Onboarding() {
               </span>
             </div>
             {step === "review" ? (
-              <form noValidate onSubmit={reviewForm.handleSubmit(prepare)}>
+              <form
+                noValidate
+                onSubmit={reviewForm.handleSubmit(prepare, (errors) => {
+                  const invalidIndex = sources.findIndex(
+                    (_, i) => errors.sources?.[i]?.text,
+                  );
+                  if (invalidIndex >= 0) setSourceIndex(invalidIndex);
+                })}
+              >
                 <h1 className="flow-heading" tabIndex={-1}>
                   {t("Does this look right?")}
                 </h1>
@@ -701,58 +768,107 @@ export function Onboarding() {
                     ". Correct unclear words or formulas before Milo learns from it.",
                   )}
                 </p>
-                <div className="source-list">
-                  {sources.map((source, i) => (
-                    <div className="source-section" key={source.id}>
-                      <label className="field-label" htmlFor={`source-${i}`}>
-                        <FileText size={15} />
-                        {/^p\d+$/.test(source.id)
-                          ? t("Page {page}", {
-                              page: Number(source.id.slice(1)),
-                            })
-                          : /^Section \d+$/.test(source.label)
-                            ? t("Section {section}", {
-                                section: Number(source.id.slice(1)),
-                              })
-                            : localizeText(source.label)}
-                      </label>
-                      {source.warnings.map((w, n) => (
-                        <p className="source-warning" key={n}>
-                          {localizeText(w)}
-                        </p>
-                      ))}
-                      <Controller
-                        control={reviewForm.control}
-                        name={`sources.${i}.text`}
-                        render={({ field, fieldState }) => (
-                          <>
-                            <MarkdownEditor
-                              id={`source-${i}`}
-                              value={field.value}
-                              onChange={field.onChange}
-                              onBlur={field.onBlur}
-                              inputRef={field.ref}
-                              name={field.name}
-                              invalid={!!fieldState.error}
-                              describedBy={
-                                fieldState.error
-                                  ? `source-${i}-error`
-                                  : undefined
-                              }
-                              rows={Math.min(
-                                12,
-                                Math.max(4, source.text.split("\n").length),
+                <div className="extraction-reader">
+                  <div className="source-list" id="extraction-page">
+                    {sources.map(
+                      (source, i) =>
+                        i === sourceIndex && (
+                          <div className="source-section" key={source.id}>
+                            <label
+                              className="field-label"
+                              htmlFor={`source-${i}`}
+                            >
+                              <FileText size={15} />
+                              {/^p\d+$/.test(source.id)
+                                ? t("Page {page}", {
+                                    page: Number(source.id.slice(1)),
+                                  })
+                                : /^Slide \d+$/.test(source.label)
+                                  ? t("Slide {slide}", {
+                                      slide: Number(source.label.slice(6)),
+                                    })
+                                  : /^Section \d+$/.test(source.label)
+                                    ? t("Section {section}", {
+                                        section: Number(source.id.slice(1)),
+                                      })
+                                    : localizeText(source.label)}
+                            </label>
+                            {source.warnings.map((w, n) => (
+                              <p className="source-warning" key={n}>
+                                {localizeText(w)}
+                              </p>
+                            ))}
+                            <Controller
+                              control={reviewForm.control}
+                              name={`sources.${i}.text`}
+                              render={({ field, fieldState }) => (
+                                <>
+                                  <MarkdownEditor
+                                    id={`source-${i}`}
+                                    defaultTab="preview"
+                                    writeLabel="Edit"
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                    onBlur={field.onBlur}
+                                    inputRef={field.ref}
+                                    name={field.name}
+                                    invalid={!!fieldState.error}
+                                    disabled={!!busy}
+                                    describedBy={
+                                      fieldState.error
+                                        ? `source-${i}-error`
+                                        : undefined
+                                    }
+                                    rows={Math.min(
+                                      12,
+                                      Math.max(
+                                        4,
+                                        source.text.split("\n").length,
+                                      ),
+                                    )}
+                                  />
+                                  <FieldError
+                                    id={`source-${i}`}
+                                    message={fieldState.error?.message}
+                                  />
+                                </>
                               )}
                             />
-                            <FieldError
-                              id={`source-${i}`}
-                              message={fieldState.error?.message}
-                            />
-                          </>
-                        )}
-                      />
-                    </div>
-                  ))}
+                          </div>
+                        ),
+                    )}
+                  </div>
+                  <nav
+                    className="extraction-pagination"
+                    aria-label={t("Review extraction")}
+                  >
+                    <button
+                      className="quiet-button"
+                      type="button"
+                      aria-controls="extraction-page"
+                      disabled={!!busy || sourceIndex === 0}
+                      onClick={() => setSourceIndex((index) => index - 1)}
+                    >
+                      <ChevronLeft size={17} aria-hidden="true" />
+                      {t("Previous")}
+                    </button>
+                    <span role="status" aria-atomic="true">
+                      {t("Page {page} of {total}", {
+                        page: formatNumber(locale, sourceIndex + 1),
+                        total: formatNumber(locale, sources.length),
+                      })}
+                    </span>
+                    <button
+                      className="quiet-button"
+                      type="button"
+                      aria-controls="extraction-page"
+                      disabled={!!busy || sourceIndex >= sources.length - 1}
+                      onClick={() => setSourceIndex((index) => index + 1)}
+                    >
+                      {t("Next")}
+                      <ChevronRight size={17} aria-hidden="true" />
+                    </button>
+                  </nav>
                 </div>
                 <div className="review-summary">
                   <span>
@@ -787,20 +903,22 @@ export function Onboarding() {
                     />
                   )}
                 />
-                <button
-                  className="primary-button"
-                  disabled={!!busy}
-                  type="submit"
-                >
-                  {busy ? (
-                    <Spinner label={t("Preparing your lesson")} />
-                  ) : (
-                    <>
-                      {t("Looks right. Find my lesson")}{" "}
-                      <ArrowRight size={17} />
-                    </>
-                  )}
-                </button>
+                <div className="extraction-actions">
+                  <button
+                    className="primary-button"
+                    disabled={!!busy}
+                    type="submit"
+                  >
+                    {busy ? (
+                      <Spinner label={t("Preparing your lesson")} />
+                    ) : (
+                      <>
+                        {t("Looks right. Find my lesson")}{" "}
+                        <ArrowRight size={17} />
+                      </>
+                    )}
+                  </button>
+                </div>
               </form>
             ) : (
               lesson && (
@@ -946,7 +1064,7 @@ export function Onboarding() {
       </main>
       <footer className="site-footer">
         <span>{t("Understanding grows when you explain.")}</span>
-        <span>{t("Formative feedback · Sign in to save your sessions")}</span>
+        <span>{t("Formative feedback · No account needed")}</span>
       </footer>
       {missing.length > 0 && (
         <div className="setup-note">

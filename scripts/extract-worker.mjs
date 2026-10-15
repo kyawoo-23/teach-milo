@@ -44,16 +44,19 @@ function reliableText(items, text) {
   return true;
 }
 
-async function inspectDocx(bytes) {
+async function inspectOfficeArchive(bytes, extension) {
   const yauzl = require("yauzl");
   let nativeEquations = false;
+  const parts = new Map();
   await new Promise((resolve, reject) => {
     yauzl.fromBuffer(
       bytes,
       { lazyEntries: true, validateEntrySizes: true, strictFileNames: true },
       (err, zip) => {
         if (err || !zip)
-          return reject(new Error("This DOCX archive is damaged."));
+          return reject(
+            new Error(`This ${extension.toUpperCase()} archive is damaged.`),
+          );
         let count = 0,
           inflated = 0;
         const names = new Set();
@@ -61,7 +64,7 @@ async function inspectDocx(bytes) {
           zip.close();
           reject(new Error(message));
         };
-        zip.on("error", () => fail("This DOCX archive could not be read."));
+        zip.on("error", () => fail("This document archive could not be read."));
         zip.on("entry", (entry) => {
           if (
             ++count > 500 ||
@@ -81,8 +84,13 @@ async function inspectDocx(bytes) {
               return fail("This document archive is damaged.");
             const xml = [];
             const isWordXml = /^word\/.*\.xml$/.test(entry.fileName);
+            const isPresentationXml =
+              extension === "pptx" &&
+              /^(?:ppt\/presentation\.xml|ppt\/_rels\/presentation\.xml\.rels|ppt\/slides\/[^/]+\.xml)$/.test(
+                entry.fileName,
+              );
             stream.on("data", (chunk) => {
-              if (isWordXml) xml.push(chunk);
+              if (isWordXml || isPresentationXml) xml.push(chunk);
               inflated += chunk.length;
               if (inflated > 25000000) {
                 stream.destroy();
@@ -93,6 +101,8 @@ async function inspectDocx(bytes) {
             });
             stream.on("error", () => fail("This document archive is damaged."));
             stream.on("end", () => {
+              if (isPresentationXml)
+                parts.set(entry.fileName, Buffer.concat(xml).toString("utf8"));
               if (
                 isWordXml &&
                 /<(?:[\w.-]+:)?oMath(?:Para)?(?=[\s/>])/.test(
@@ -105,18 +115,150 @@ async function inspectDocx(bytes) {
           });
         });
         zip.on("end", () =>
-          names.has("[Content_Types].xml") && names.has("word/document.xml")
+          names.has("[Content_Types].xml") &&
+          (extension === "docx"
+            ? names.has("word/document.xml")
+            : names.has("ppt/presentation.xml") &&
+              names.has("ppt/_rels/presentation.xml.rels"))
             ? resolve()
-            : reject(new Error("Upload a valid DOCX document.")),
+            : reject(
+                new Error(
+                  `Upload a valid ${extension.toUpperCase()} document.`,
+                ),
+              ),
         );
         zip.readEntry();
       },
     );
   });
-  return nativeEquations;
+  return { nativeEquations, parts };
+}
+
+async function extractPptx(bytes) {
+  const { parts } = await inspectOfficeArchive(bytes, "pptx");
+  const { XMLParser, XMLValidator } = require("fast-xml-parser");
+  const parser = new XMLParser({
+    preserveOrder: true,
+    ignoreAttributes: false,
+    parseTagValue: false,
+    trimValues: false,
+  });
+  const parse = (name) => {
+    const xml = parts.get(name);
+    if (
+      !xml ||
+      /<!DOCTYPE|<!ENTITY/i.test(xml) ||
+      XMLValidator.validate(xml) !== true
+    )
+      throw new Error("This PPTX contains missing or damaged slide data.");
+    return parser.parse(xml);
+  };
+  const localName = (key) => key.split(":").at(-1);
+  const children = (nodes, name) =>
+    nodes.flatMap((node) =>
+      Object.entries(node)
+        .filter(([key]) => localName(key) === name)
+        .map(([, value]) => ({ nodes: value, attributes: node[":@"] ?? {} })),
+    );
+  const presentation = children(
+    parse("ppt/presentation.xml"),
+    "presentation",
+  )[0];
+  const slideList = presentation && children(presentation.nodes, "sldIdLst")[0];
+  const slides = slideList ? children(slideList.nodes, "sldId") : [];
+  if (!slides.length) throw new Error("This PPTX has no slides to read.");
+  if (slides.length > 50)
+    throw new Error("Choose a PPTX with 50 slides or fewer.");
+  const relationships = children(
+    parse("ppt/_rels/presentation.xml.rels"),
+    "Relationships",
+  )[0];
+  if (!relationships)
+    throw new Error("This PPTX contains missing or damaged slide data.");
+  const links = new Map(
+    children(relationships.nodes, "Relationship").map(({ attributes }) => [
+      attributes["@_Id"],
+      attributes,
+    ]),
+  );
+  let length = 0;
+  const sources = slides.map(({ attributes }, index) => {
+    const relationshipId = Object.entries(attributes).find(([key]) =>
+      key.endsWith(":id"),
+    )?.[1];
+    const link = links.get(relationshipId);
+    if (
+      !link ||
+      link["@_TargetMode"] === "External" ||
+      !link["@_Type"]?.endsWith("/slide")
+    )
+      throw new Error("This PPTX contains missing or damaged slide data.");
+    const target = link["@_Target"] ?? "";
+    const name = path.posix.normalize(
+      target.startsWith("/") ? target.slice(1) : `ppt/${target}`,
+    );
+    if (!/^ppt\/slides\/[^/]+\.xml$/.test(name))
+      throw new Error("This PPTX contains an invalid slide reference.");
+    const root = children(parse(name), "sld")[0];
+    if (!root)
+      throw new Error("This PPTX contains missing or damaged slide data.");
+    const paragraphs = [];
+    let visual = false;
+    const inlineText = (nodes) =>
+      nodes
+        .map((node) =>
+          Object.entries(node)
+            .filter(([key]) => key !== ":@")
+            .map(([key, value]) => {
+              const tag = localName(key);
+              if (tag === "oMath" || tag === "oMathPara") {
+                visual = true;
+                return "";
+              }
+              if (tag === "t" && Array.isArray(value))
+                return value.map((node) => node["#text"] ?? "").join("");
+              if (tag === "br") return "\n";
+              return Array.isArray(value) ? inlineText(value) : "";
+            })
+            .join(""),
+        )
+        .join("");
+    const visit = (nodes) => {
+      for (const node of nodes)
+        for (const [key, value] of Object.entries(node)) {
+          const tag = localName(key);
+          if (["pic", "graphicData", "oMath", "oMathPara"].includes(tag))
+            visual = true;
+          if (tag === "oMath" || tag === "oMathPara") continue;
+          if (tag === "p" && Array.isArray(value))
+            paragraphs.push(inlineText(value));
+          else if (Array.isArray(value)) visit(value);
+        }
+    };
+    visit(root.nodes);
+    const text = paragraphs.join("\n").trim();
+    length += text.length;
+    if (length > MAX_TEXT)
+      throw new Error(
+        "Choose a shorter section: materials are limited to 50,000 characters.",
+      );
+    const warnings = [];
+    if (visual)
+      warnings.push(
+        "Images, charts, diagrams, and native equations in this slide were not extracted. Upload a PDF to include visual content.",
+      );
+    if (!text) warnings.push("No readable text was extracted from this slide.");
+    return { id: `s${index + 1}`, label: `Slide ${index + 1}`, text, warnings };
+  });
+  if (length < 30)
+    throw new Error(
+      "This presentation has too little readable text. Upload a PDF to include visual content, or paste your notes.",
+    );
+  return { sources, chunks: [] };
 }
 async function extract() {
   const bytes = Buffer.from(workerData.bytes);
+  if (workerData.extension === "pptx") return extractPptx(bytes);
   if (workerData.extension === "pdf") {
     if (!bytes.subarray(0, 1024).includes(Buffer.from("%PDF-")))
       throw new Error("This file is not a PDF.");
@@ -246,7 +388,7 @@ async function extract() {
   let text;
   const warnings = [];
   if (workerData.extension === "docx") {
-    if (await inspectDocx(bytes))
+    if ((await inspectOfficeArchive(bytes, "docx")).nativeEquations)
       warnings.push(
         "Native equations in this DOCX were not extracted. Add them as LaTeX during review, or upload a PDF.",
       );

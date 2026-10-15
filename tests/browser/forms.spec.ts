@@ -201,6 +201,10 @@ test("material and extraction validation block bad submissions and recover after
   await expect(
     page.getByRole("heading", { name: "Does this look right?" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("tab", { name: "Preview", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("tab", { name: "Edit", exact: true }).click();
   await page.locator("#source-0").fill(" ");
   await page
     .getByRole("button", { name: "Looks right. Find my lesson" })
@@ -220,6 +224,112 @@ test("material and extraction validation block bad submissions and recover after
       () => sent.filter((request) => request.path === "/api/lessons").length,
     )
     .toBe(1);
+});
+
+test("extraction pages preserve edits and open the page with a validation error", async ({
+  page,
+}) => {
+  const sent = await setup(page);
+  await page.route("**/api/materials", (route) =>
+    route.fulfill({
+      json: {
+        id,
+        name: "Learning material.pptx",
+        sources: [1, 2, 3].map((number) => ({
+          id: `s${number}`,
+          label: `Slide ${number}`,
+          text:
+            number === 2
+              ? Array(30).fill(notes).join("\n\n")
+              : `${notes} Page ${number}.`,
+          warnings: number === 2 ? ["Check the formula on this page."] : [],
+        })),
+      },
+    }),
+  );
+  await page.goto("/");
+  await page.locator("input[type=file]").setInputFiles({
+    name: "Learning material.pptx",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    buffer: Buffer.from("Mocked presentation upload"),
+  });
+  await page
+    .getByLabel("What would you like to focus on?")
+    .fill("Photosynthesis");
+  await page.getByRole("button", { name: "Prepare my lesson" }).click();
+  const previous = page.getByRole("button", { name: "Previous", exact: true });
+  const next = page.getByRole("button", { name: "Next", exact: true });
+  await expect(
+    page.getByRole("status").filter({ hasText: "Page 1 of 3" }),
+  ).toBeVisible();
+  await expect(previous).toBeDisabled();
+  await expect(page.locator(".source-section")).toHaveCount(1);
+  await next.scrollIntoViewIfNeeded();
+  const paginationBounds = async () =>
+    Promise.all([previous.boundingBox(), next.boundingBox()]);
+  const initialBounds = await paginationBounds();
+  await next.click();
+  await expect(page.getByText("Check the formula on this page.")).toBeVisible();
+  await expect.poll(paginationBounds).toEqual(initialBounds);
+  await expect
+    .poll(() =>
+      page
+        .locator(".source-section")
+        .evaluate((element) => element.scrollHeight > element.clientHeight),
+    )
+    .toBe(true);
+  await previous.click();
+  await expect(page.getByText("Page 1 of 3", { exact: true })).toBeVisible();
+  await expect.poll(paginationBounds).toEqual(initialBounds);
+  await expect(
+    page.getByRole("tab", { name: "Preview", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("tab", { name: "Edit", exact: true }).click();
+  await page.locator("#source-0").fill(" ");
+  await next.click();
+  await expect(page.getByText("Check the formula on this page.")).toBeVisible();
+  await expect(
+    page.getByRole("tab", { name: "Preview", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("tab", { name: "Edit", exact: true }).click();
+  await page.locator("#source-1").fill(" ");
+  await next.click();
+  await expect(next).toBeDisabled();
+  await expect(page.getByText("Check the formula on this page.")).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByRole("tab", { name: "Preview", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("tab", { name: "Edit", exact: true }).click();
+  await page.locator("#source-2").fill(" ");
+  await previous.click();
+  await expect(page.locator("#source-1")).toHaveValue(" ");
+  await next.click();
+  await page
+    .getByRole("button", { name: "Looks right. Find my lesson" })
+    .click();
+  await expect(page.locator("#source-0")).toBeFocused();
+  await expect(
+    page.getByText("Include at least one passage of 30 characters."),
+  ).toBeVisible();
+  const corrected = `${notes} Corrected text.`;
+  await page.locator("#source-0").fill(corrected);
+  await next.click();
+  await page
+    .getByRole("button", { name: "Looks right. Find my lesson" })
+    .click();
+  await expect
+    .poll(
+      () => sent.filter((request) => request.path === "/api/lessons").length,
+    )
+    .toBe(1);
+  expect(
+    sent
+      .find((request) => request.path === "/api/lessons")!
+      .data.sources.map((source: { text: string }) => source.text),
+  ).toEqual([corrected, " ", " "]);
 });
 
 test("independent check requires each numeric field, preserves answers and permits explicit skipping", async ({

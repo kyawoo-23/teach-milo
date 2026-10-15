@@ -11,7 +11,7 @@ export function NotificationToast({
 }: {
   message: string;
   error: boolean;
-  onClose: () => void;
+  onClose?: () => void;
 }) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement>(null);
@@ -30,14 +30,16 @@ export function NotificationToast({
       <p role={error ? "alert" : "status"} aria-atomic="true">
         {message}
       </p>
-      <button
-        type="button"
-        className="icon-button"
-        aria-label={t("Close notification")}
-        onClick={onClose}
-      >
-        <X size={18} aria-hidden="true" />
-      </button>
+      {onClose && (
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={t("Close notification")}
+          onClick={onClose}
+        >
+          <X size={18} aria-hidden="true" />
+        </button>
+      )}
     </div>
   );
 }

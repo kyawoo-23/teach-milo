@@ -46,6 +46,10 @@ import {
   sessionFixture,
 } from "./fixtures";
 
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: () => undefined }),
+}));
+
 vi.mock("@/server/auth", () => ({ getAuthenticatedUser: vi.fn() }));
 
 const enabled = !!process.env.FIRESTORE_EMULATOR_HOST;

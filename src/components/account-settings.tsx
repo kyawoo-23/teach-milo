@@ -1,5 +1,7 @@
 "use client";
 
+import { AnimatedTabs } from "./animated-tabs";
+
 import { useId, useRef, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { UpdateProfileSchema, type UserPublic } from "@/lib/contracts";
@@ -123,7 +125,8 @@ export function AccountSettings({
       className="account-settings-modal"
     >
       <div className="account-settings-content">
-        <div
+        <AnimatedTabs
+          activeKey={activeTab}
           className="auth-tabs"
           role="tablist"
           aria-label={t("Account settings")}
@@ -172,7 +175,7 @@ export function AccountSettings({
               )}
             </button>
           ))}
-        </div>
+        </AnimatedTabs>
         <div
           role="tabpanel"
           id={`${tabId}-profile-panel`}

@@ -190,6 +190,15 @@ export function Modal({
 }
 export function useOperationId(scope = "preparation") {
   const operation = useRef<{ key: string; id: string } | null>(null);
+  useEffect(() => {
+    if (scope !== "preparation") return;
+    const reset = () => {
+      operation.current = null;
+    };
+    window.addEventListener("teachback-preparation-reset", reset);
+    return () =>
+      window.removeEventListener("teachback-preparation-reset", reset);
+  }, [scope]);
   return (key: string) => {
     if (!operation.current) {
       try {

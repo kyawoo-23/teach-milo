@@ -1,7 +1,7 @@
 import { Lesson, PrepareSchema, publicLesson } from "@/lib/contracts";
 import {
   assertOrigin,
-  requireUserId,
+  requireLearningOwnerId,
   json,
   respond,
   route,
@@ -15,7 +15,7 @@ export const maxDuration = 180;
 export async function POST(request: Request) {
   return route(async () => {
     assertOrigin(request);
-    const ownerId = await requireUserId();
+    const ownerId = await requireLearningOwnerId();
     const input = await json(request, PrepareSchema);
     const id = await ownerOperation(
       ownerId,

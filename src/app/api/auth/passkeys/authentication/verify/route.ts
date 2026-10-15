@@ -1,4 +1,4 @@
-import { createUserSession, toPublicUser } from "@/server/auth";
+import { finishSignIn } from "@/server/auth";
 import { PasskeyAuthenticationSchema } from "@/lib/passkey-contracts";
 import { assertOrigin, json, respond, route } from "@/server/http";
 import { authenticatePasskey } from "@/server/passkeys";
@@ -9,7 +9,6 @@ export async function POST(request: Request) {
     assertOrigin(request);
     const input = await json(request, PasskeyAuthenticationSchema);
     const user = await authenticatePasskey(input.ceremonyId, input.credential);
-    await createUserSession(user.id, user.authVersion ?? 0);
-    return respond({ user: toPublicUser(user) });
+    return respond(await finishSignIn(user));
   });
 }

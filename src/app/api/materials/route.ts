@@ -3,7 +3,7 @@ import { z } from "zod";
 import { CreateMaterialSchema, Id } from "@/lib/contracts";
 import {
   assertOrigin,
-  requireUserId,
+  requireLearningOwnerId,
   hash,
   json,
   respond,
@@ -23,7 +23,7 @@ export const maxDuration = 300;
 export async function POST(request: Request) {
   return route(async () => {
     assertOrigin(request);
-    const ownerId = await requireUserId();
+    const ownerId = await requireLearningOwnerId();
     let id: string;
     if (
       request.headers.get("content-type")?.startsWith("multipart/form-data")

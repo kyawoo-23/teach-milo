@@ -49,7 +49,130 @@ function zip(entries: Record<string, string>) {
   end.writeUInt32LE(offset, 16);
   return Buffer.concat([...chunks, dir, end]);
 }
+function pptx(
+  slides: string[],
+  order = slides.map((_, i) => i + 1),
+  extra: Record<string, string> = {},
+) {
+  return zip({
+    "[Content_Types].xml":
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>',
+    "ppt/presentation.xml": `<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst>${order.map((n, i) => `<p:sldId id="${256 + i}" r:id="rId${n}"/>`).join("")}</p:sldIdLst></p:presentation>`,
+    "ppt/_rels/presentation.xml.rels": `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${slides.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${i + 1}.xml"/>`).join("")}</Relationships>`,
+    ...Object.fromEntries(
+      slides.map((content, i) => [
+        `ppt/slides/slide${i + 1}.xml`,
+        `<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree>${content}</p:spTree></p:cSld></p:sld>`,
+      ]),
+    ),
+    ...extra,
+  });
+}
 describe("bounded material extraction", () => {
+  it("extracts PPTX paragraphs, runs and table cells in presentation order without Gemini", async () => {
+    const bytes = pptx(
+      [
+        "<p:sp><p:txBody><a:p><a:r><a:t>Second &amp; final slide explains </a:t></a:r><a:r><a:t>energy transfer.</a:t></a:r></a:p></p:txBody></p:sp>",
+        "<p:sp><p:txBody><a:p><a:r><a:t>First slide explains how plants store energy.</a:t></a:r><a:br/><a:r><a:t>More detail.</a:t></a:r></a:p></p:txBody></p:sp><a:tbl><a:tr><a:tc><a:txBody><a:p><a:r><a:t>Table cell</a:t></a:r></a:p></a:txBody></a:tc></a:tr></a:tbl>",
+      ],
+      [2, 1],
+      {
+        "ppt/notesSlides/notesSlide1.xml":
+          "<notes>Private speaker notes</notes>",
+      },
+    );
+    const generate = vi.fn();
+    const sources = await extractUpload(bytes, "Lesson.PPTX", ctx, {
+      generate,
+    });
+    expect(sources.map(({ id, label, text }) => ({ id, label, text }))).toEqual(
+      [
+        {
+          id: "s1",
+          label: "Slide 1",
+          text: "First slide explains how plants store energy.\nMore detail.\nTable cell",
+        },
+        {
+          id: "s2",
+          label: "Slide 2",
+          text: "Second & final slide explains energy transfer.",
+        },
+      ],
+    );
+    expect(generate).not.toHaveBeenCalled();
+  });
+  it("retains blank PPTX slides and warns about visual content", async () => {
+    const result = await extractInWorker(
+      pptx([
+        "<a:p><a:r><a:t>A useful explanation with enough readable text for a lesson.</a:t></a:r></a:p>",
+        "<p:pic/>",
+        "",
+      ]),
+      "pptx",
+    );
+    expect(result.sources).toHaveLength(3);
+    expect(result.sources[1]).toMatchObject({ label: "Slide 2", text: "" });
+    expect(result.sources[1].warnings.join(" ")).toContain("Upload a PDF");
+    expect(result.sources[2].warnings).toEqual([
+      "No readable text was extracted from this slide.",
+    ]);
+  });
+  it("preserves literal formulas but does not flatten native PPTX equations into prose", async () => {
+    const result = await extractInWorker(
+      pptx([
+        '<a:p><a:r><a:t>A useful worked example uses $x^2$ and explains each step.</a:t></a:r><m:oMath xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><m:r><m:t>lost structure</m:t></m:r></m:oMath></a:p>',
+      ]),
+      "pptx",
+    );
+    expect(result.sources[0].text).toBe(
+      "A useful worked example uses $x^2$ and explains each step.",
+    );
+    expect(result.sources[0].warnings.join(" ")).toContain("native equations");
+  });
+  it("rejects invalid, oversized, unreadable and unsafe PPTX files", async () => {
+    await expect(
+      extractInWorker(Buffer.from("not a zip"), "pptx"),
+    ).rejects.toThrow();
+    await expect(
+      extractInWorker(zip({ "[Content_Types].xml": "<Types/>" }), "pptx"),
+    ).rejects.toThrow("valid PPTX");
+    await expect(
+      extractInWorker(pptx(["<a:p><a:t>short</a:t></a:p>"]), "pptx"),
+    ).rejects.toThrow("too little readable text");
+    await expect(
+      extractInWorker(pptx(Array(51).fill("")), "pptx"),
+    ).rejects.toThrow("50 slides");
+    await expect(
+      extractInWorker(
+        pptx([`<a:p><a:t>${"x".repeat(50001)}</a:t></a:p>`]),
+        "pptx",
+      ),
+    ).rejects.toThrow("50,000");
+    await expect(extractInWorker(pptx(["<a:p>"]), "pptx")).rejects.toThrow(
+      "damaged",
+    );
+    await expect(
+      extractInWorker(
+        pptx([""], [1], {
+          "ppt/slides/slide1.xml":
+            '<!DOCTYPE x [<!ENTITY x "expanded">]><x>&x;</x>',
+        }),
+        "pptx",
+      ),
+    ).rejects.toThrow("damaged");
+    await expect(
+      extractInWorker(
+        pptx([""], [1], {
+          "ppt/_rels/presentation.xml.rels":
+            '<Relationships><Relationship Id="rId1" Type="example/slide" Target="../../outside.xml"/></Relationships>',
+        }),
+        "pptx",
+      ),
+    ).rejects.toThrow("invalid slide reference");
+    await expect(
+      extractInWorker(pptx([""], [1], { "../escape": "bad" }), "pptx"),
+    ).rejects.toThrow();
+  });
   it("invalidates extraction reuse when user, bytes, model or prompt change", () => {
     const key = extractionCacheId(
       "owner",

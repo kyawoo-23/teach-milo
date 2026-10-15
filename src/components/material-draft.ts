@@ -1,4 +1,5 @@
 import type { TeachingLanguage } from "@/lib/i18n/locales";
+import type { LessonPublic, SessionMode, Source } from "@/lib/contracts";
 // Keeps the learner's unsent material across a sign-in redirect (e.g. Google OAuth).
 // Text fields live in sessionStorage; the chosen file is kept in IndexedDB.
 export type MaterialDraft = {
@@ -7,6 +8,13 @@ export type MaterialDraft = {
   topic: string;
   level: string;
   teachingLanguage?: TeachingLanguage;
+  flow?: {
+    step: "material" | "review" | "lesson";
+    material: { id: string; name: string; sources: Source[] } | null;
+    sources: Source[];
+    lesson: LessonPublic | null;
+    sessionMode: SessionMode;
+  };
 };
 
 const KEY = "teachback:material-draft";

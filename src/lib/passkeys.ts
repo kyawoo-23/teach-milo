@@ -1,7 +1,7 @@
 "use client";
 
 import "webauthn-polyfills";
-import type { UserPublic } from "./contracts";
+import type { AuthIdentity, UserPublic } from "./contracts";
 import type { PasskeyList } from "./passkey-contracts";
 import { api, ApiError } from "./api-client";
 
@@ -103,7 +103,7 @@ export async function signInWithPasskey(
   signal.throwIfAborted();
   const encoded = credential.toJSON();
   try {
-    return await api<{ user: UserPublic }>(
+    return await api<AuthIdentity>(
       "/api/auth/passkeys/authentication/verify",
       {
         ceremonyId,

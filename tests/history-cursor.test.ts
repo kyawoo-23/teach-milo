@@ -3,6 +3,10 @@ import { GET } from "@/app/api/sessions/route";
 import { getAuthenticatedUser } from "@/server/auth";
 import { database } from "@/server/db";
 
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: () => undefined }),
+}));
+
 vi.mock("@/server/auth", () => ({ getAuthenticatedUser: vi.fn() }));
 vi.mock("@/server/db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/server/db")>()),

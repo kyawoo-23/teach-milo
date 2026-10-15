@@ -1,7 +1,7 @@
 import { Id, Message, Session } from "@/lib/contracts";
 import { AppError } from "@/lib/errors";
 import { database, decode, readOwned } from "@/server/db";
-import { requireUserId, respond, route } from "@/server/http";
+import { requireLearningOwnerId, respond, route } from "@/server/http";
 import { readMessagePage } from "@/server/sessions";
 import { publicMessages } from "@/server/board-media";
 export async function GET(
@@ -9,7 +9,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   return route(async () => {
-    const owner = await requireUserId();
+    const owner = await requireLearningOwnerId();
     const id = Id.parse((await context.params).id);
     const session = await readOwned<
       Pick<Session, "ownerId" | "expiresAt" | "phase">

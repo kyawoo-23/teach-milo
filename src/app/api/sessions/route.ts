@@ -12,7 +12,7 @@ import { AppError } from "@/lib/errors";
 import { database, decode } from "@/server/db";
 import {
   assertOrigin,
-  requireUserId,
+  requireLearningOwnerId,
   json,
   respond,
   route,
@@ -70,7 +70,7 @@ function readCursor(value: string | null) {
 
 export async function GET(request: Request) {
   return route(async () => {
-    const ownerId = await requireUserId();
+    const ownerId = await requireLearningOwnerId();
     const cursor = readCursor(new URL(request.url).searchParams.get("cursor"));
     const now = Timestamp.now();
     let query = database()
@@ -173,7 +173,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   return route(async () => {
     assertOrigin(request);
-    const ownerId = await requireUserId();
+    const ownerId = await requireLearningOwnerId();
     const input = await json(
       request,
       z

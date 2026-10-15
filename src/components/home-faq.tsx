@@ -13,7 +13,7 @@ const questions: { question: TranslationKey; answer: TranslationKey }[] = [
   {
     question: "What learning materials can I use?",
     answer:
-      "Upload a PDF, DOCX, or TXT file smaller than 10 MB, or paste your notes. You can review the extracted text before preparing your lesson.",
+      "Upload a PDF, DOCX, PPTX, or TXT file smaller than 10 MB, or paste your notes. You can review the extracted text before preparing your lesson.",
   },
   {
     question: "What happens in a session?",
@@ -23,7 +23,7 @@ const questions: { question: TranslationKey; answer: TranslationKey }[] = [
   {
     question: "Can I return to my sessions?",
     answer:
-      "Sign in to save and revisit your sessions from history. Sessions expire after the retention period, which is 7 days by default. You can also delete a session anytime.",
+      "Guest sessions are available from history in the same browser. Sign in to access them across devices. Sessions expire after seven days by default, and you can delete a session anytime.",
   },
 ];
 
