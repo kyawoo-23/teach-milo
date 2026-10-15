@@ -63,6 +63,12 @@ describe("client form validation", () => {
         file: new File(["source"], "notes.TXT"),
       }).success,
     ).toBe(true);
+    expect(
+      materialFormSchema(true).safeParse({
+        ...base,
+        file: new File(["presentation"], "lesson.PPTX"),
+      }).success,
+    ).toBe(true);
     for (const file of [
       new File(["source"], "notes.exe"),
       new File([], "empty.txt"),

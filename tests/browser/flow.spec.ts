@@ -774,7 +774,7 @@ for (const viewport of [
       page.getByRole("heading", { name: "Does this look right?" }),
     ).toBeVisible();
     await assertFits();
-    await page.getByRole("tab", { name: "Write", exact: true }).focus();
+    await page.getByRole("tab", { name: "Edit", exact: true }).focus();
     await page.keyboard.press("ArrowRight");
     await expect(
       page.getByRole("tab", { name: "Preview", exact: true }),

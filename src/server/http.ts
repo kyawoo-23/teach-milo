@@ -4,6 +4,7 @@ import { z } from "zod";
 import { isTranslationKey } from "@/lib/i18n/messages";
 import { AppError } from "@/lib/errors";
 import { getAuthenticatedUser } from "./auth";
+import { getGuest, guestClaimState } from "./guests";
 
 export const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 export function assertOrigin(request: Request) {
@@ -30,6 +31,27 @@ export async function requireUserId() {
       401,
     );
   return user.id;
+}
+export async function requireLearningOwnerId() {
+  const user = await getAuthenticatedUser();
+  if (user) {
+    if ((await guestClaimState(user.id))?.status === "pending")
+      throw new AppError(
+        "GUEST_SYNC_PENDING",
+        "Moving your guest work to your account…",
+        409,
+        1,
+      );
+    return user.id;
+  }
+  const guest = await getGuest();
+  if (!guest)
+    throw new AppError(
+      "GUEST_ACCESS_REQUIRED",
+      "Your browser access expired or is unavailable. Sign in to your account or start a new lesson.",
+      401,
+    );
+  return guest.id;
 }
 export async function json<T>(
   request: Request,

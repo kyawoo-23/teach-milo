@@ -1,5 +1,7 @@
 "use client";
 
+import { AnimatedTabs } from "./animated-tabs";
+
 import { useI18n } from "@/components/locale-context";
 import { useEffect, useId, useRef, useState } from "react";
 import type { Message, SessionPublic, UserPublic } from "@/lib/contracts";
@@ -77,7 +79,8 @@ export function CompletedSessionView({
           <Milo size={64} state="reply" reactionKey={session.id} interactive />
           <span>{t("Thanks for teaching me.")}</span>
         </div>
-        <div
+        <AnimatedTabs
+          activeKey={view}
           className="completed-tabs"
           role="tablist"
           aria-label={t("Completed session")}
@@ -114,7 +117,7 @@ export function CompletedSessionView({
               {tab === "report" ? t("Report") : t("Chat")}
             </button>
           ))}
-        </div>
+        </AnimatedTabs>
       </div>
       <div
         role="tabpanel"

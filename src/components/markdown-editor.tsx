@@ -1,5 +1,7 @@
 "use client";
 
+import { AnimatedTabs } from "./animated-tabs";
+
 import { localize } from "@/lib/i18n/messages";
 import type { Locale } from "@/lib/i18n/locales";
 import { useI18n } from "@/components/locale-context";
@@ -296,6 +298,8 @@ export function MarkdownEditor({
   compact = false,
   bar = true,
   tabs = true,
+  defaultTab = "write",
+  writeLabel = "Write",
   selectionToolbar = false,
   maxLength = 50000,
   disabled,
@@ -318,12 +322,18 @@ export function MarkdownEditor({
   compact?: boolean;
   bar?: boolean;
   tabs?: boolean;
+  defaultTab?: "write" | "preview";
+  writeLabel?: "Write" | "Edit";
   selectionToolbar?: boolean;
   submitOnEnter?: boolean;
 }) {
   const { t, text: localizeText, locale } = useI18n();
 
-  const [tab, setTab] = useState<"write" | "preview">("write");
+  const [tab, setTab] = useState<"write" | "preview">(defaultTab);
+  const tabOrder =
+    defaultTab === "preview"
+      ? (["preview", "write"] as const)
+      : (["write", "preview"] as const);
   const [bubble, setBubble] = useState<{
     top: number;
     left: number;
@@ -486,12 +496,13 @@ export function MarkdownEditor({
       {bar && (
         <div className="md-bar">
           {tabs && (
-            <div
+            <AnimatedTabs
+              activeKey={tab}
               className="md-tabs"
               role="tablist"
               aria-label={t("Editor mode")}
             >
-              {(["write", "preview"] as const).map((tabId) => (
+              {tabOrder.map((tabId) => (
                 <button
                   key={tabId}
                   type="button"
@@ -510,9 +521,9 @@ export function MarkdownEditor({
                     event.preventDefault();
                     const next =
                       event.key === "Home"
-                        ? "write"
+                        ? tabOrder[0]
                         : event.key === "End"
-                          ? "preview"
+                          ? tabOrder[1]
                           : tabId === "write"
                             ? "preview"
                             : "write";
@@ -521,10 +532,10 @@ export function MarkdownEditor({
                   }}
                   onClick={() => setTab(tabId)}
                 >
-                  {tabId === "write" ? t("Write") : t("Preview")}
+                  {tabId === "write" ? t(writeLabel) : t("Preview")}
                 </button>
               ))}
-            </div>
+            </AnimatedTabs>
           )}
           {(!tabs || tab === "write") && (
             <div

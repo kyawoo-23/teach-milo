@@ -1,5 +1,6 @@
 import { getGoogleOAuthUrl } from "@/server/auth";
 import { AppError } from "@/lib/errors";
+import { createGoogleState } from "@/server/guests";
 
 export const runtime = "nodejs";
 
@@ -9,11 +10,12 @@ export async function GET(request: Request) {
     const origin = process.env.APP_ORIGIN || url.origin;
     const returnTo = url.searchParams.get("returnTo") || "/";
     // Sanitize returnTo to ensure it's a relative path
+    const target = new URL(returnTo, origin);
     const safeReturnTo =
-      returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/";
-    const state = Buffer.from(
-      JSON.stringify({ returnTo: safeReturnTo, nonce: Date.now() }),
-    ).toString("base64url");
+      returnTo.startsWith("/") && target.origin === origin
+        ? target.pathname + target.search + target.hash
+        : "/";
+    const state = await createGoogleState(safeReturnTo);
     const authUrl = getGoogleOAuthUrl(origin, state);
     return Response.redirect(authUrl, 302);
   } catch (e) {

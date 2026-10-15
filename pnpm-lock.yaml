@@ -29,6 +29,9 @@ importers:
       clsx:
         specifier: 2.1.1
         version: 2.1.1
+      fast-xml-parser:
+        specifier: 5.11.2
+        version: 5.11.2
       firebase-admin:
         specifier: 14.5.0
         version: 14.5.0(supports-color@7.2.0)
@@ -5285,8 +5288,7 @@ snapshots:
   '@next/swc-win32-x64-msvc@16.4.0':
     optional: true
 
-  '@nodable/entities@3.1.0':
-    optional: true
+  '@nodable/entities@3.1.0': {}
 
   '@opentelemetry/api@1.9.1': {}
 
@@ -5812,8 +5814,7 @@ snapshots:
       normalize-path: 3.0.0
       picomatch: 2.3.2
 
-  anynum@1.0.1:
-    optional: true
+  anynum@1.0.1: {}
 
   archiver-utils@5.0.2:
     dependencies:
@@ -6579,7 +6580,6 @@ snapshots:
     dependencies:
       path-expression-matcher: 1.6.2
       xml-naming: 0.3.0
-    optional: true
 
   fast-xml-parser@5.11.2:
     dependencies:
@@ -6589,7 +6589,6 @@ snapshots:
       path-expression-matcher: 1.6.2
       strnum: 2.4.2
       xml-naming: 0.3.0
-    optional: true
 
   faye-websocket@0.11.4:
     dependencies:
@@ -7244,8 +7243,7 @@ snapshots:
 
   is-unicode-supported@0.1.0: {}
 
-  is-unsafe@2.0.2:
-    optional: true
+  is-unsafe@2.0.2: {}
 
   is-url@1.2.4: {}
 
@@ -8246,8 +8244,7 @@ snapshots:
 
   parseurl@1.3.3: {}
 
-  path-expression-matcher@1.6.2:
-    optional: true
+  path-expression-matcher@1.6.2: {}
 
   path-key@3.1.1: {}
 
@@ -8909,7 +8906,6 @@ snapshots:
   strnum@2.4.2:
     dependencies:
       anynum: 1.0.1
-    optional: true
 
   stubs@3.0.0: {}
 
@@ -9375,8 +9371,7 @@ snapshots:
 
   xdg-basedir@4.0.0: {}
 
-  xml-naming@0.3.0:
-    optional: true
+  xml-naming@0.3.0: {}
 
   xmlbuilder@10.1.1: {}
 

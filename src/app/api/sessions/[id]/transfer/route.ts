@@ -1,7 +1,7 @@
 import { Id, TransferSchema } from "@/lib/contracts";
 import {
   assertOrigin,
-  requireUserId,
+  requireLearningOwnerId,
   json,
   respond,
   route,
@@ -15,7 +15,7 @@ export async function POST(
 ) {
   return route(async () => {
     assertOrigin(request);
-    const owner = await requireUserId();
+    const owner = await requireLearningOwnerId();
     const id = Id.parse((await context.params).id);
     const input = await json(request, TransferSchema);
     const snapshot = await submitTransfer(

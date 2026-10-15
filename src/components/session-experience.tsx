@@ -19,7 +19,7 @@ import {
   History,
   Layers3,
   Lightbulb,
-  LogIn,
+  UserRound,
   MessageCircle,
   Paperclip,
   ShieldCheck,
@@ -63,11 +63,14 @@ export function SessionExperience({ id }: { id: string }) {
   const pathname = usePathname();
   const {
     user,
+    guest,
+    ownerId,
+    refreshUser,
     loading: authLoading,
     openAuthModal,
     openSessionModal,
   } = useAuth();
-  const userId = user?.id;
+  const userId = ownerId;
   const getOperation = useOperationId(id);
   const busyRef = useRef(false);
   const [session, setSession] = useState<SessionPublic | null>(null);
@@ -221,10 +224,18 @@ export function SessionExperience({ id }: { id: string }) {
             clearBoardDrafts(userId, id);
             notFound();
           }
-          if (e instanceof ApiError && e.code === "AUTH_REQUIRED") {
+          if (
+            e instanceof ApiError &&
+            [
+              "AUTH_REQUIRED",
+              "GUEST_ACCESS_REQUIRED",
+              "GUEST_CHANGED",
+              "GUEST_SYNC_PENDING",
+            ].includes(e.code)
+          ) {
             sessionRef.current = null;
             setSession(null);
-            openAuthModal("login");
+            void refreshUser();
           }
           setError(e instanceof Error ? e : "Couldn't open this session.");
           return false;
@@ -236,7 +247,7 @@ export function SessionExperience({ id }: { id: string }) {
       request.current = { controller, promise };
       return promise;
     },
-    [id, userId, openAuthModal, acceptSession],
+    [id, userId, refreshUser, acceptSession],
   );
   const sessionLoaded = session !== null;
   const sessionPending = !!session?.pending;
@@ -284,8 +295,9 @@ export function SessionExperience({ id }: { id: string }) {
     if (!authLoading) {
       if (userId) void load();
       else {
-        setError("Sign in to open your learning session.");
-        openAuthModal("login");
+        setError(
+          "Your browser access expired or is unavailable. Sign in to your account or start a new lesson.",
+        );
       }
     }
     return () => {
@@ -295,7 +307,7 @@ export function SessionExperience({ id }: { id: string }) {
       earlierRequest.current?.abort();
       earlierRequest.current = null;
     };
-  }, [load, userId, authLoading, openAuthModal]);
+  }, [load, userId, authLoading]);
   useEffect(() => {
     if (!session) return;
     const path = `/session/${id}${session.phase === "transfer" ? "/transfer" : session.phase === "report" ? "/report" : ""}`;
@@ -565,7 +577,7 @@ export function SessionExperience({ id }: { id: string }) {
                 <span className="session-end-label">{t("End session")}</span>
               </button>
             )}
-            {user && (
+            {userId && (
               <button
                 type="button"
                 className="header-nav-button"
@@ -582,11 +594,12 @@ export function SessionExperience({ id }: { id: string }) {
             ) : (
               <button
                 type="button"
-                className="quiet-button signin-button-small"
+                className="header-auth-button"
+                aria-label={guest ? t("Guest mode") : t("Sign In")}
                 onClick={() => openAuthModal("login")}
               >
-                <LogIn size={14} />
-                <span>{t("Sign In")}</span>
+                <UserRound size={15} aria-hidden="true" />
+                <span>{guest ? t("Guest mode") : t("Sign In")}</span>
               </button>
             )}
           </nav>

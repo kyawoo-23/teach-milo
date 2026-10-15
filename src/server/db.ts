@@ -4,6 +4,7 @@ import {
   getFirestore,
   Timestamp,
   type Firestore,
+  type Transaction,
 } from "firebase-admin/firestore";
 import { AppError } from "@/lib/errors";
 
@@ -55,6 +56,24 @@ export const expiresAt = () =>
   new Date(
     Date.now() + Number(process.env.SESSION_RETENTION_DAYS || 7) * 86_400_000,
   ).toISOString();
+
+// Read this fence before any transaction writes. Claiming a guest conflicts
+// with these reads, so requests started before sign-in cannot restore ownership.
+export async function assertGuestWritable(tx: Transaction, ownerId: string) {
+  if (!ownerId.startsWith("guest_")) return;
+  const guest = await tx.get(database().collection("guests").doc(ownerId));
+  if (
+    !guest.exists ||
+    guest.get("claimedBy") ||
+    !(guest.get("expiresAt") instanceof Timestamp) ||
+    guest.get("expiresAt").toMillis() <= Date.now()
+  )
+    throw new AppError(
+      "GUEST_CHANGED",
+      "Your browser access changed. Refresh to continue or start a new lesson.",
+      409,
+    );
+}
 export function assertOwned(
   value: { ownerId: string; expiresAt: string } | undefined,
   ownerId: string,

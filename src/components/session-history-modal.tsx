@@ -119,7 +119,7 @@ export function SessionHistoryModal() {
   const { t, text: localizeText, locale } = useI18n();
 
   const confirm = useConfirmation();
-  const { sessionModalOpen, closeSessionModal, user, openAuthModal } =
+  const { sessionModalOpen, closeSessionModal, guest, ownerId, openAuthModal } =
     useAuth();
   const router = useRouter();
 
@@ -185,7 +185,7 @@ export function SessionHistoryModal() {
     }
   }, []);
 
-  const userId = user?.id;
+  const userId = ownerId;
   useEffect(() => {
     requests.current.controller?.abort();
     requests.current = {
@@ -373,13 +373,20 @@ export function SessionHistoryModal() {
 
   return (
     <Modal
-      open={sessionModalOpen && !!user}
+      open={sessionModalOpen && !!ownerId}
       onClose={closeSessionModal}
       title={t("My Learning Sessions")}
       className="session-history-modal"
     >
       <div className="session-history-content">
-        {!user ? (
+        {guest && (
+          <p className="muted">
+            {t(
+              "Guest sessions are available only in this browser and expire after seven days. Sign in to access them across devices.",
+            )}
+          </p>
+        )}
+        {!ownerId ? (
           <div className="signin-history-banner">
             <div>
               <strong>{t("Sign in to see your sessions.")}</strong>

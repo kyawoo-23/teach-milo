@@ -6,7 +6,14 @@ import Busboy from "busboy";
 import { z } from "zod";
 import { Material, Source } from "@/lib/contracts";
 import { AppError } from "@/lib/errors";
-import { assertOwned, database, decode, encode, expiresAt } from "./db";
+import {
+  assertGuestWritable,
+  assertOwned,
+  database,
+  decode,
+  encode,
+  expiresAt,
+} from "./db";
 import { gemini, Model } from "./model";
 import { CallContext } from "./usage";
 import { OCR_PROMPT } from "@/content/prompts";
@@ -66,7 +73,8 @@ export async function readUpload(
     });
     source.on("error", () => fail("The upload was interrupted. Try again."));
     parser.on("file", (field, stream, info) => {
-      if (field !== "file") return fail("Choose one PDF, DOCX, or TXT file.");
+      if (field !== "file")
+        return fail("Choose one PDF, DOCX, PPTX, or TXT file.");
       filename = path.basename(info.filename).slice(0, 120);
       const chunks: Buffer[] = [];
       stream.on("limit", () => fail("Files must be 10 MB or smaller."));
@@ -161,10 +169,10 @@ export async function extractUpload(
   progress?: ExtractionProgress,
 ) {
   const extension = filename.split(".").at(-1)?.toLowerCase();
-  if (!extension || !["pdf", "docx", "txt"].includes(extension))
+  if (!extension || !["pdf", "docx", "pptx", "txt"].includes(extension))
     throw new AppError(
       "UNSUPPORTED_FILE",
-      "Choose a PDF, DOCX, or TXT document.",
+      "Choose a PDF, DOCX, PPTX, or TXT document.",
       415,
     );
   const extracted = await extractInWorker(bytes, extension);
@@ -308,6 +316,7 @@ export async function saveMaterial(
   };
   const ref = database().collection("materials").doc(id);
   await database().runTransaction(async (tx) => {
+    await assertGuestWritable(tx, ownerId);
     const existing = await tx.get(ref);
     if (existing.exists) {
       assertOwned(decode<Material>(existing.data()), ownerId);

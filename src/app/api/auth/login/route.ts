@@ -1,11 +1,6 @@
 import { LoginSchema } from "@/lib/contracts";
 import { AppError } from "@/lib/errors";
-import {
-  createUserSession,
-  findUserByEmail,
-  toPublicUser,
-  verifyPassword,
-} from "@/server/auth";
+import { finishSignIn, findUserByEmail, verifyPassword } from "@/server/auth";
 import { assertOrigin, json, respond, route } from "@/server/http";
 
 export const runtime = "nodejs";
@@ -27,7 +22,6 @@ export async function POST(request: Request) {
         401,
       );
     }
-    await createUserSession(user.id, user.authVersion ?? 0);
-    return respond({ user: toPublicUser(user) });
+    return respond(await finishSignIn(user));
   });
 }

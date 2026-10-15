@@ -2,7 +2,14 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { Message, Session } from "@/lib/contracts";
 import { AppError } from "@/lib/errors";
-import { assertOwned, database, decode, encode, expiresAt } from "./db";
+import {
+  assertGuestWritable,
+  assertOwned,
+  database,
+  decode,
+  encode,
+  expiresAt,
+} from "./db";
 import { hash } from "./http";
 
 type Operation = {
@@ -23,6 +30,7 @@ export async function ownerOperation(
   const fingerprint = hash(JSON.stringify(payload));
   const token = randomUUID();
   const cached = await database().runTransaction(async (tx) => {
+    await assertGuestWritable(tx, ownerId);
     const doc = await tx.get(ref);
     const op = doc.exists ? decode<Operation>(doc.data()) : undefined;
     if (op && op.fingerprint !== fingerprint)
@@ -42,6 +50,7 @@ export async function ownerOperation(
     tx.set(
       ref,
       encode({
+        ownerId,
         fingerprint,
         status: "running",
         token,
@@ -55,6 +64,7 @@ export async function ownerOperation(
   try {
     const result = await work();
     await database().runTransaction(async (tx) => {
+      await assertGuestWritable(tx, ownerId);
       const op = await tx.get(ref);
       if (op.data()?.token !== token)
         throw new AppError(
@@ -68,6 +78,7 @@ export async function ownerOperation(
   } catch (e) {
     await database()
       .runTransaction(async (tx) => {
+        await assertGuestWritable(tx, ownerId);
         const op = await tx.get(ref);
         if (op.data()?.token === token) tx.update(ref, { status: "failed" });
       })
@@ -91,6 +102,7 @@ export async function sessionOperation(
   const fingerprint = hash(JSON.stringify(payload));
   const token = randomUUID();
   const reserved = await f.runTransaction(async (tx) => {
+    await assertGuestWritable(tx, ownerId);
     const [sessionDoc, opDoc] = await tx.getAll(ref, opRef);
     const session = sessionDoc.exists
       ? decode<Session>(sessionDoc.data())
@@ -122,6 +134,7 @@ export async function sessionOperation(
     tx.set(
       opRef,
       encode({
+        ownerId,
         fingerprint,
         status: "running",
         token,
@@ -135,6 +148,7 @@ export async function sessionOperation(
   try {
     const result = await work(reserved.session);
     return await f.runTransaction(async (tx) => {
+      await assertGuestWritable(tx, ownerId);
       const current = await tx.get(ref);
       if (
         current.data()?.activeOperation?.token !== token ||
@@ -163,6 +177,7 @@ export async function sessionOperation(
   } catch (e) {
     await f
       .runTransaction(async (tx) => {
+        await assertGuestWritable(tx, ownerId);
         const current = await tx.get(ref);
         if (current.data()?.activeOperation?.token === token) {
           const session = decode<Session>(current.data());

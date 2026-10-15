@@ -1,11 +1,12 @@
 import {
   createUser,
-  createUserSession,
+  finishSignIn,
   exchangeGoogleOAuthCode,
   findUserByEmail,
   User,
 } from "@/server/auth";
-import { database, decode, encode } from "@/server/db";
+import { database, encode } from "@/server/db";
+import { consumeGoogleState } from "@/server/guests";
 
 export const runtime = "nodejs";
 
@@ -17,22 +18,6 @@ export async function GET(request: Request) {
   const stateRaw = url.searchParams.get("state");
 
   let returnTo = "/";
-  if (stateRaw) {
-    try {
-      const parsed = JSON.parse(
-        Buffer.from(stateRaw, "base64url").toString("utf8"),
-      );
-      if (
-        typeof parsed.returnTo === "string" &&
-        parsed.returnTo.startsWith("/") &&
-        !parsed.returnTo.startsWith("//")
-      ) {
-        returnTo = parsed.returnTo;
-      }
-    } catch {
-      /* Fallback to default returnTo */
-    }
-  }
 
   const failRedirect = (message: string) => {
     const target = new URL(returnTo, origin);
@@ -40,6 +25,11 @@ export async function GET(request: Request) {
     return Response.redirect(target.toString(), 302);
   };
 
+  try {
+    returnTo = await consumeGoogleState(stateRaw);
+  } catch {
+    return failRedirect("Google sign-in expired. Please try again.");
+  }
   if (error || !code) {
     return failRedirect(
       error
@@ -75,7 +65,7 @@ export async function GET(request: Request) {
       });
     }
 
-    await createUserSession(user.id, user.authVersion ?? 0);
+    await finishSignIn(user);
 
     const successTarget = new URL(returnTo, origin);
     successTarget.searchParams.set("signed-in", "1");

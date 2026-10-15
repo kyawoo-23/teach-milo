@@ -1,5 +1,5 @@
 import { SignupSchema } from "@/lib/contracts";
-import { createUser, createUserSession, toPublicUser } from "@/server/auth";
+import { createUser, finishSignIn } from "@/server/auth";
 import { assertOrigin, json, respond, route } from "@/server/http";
 
 export const runtime = "nodejs";
@@ -13,7 +13,6 @@ export async function POST(request: Request) {
       name: input.name,
       password: input.password,
     });
-    await createUserSession(user.id);
-    return respond({ user: toPublicUser(user) }, 201);
+    return respond(await finishSignIn(user), 201);
   });
 }

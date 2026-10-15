@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash, createHmac, randomUUID } from "node:crypto";
-import { database, encode, expiresAt } from "./db";
+import { assertGuestWritable, database, encode, expiresAt } from "./db";
 import { AppError } from "@/lib/errors";
 
 export type CallContext = { ownerId: string; network: string };
@@ -45,6 +45,7 @@ export async function reserveModelCall(ctx: CallContext) {
     );
   const f = database();
   await f.runTransaction(async (tx) => {
+    await assertGuestWritable(tx, ctx.ownerId);
     const refs = limits.map(([id]) => f.collection("usage").doc(id));
     const docs = await tx.getAll(...refs);
     for (let i = 0; i < docs.length; i++)
