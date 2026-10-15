@@ -318,7 +318,7 @@ export function SessionExperience({ id }: { id: string }) {
       setText("");
       draftStorage.removeItem(`draft:${id}`);
     }
-    document.title = `${session.lesson.title} | TeachBack AI`;
+    document.title = `${session.lesson.title} | Teach Milo`;
   }, [session, id, pathname, router]);
   useEffect(() => {
     setText(draftStorage.getItem(`draft:${id}`) || "");

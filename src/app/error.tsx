@@ -24,7 +24,7 @@ export default function Error({
       icon={<AlertCircle size={28} strokeWidth={1.75} />}
       title={t("Something went wrong")}
       description={t(
-        "TeachBack hit an unexpected snag. You can try again, or return home while we get things back on track.",
+        "Teach Milo hit an unexpected snag. You can try again, or return home while we get things back on track.",
       )}
       actions={
         <>

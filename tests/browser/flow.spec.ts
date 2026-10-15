@@ -2217,7 +2217,7 @@ test("fetching cannot replace a new login with a delayed old auth response", asy
     }),
   );
   await page.goto("/?authError=Please%20sign%20in");
-  const dialog = page.getByRole("dialog", { name: "Sign In to TeachBack" });
+  const dialog = page.getByRole("dialog", { name: "Sign In to Teach Milo" });
   await dialog.getByLabel("Email Address").fill("new@example.test");
   await dialog.getByLabel("Password", { exact: true }).fill("valid-password");
   await dialog

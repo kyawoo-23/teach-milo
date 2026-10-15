@@ -2,7 +2,7 @@
 
 let preparation: Promise<boolean> | undefined;
 
-// TeachBack does not install a service worker. Other apps using the same local
+// Teach Milo does not install a service worker. Other apps using the same local
 // origin can leave one behind that caches /api/auth/me despite Cache-Control.
 // Unregister only the worker for this page; keep cookies and stored data intact.
 export function prepareLocalAuth(): Promise<boolean> {

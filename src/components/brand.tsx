@@ -10,20 +10,18 @@ export function Brand() {
   const { t } = useI18n();
 
   return (
-    <Link className="brand" href="/" aria-label={t("TeachBack AI home")}>
+    <Link className="brand" href="/" aria-label={t("Teach Milo home")}>
       <span className="brand-mark">
         <Image
           src={BRAND_ICON}
-          alt="TeachBack-AI"
+          alt="Teach Milo"
           width={64}
           height={64}
           sizes="36px"
           priority
         />
       </span>
-      <span>
-        TeachBack<span className="brand-ai"> AI</span>
-      </span>
+      <span>Teach Milo</span>
     </Link>
   );
 }

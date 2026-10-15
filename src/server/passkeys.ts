@@ -251,7 +251,7 @@ export async function registrationOptions(request: Request, user: User) {
       400,
     );
   const options = await generateRegistrationOptions({
-    rpName: "TeachBack AI",
+    rpName: "Teach Milo",
     rpID: rpId,
     userID: new TextEncoder().encode(user.id),
     userName: user.email,

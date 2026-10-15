@@ -17,7 +17,7 @@ export function assertOrigin(request: Request) {
   )
     throw new AppError(
       "INVALID_ORIGIN",
-      "Open TeachBack in its original tab and try again.",
+      "Open Teach Milo in its original tab and try again.",
       403,
     );
 }
@@ -127,7 +127,7 @@ export async function route(fn: () => Promise<Response>): Promise<Response> {
         },
       );
     const code = (e as { code?: string | number })?.code;
-    console.error("TeachBack request failed", {
+    console.error("Teach Milo request failed", {
       name: e instanceof Error ? e.name : "Error",
       code,
     });

@@ -45,7 +45,7 @@ Added single-field index exemptions for `sessions.lessonSummary`, `sessions.acti
 Deploy the application through the existing Cloud Build / Cloud Run workflow. Apply the index configuration separately:
 
 ```sh
-pnpm exec firebase deploy --only firestore:indexes --project teachback-ai-511214
+pnpm exec firebase deploy --only firestore:indexes --project teach-milo
 ```
 
 This work did not run that deployment. No new composite query index is needed. Existing sessions continue working without a migration; only newly created sessions receive the embedded lesson summary, so legacy history savings are limited to the existing batched lookup. Confirm index operation completion in Firebase before treating the exemptions as live.
