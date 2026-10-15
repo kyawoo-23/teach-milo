@@ -4,7 +4,7 @@ substitutions:
   _REPOSITORY: teach-milo
   _RUNTIME_SA: teach-milo-runtime@teach-milo.iam.gserviceaccount.com
   _GEMINI_MODEL: gemini-3.5-flash-lite
-  _APP_ORIGIN: https://teach-milo-86758133633.asia-southeast1.run.app/
+  _APP_ORIGIN: https://teach-milo-86758133633.asia-southeast1.run.app
 
 steps:
   - id: build
