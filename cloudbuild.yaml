@@ -1,8 +1,8 @@
 substitutions:
   _REGION: asia-southeast1
-  _SERVICE: teachmilo
-  _REPOSITORY: teachback
-  _RUNTIME_SA: teachback-runtime@teach-milo.iam.gserviceaccount.com
+  _SERVICE: teach-milo
+  _REPOSITORY: teach-milo
+  _RUNTIME_SA: teach-milo-runtime@teach-milo.iam.gserviceaccount.com
   _GEMINI_MODEL: gemini-3.5-flash-lite
   _APP_ORIGIN: https://teachmilo-86758133633.asia-southeast1.run.app
 
@@ -37,6 +37,7 @@ steps:
       - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/app:$SHORT_SHA
       - --region=${_REGION}
       - --platform=managed
+      - --allow-unauthenticated
       - --service-account=${_RUNTIME_SA}
       - --cpu=1
       - --memory=1Gi
@@ -46,7 +47,7 @@ steps:
       - --port=8080
       - --startup-probe=httpGet.path=/api/status,httpGet.port=8080
       - --set-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID,APP_ORIGIN=${_APP_ORIGIN},GEMINI_MODEL=${_GEMINI_MODEL},MODEL_CALLS_PER_GLOBAL_DAY=1000
-      - --set-secrets=GEMINI_API_KEY=teachback-gemini-key:latest,RATE_LIMIT_SECRET=teachback-rate-limit-secret:latest,GOOGLE_CLIENT_ID=teachback-google-client-id:latest,GOOGLE_CLIENT_SECRET=teachback-google-client-secret:latest
+      - --set-secrets=GEMINI_API_KEY=teach-milo-gemini-key:latest,RATE_LIMIT_SECRET=teach-milo-rate-limit-secret:latest,GOOGLE_CLIENT_ID=teach-milo-google-client-id:latest,GOOGLE_CLIENT_SECRET=teach-milo-google-client-secret:latest
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/app:$SHORT_SHA
