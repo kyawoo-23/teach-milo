@@ -642,7 +642,7 @@
   "{concepts}/10 concepts · {relationships}/20 relationships": "개념 {concepts}/10 · 관계 {relationships}/20",
   "Save changes": "변경 사항 저장",
   "Select concept {name}": "개념 {name} 선택",
-  "Select a concept to move or edit it. Right-click for more actions. Click outside to deselect.": "개념을 선택하여 이동하거나 편집하세요. 오른쪽 클릭으로 더 많은 작업을 할 수 있습니다. 바깥을 클릭하면 선택이 해제됩니다.",
+  "Select a concept to move or edit it. Delete or Backspace removes the selected concept. Right-click for more actions. Click outside to deselect.": "개념을 선택하여 이동하거나 편집하세요. Delete 또는 Backspace로 선택한 개념을 삭제할 수 있습니다. 오른쪽 클릭으로 더 많은 작업을 할 수 있습니다. 바깥을 클릭하면 선택이 해제됩니다.",
   "All pairs connected. Explain why they belong together.": "모든 쌍이 연결되었어요. 왜 서로 연결되는지 설명하세요.",
   "Choose a term to start. Select a connected term to change its match.": "먼저 용어를 선택하세요. 연결된 용어를 선택하면 짝을 바꿀 수 있어요.",
   "1. Choose a term": "1. 용어 선택",

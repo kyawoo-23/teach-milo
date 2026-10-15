@@ -21,6 +21,7 @@ export const resizeHandles = [
 export type ResizeHandle = (typeof resizeHandles)[number];
 export type SketchHandle = ResizeHandle | "rotate";
 const FRAME_PAD = 12;
+const ROTATE_STEM = 28;
 const MIN_SIZE = 16;
 
 export function objectRotation(object: SketchObject) {
@@ -93,7 +94,7 @@ export function handleAnchor(
   const midX = (bounds.minX + bounds.maxX) / 2;
   const midY = (bounds.minY + bounds.maxY) / 2;
   if (handle === "rotate")
-    return toWorld(object, { x: midX, y: bounds.minY - 26 });
+    return toWorld(object, { x: midX, y: bounds.minY - ROTATE_STEM });
   return toWorld(object, {
     x: handle.includes("w")
       ? bounds.minX
@@ -271,37 +272,60 @@ export function paintSelection(
   ctx.save();
   ctx.scale(canvas.width / CANVAS_WIDTH, canvas.height / CANVAS_HEIGHT);
   withObjectTransform(ctx, object, () => {
-    ctx.strokeStyle = "#655dcc";
-    ctx.lineWidth = 2;
-    ctx.setLineDash([8, 6]);
+    const midX = (bounds.minX + bounds.maxX) / 2;
+    ctx.strokeStyle = "rgba(101, 93, 204, 0.9)";
+    ctx.lineWidth = 1.25;
+    ctx.setLineDash([]);
     ctx.strokeRect(
       bounds.minX,
       bounds.minY,
       bounds.maxX - bounds.minX,
       bounds.maxY - bounds.minY,
     );
-    const midX = (bounds.minX + bounds.maxX) / 2;
+    ctx.strokeStyle = "rgba(101, 93, 204, 0.55)";
     ctx.beginPath();
     ctx.moveTo(midX, bounds.minY);
-    ctx.lineTo(midX, bounds.minY - 26);
+    ctx.lineTo(midX, bounds.minY - ROTATE_STEM);
     ctx.stroke();
   });
   ctx.restore();
 }
+const SKETCH_CANVAS_LIGHT = "#ffffff";
+const SKETCH_CANVAS_DARK = "#1f1f1f";
+
+function sketchCanvasIsDark(): boolean {
+  const theme = document.documentElement.dataset.theme;
+  if (theme === "dark") return true;
+  if (theme === "light") return false;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
+function sketchCanvasFill(canvas: HTMLCanvasElement): string {
+  if (typeof document === "undefined") return SKETCH_CANVAS_LIGHT;
+  const probe =
+    (canvas.isConnected && canvas) ||
+    document.querySelector<HTMLCanvasElement>(".sketch-board canvas") ||
+    canvas;
+  const fill = getComputedStyle(probe).backgroundColor;
+  if (fill && fill !== "rgba(0, 0, 0, 0)") return fill;
+  return sketchCanvasIsDark() ? SKETCH_CANVAS_DARK : SKETCH_CANVAS_LIGHT;
+}
+
 export function drawSketch(canvas: HTMLCanvasElement, state: SketchState) {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Drawing is unavailable in this browser.");
+  const paper = sketchCanvasFill(canvas);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.save();
   ctx.scale(canvas.width / CANVAS_WIDTH, canvas.height / CANVAS_HEIGHT);
-  ctx.fillStyle = "#fff";
+  ctx.fillStyle = paper;
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
   for (const object of state.objects) {
     const a = object.points[0],
       b = object.points.at(-1)!;
-    ctx.strokeStyle = object.type === "eraser" ? "#fff" : object.color;
+    ctx.strokeStyle = object.type === "eraser" ? paper : object.color;
     ctx.fillStyle = object.color;
     ctx.lineWidth = object.width;
     withObjectTransform(ctx, object, () => {

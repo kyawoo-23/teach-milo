@@ -642,7 +642,7 @@
   "{concepts}/10 concepts · {relationships}/20 relationships": "概念 {concepts}/10 · 関係 {relationships}/20",
   "Save changes": "変更を保存",
   "Select concept {name}": "概念 {name} を選択",
-  "Select a concept to move or edit it. Right-click for more actions. Click outside to deselect.": "概念を選択して移動や編集。右クリックで他の操作ができます。外側をクリックすると選択を解除します。",
+  "Select a concept to move or edit it. Delete or Backspace removes the selected concept. Right-click for more actions. Click outside to deselect.": "概念を選択して移動や編集。Delete または Backspace で選択中の概念を削除。右クリックで他の操作ができます。外側をクリックすると選択を解除します。",
   "All pairs connected. Explain why they belong together.": "すべての組み合わせがつながりました。なぜその組み合わせになるのか説明しましょう。",
   "Choose a term to start. Select a connected term to change its match.": "まず用語を選びましょう。つながっている用語を選ぶと組み合わせを変更できます。",
   "1. Choose a term": "1. 用語を選ぶ",
