@@ -1,10 +1,10 @@
 substitutions:
   _REGION: asia-southeast1
-  _SERVICE: teachback-ai
+  _SERVICE: teachmilo
   _REPOSITORY: teachback
-  _RUNTIME_SA: teachback-runtime@teachback-ai-511214.iam.gserviceaccount.com
+  _RUNTIME_SA: teachback-runtime@teach-milo.iam.gserviceaccount.com
   _GEMINI_MODEL: gemini-3.5-flash-lite
-  _APP_ORIGIN: https://teachback-ai-609216296403.asia-southeast1.run.app
+  _APP_ORIGIN: https://teachmilo-86758133633.asia-southeast1.run.app
 
 steps:
   - id: build
