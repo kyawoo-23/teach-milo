@@ -135,6 +135,7 @@
   height: auto;
   aspect-ratio: 3 / 2;
   background: var(--sketch-canvas);
+  color: var(--ink);
   border: 1px solid light-dark(#c7cad9, #3a3d52);
   border-radius: 8px;
   touch-action: none;

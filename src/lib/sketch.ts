@@ -300,21 +300,32 @@ function sketchCanvasIsDark(): boolean {
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
-function sketchCanvasFill(canvas: HTMLCanvasElement): string {
-  if (typeof document === "undefined") return SKETCH_CANVAS_LIGHT;
+function sketchCanvasPalette(canvas: HTMLCanvasElement) {
+  if (typeof document === "undefined")
+    return { paper: SKETCH_CANVAS_LIGHT, ink: "#24283f" };
   const probe =
     (canvas.isConnected && canvas) ||
     document.querySelector<HTMLCanvasElement>(".sketch-board canvas") ||
     canvas;
-  const fill = getComputedStyle(probe).backgroundColor;
-  if (fill && fill !== "rgba(0, 0, 0, 0)") return fill;
-  return sketchCanvasIsDark() ? SKETCH_CANVAS_DARK : SKETCH_CANVAS_LIGHT;
+  const style = getComputedStyle(probe);
+  const fill = style.backgroundColor;
+  return {
+    paper:
+      fill && fill !== "rgba(0, 0, 0, 0)"
+        ? fill
+        : sketchCanvasIsDark()
+          ? SKETCH_CANVAS_DARK
+          : SKETCH_CANVAS_LIGHT,
+    ink: probe.isConnected
+      ? style.color
+      : getComputedStyle(document.body).color,
+  };
 }
 
 export function drawSketch(canvas: HTMLCanvasElement, state: SketchState) {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Drawing is unavailable in this browser.");
-  const paper = sketchCanvasFill(canvas);
+  const { paper, ink } = sketchCanvasPalette(canvas);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.save();
   ctx.scale(canvas.width / CANVAS_WIDTH, canvas.height / CANVAS_HEIGHT);
@@ -325,8 +336,10 @@ export function drawSketch(canvas: HTMLCanvasElement, state: SketchState) {
   for (const object of state.objects) {
     const a = object.points[0],
       b = object.points.at(-1)!;
-    ctx.strokeStyle = object.type === "eraser" ? paper : object.color;
-    ctx.fillStyle = object.color;
+    // Keep the stored Ink value stable across themes and adapt only its paint.
+    const color = object.color === "#24283f" ? ink : object.color;
+    ctx.strokeStyle = object.type === "eraser" ? paper : color;
+    ctx.fillStyle = color;
     ctx.lineWidth = object.width;
     withObjectTransform(ctx, object, () => {
       ctx.beginPath();
