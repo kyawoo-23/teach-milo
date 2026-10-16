@@ -106,6 +106,9 @@ const colors: { value: SketchObject["color"]; label: TranslationKey }[] = [
   { value: "#b43b48", label: "Red" },
   { value: "#287b62", label: "Green" },
 ];
+function swatchColor(color: SketchObject["color"]) {
+  return color === "#24283f" ? "var(--ink)" : color;
+}
 export function SketchBoard({
   state,
   history,
@@ -161,7 +164,6 @@ export function SketchBoard({
     });
   }, [textLabelDialog, helpId]);
   useEffect(() => {
-    if (!canvas.current) return;
     const shown: SketchState = !live
       ? state
       : {
@@ -172,12 +174,21 @@ export function SketchBoard({
               )
             : [...state.objects, live],
         };
-    drawSketch(canvas.current, shown);
-    const overlay =
-      mode === "select" && selected
-        ? shown.objects.find((object) => object.id === selected)
-        : undefined;
-    if (overlay) paintSelection(canvas.current, overlay);
+    const paint = () => {
+      if (!canvas.current) return;
+      drawSketch(canvas.current, shown);
+      const overlay =
+        mode === "select" && selected
+          ? shown.objects.find((object) => object.id === selected)
+          : undefined;
+      if (overlay) paintSelection(canvas.current, overlay);
+    };
+    paint();
+    if (theme !== "system") return;
+    // CSS updates automatically, but the painted bitmap must be redrawn too.
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+    systemTheme.addEventListener("change", paint);
+    return () => systemTheme.removeEventListener("change", paint);
   }, [state, live, selected, mode, theme]);
   const canvasPoint = (clientX: number, clientY: number, clamp = true) => {
     const bounds = canvas.current?.getBoundingClientRect();
@@ -449,7 +460,7 @@ export function SketchBoard({
                     <span
                       className="sketch-color-swatch"
                       aria-hidden="true"
-                      style={{ background: field.value }}
+                      style={{ background: swatchColor(field.value) }}
                     />
                   }
                   options={colors.map((color) => ({
@@ -462,7 +473,7 @@ export function SketchBoard({
                           width: 14,
                           height: 14,
                           borderRadius: "50%",
-                          background: color.value,
+                          background: swatchColor(color.value),
                         }}
                       />
                     ),
@@ -796,7 +807,7 @@ export function SketchBoard({
                     <span
                       className="sketch-color-swatch"
                       aria-hidden="true"
-                      style={{ background: selectedObject.color }}
+                      style={{ background: swatchColor(selectedObject.color) }}
                     />
                   }
                   options={colors.map((color) => ({
@@ -809,7 +820,7 @@ export function SketchBoard({
                           width: 14,
                           height: 14,
                           borderRadius: "50%",
-                          background: color.value,
+                          background: swatchColor(color.value),
                         }}
                       />
                     ),
@@ -1062,7 +1073,7 @@ export function SketchBoard({
                   role="menuitemradio"
                   aria-checked={selectedObject.color === color.value}
                   aria-label={t(color.label)}
-                  style={{ background: color.value }}
+                  style={{ background: swatchColor(color.value) }}
                   onClick={() => recolorSelected(color.value)}
                 />
               ))}
