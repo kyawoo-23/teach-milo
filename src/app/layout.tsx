@@ -36,15 +36,20 @@ export async function generateMetadata(): Promise<Metadata> {
     icons: {
       icon: [
         {
-          url: "/brand/teachback-icon-64.png",
+          url: "/brand/teach-milo-icon-64.png",
           sizes: "64x64",
           type: "image/png",
+        },
+        {
+          url: "/brand/teach-milo-mark.svg",
+          sizes: "any",
+          type: "image/svg+xml",
         },
       ],
       apple: [
         {
-          url: "/brand/teachback-icon-master.png",
-          sizes: "1254x1254",
+          url: "/brand/teach-milo-apple-icon.png",
+          sizes: "180x180",
           type: "image/png",
         },
       ],
