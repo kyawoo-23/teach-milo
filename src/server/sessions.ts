@@ -9,7 +9,6 @@ import {
   Lesson,
   Message,
   publicLesson,
-  ReportGeneratedSchema,
   Session,
   SessionMode,
   SessionPublic,
@@ -29,7 +28,7 @@ import {
 import { lessonBoard } from "@/lib/boards";
 import { modelMessages, publicMessages, validatePng } from "./board-media";
 import { verifyBoardSubmission } from "./calculation";
-import { finalizeReport } from "@/lib/assessment";
+import { finalizeReport, reportSchemaForMessages } from "@/lib/assessment";
 import { AppError } from "@/lib/errors";
 import {
   EVALUATE_PROMPT,
@@ -462,7 +461,7 @@ export async function submitTurn(
   ]);
   return { session: committed, lesson: responseLesson };
 }
-async function evaluate(
+export async function evaluateSessionReport(
   session: Session,
   lesson: Lesson,
   messages: Message[],
@@ -473,20 +472,28 @@ async function evaluate(
 ) {
   const fields = numericFields(lesson);
   const raw = await model.generate(
-    ReportGeneratedSchema,
+    reportSchemaForMessages(messages),
     EVALUATE_PROMPT + languageInstruction(lesson.teachingLanguage),
     {
       teachingLanguage: lessonLanguage(lesson.teachingLanguage),
       knowledge: lesson.knowledge,
       objectives: lesson.objectives,
       concerns: lesson.concerns,
+      misconceptionIntroduced: session.challengeUsed,
+      misconception: lesson.misconception,
       misconceptionCorrection: lesson.misconceptionCorrection,
       transfer: {
         question: lesson.transfer.question,
         expected: lesson.transfer.expected,
         criteria: lesson.transfer.criteria,
       },
-      messages: modelMessages(messages),
+      messages: modelMessages(
+        messages.filter((m) => (m.kind || "teaching") === "teaching"),
+      ),
+      transferAnswer:
+        modelMessages(
+          messages.filter((m) => m.role === "learner" && m.kind === "transfer"),
+        ).at(-1) ?? null,
       ledger: session.ledger,
       skipped,
       numericCheck: fields.length
@@ -585,7 +592,7 @@ export async function sessionAction(
         session,
         await readMessages(id, 20),
       );
-      const report = await evaluate(
+      const report = await evaluateSessionReport(
         session,
         lesson,
         messages,
@@ -662,7 +669,7 @@ export async function submitTransfer(
         ...(await evidenceMessages(session, await readMessages(id, 20))),
         ...(input.skip ? [] : [learner]),
       ];
-      const report = await evaluate(
+      const report = await evaluateSessionReport(
         session,
         lesson,
         messages,

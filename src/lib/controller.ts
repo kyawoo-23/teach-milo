@@ -97,6 +97,7 @@ export function normalizeStudentReply(
   const ids = new Set(lesson.objectives.map((o) => o.id));
   const seen = new Set<string>();
   const mechanism = keep(reply.mechanism);
+  const misconceptionCorrection = keep(reply.misconceptionCorrection);
   const evidence = reply.evidence.flatMap((item) => {
     if (!ids.has(item.objectiveId) || seen.has(item.objectiveId)) return [];
     seen.add(item.objectiveId);
@@ -122,7 +123,12 @@ export function normalizeStudentReply(
     demonstration: keep(reply.demonstration).length
       ? keep(reply.demonstration)
       : inferDemonstration(mechanism, evidence),
-    misconceptionCorrection: keep(reply.misconceptionCorrection),
+    // An unrelated follow-up must not erase an already cited correction.
+    // A newly identified fundamental error can still revoke that evidence.
+    misconceptionCorrection:
+      misconceptionCorrection.length || reply.unresolvedError
+        ? misconceptionCorrection
+        : keep(session.ledger.misconceptionCorrection),
     evidence,
   };
 }
