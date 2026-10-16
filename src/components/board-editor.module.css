@@ -200,7 +200,7 @@
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  justify-content: flex-start;
+  justify-content: center;
   overflow: hidden;
 }
 .workspace :global(.comparison-table-editor .tool-actions button svg) {
@@ -454,7 +454,7 @@
   overflow-wrap: anywhere;
   text-align: start;
 }
-.workspace :global(.matching-columns button:not(.matching-delete) > svg) {
+.workspace :global(.matching-choice > svg) {
   float: right;
   margin-inline-start: 4px;
 }
@@ -471,6 +471,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.workspace :global(.matching-column-heading) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-height: 32px;
+}
+.workspace :global(.matching-columns .matching-add) {
+  padding: 0;
+  background: var(--lavender);
+  color: var(--purple-dark);
+  border-color: transparent;
+  flex-shrink: 0;
 }
 .workspace :global(.matching-next-step) {
   margin: 0;
@@ -531,6 +545,10 @@
 .workspace :global(.matching-choice[data-match-description]:disabled) {
   opacity: 1;
 }
+.workspace
+  :global(.matching-choice[data-match-description][data-empty="true"]:disabled) {
+  opacity: 0.5;
+}
 .workspace :global(.matching-choice[data-ready="true"]:hover:not(:disabled)) {
   border-color: var(--purple-dark);
   background: var(--lavender);
@@ -550,6 +568,12 @@
   min-height: 32px;
   flex-shrink: 0;
   align-self: center;
+}
+.workspace :global(.matching-delete:hover:not(:disabled)) {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: light-dark(#a94d52, #ed9ba1);
 }
 .workspace :global(.board-reorder-controls:not(.sketch-toolbar)) {
   display: flex;

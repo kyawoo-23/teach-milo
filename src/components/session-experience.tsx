@@ -19,6 +19,8 @@ import {
   History,
   Layers3,
   Lightbulb,
+  Maximize,
+  Minimize,
   UserRound,
   MessageCircle,
   Paperclip,
@@ -40,6 +42,7 @@ import { Milo } from "./milo";
 import { TeachingBoard } from "./teaching-board";
 import { BoardResizer } from "./board-resizer";
 import { useBoardWorkspace } from "./use-board-workspace";
+import { useClassroomFullscreen } from "./use-classroom-fullscreen";
 import { BoardPreview } from "./board-preview";
 import { clearBoardDrafts } from "@/lib/board-drafts";
 import { CompletedSessionView } from "./completed-session-view";
@@ -529,6 +532,8 @@ export function SessionExperience({ id }: { id: string }) {
   const isTeaching =
     session &&
     ["baseline", "teaching", "ready_for_check"].includes(session.phase);
+  const { focused, toggle: toggleFullscreen } =
+    useClassroomFullscreen(!!isTeaching);
   const showCelebration =
     session?.phase === "ready_for_check" &&
     !celebrationDismissed &&
@@ -548,7 +553,7 @@ export function SessionExperience({ id }: { id: string }) {
       : []),
   ].filter((m, i, all) => all.findIndex((x) => x.id === m.id) === i);
   return (
-    <div className="session-shell">
+    <div className={`session-shell${focused ? " session-focused" : ""}`}>
       <header className="session-header">
         <div className="session-header-inner">
           <Brand />
@@ -827,6 +832,21 @@ export function SessionExperience({ id }: { id: string }) {
                       <ChevronDown size={18} aria-hidden="true" />
                     </button>
                   </h1>
+                  <button
+                    type="button"
+                    className="icon-button classroom-fullscreen-button"
+                    aria-label={t(
+                      focused ? "Exit fullscreen" : "Enter fullscreen",
+                    )}
+                    title={t(focused ? "Exit fullscreen" : "Enter fullscreen")}
+                    onClick={() => void toggleFullscreen()}
+                  >
+                    {focused ? (
+                      <Minimize size={18} aria-hidden="true" />
+                    ) : (
+                      <Maximize size={18} aria-hidden="true" />
+                    )}
+                  </button>
                   <button
                     className="icon-button mobile-board-button labeled-board-button"
                     aria-label={t("Open teaching board")}

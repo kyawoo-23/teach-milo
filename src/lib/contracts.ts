@@ -212,6 +212,16 @@ export type LessonPublic = Pick<
   Lesson,
   "id" | "title" | "scope" | "level" | "concerns" | "teachingLanguage"
 > & { objectives: { id: string; label: string }[] };
+export const ThoughtEmotionSchema = z.enum([
+  "curious",
+  "puzzled",
+  "encouraged",
+  "unsure",
+]);
+export type MessageThought = {
+  emotion: z.infer<typeof ThoughtEmotionSchema>;
+  reason: string;
+};
 export type Message = {
   id: string;
   role: "learner" | "student";
@@ -221,6 +231,7 @@ export type Message = {
   board?: BoardSnapshot;
   kind?: "teaching" | "transfer" | "hint";
   move?: "request_demo";
+  thought?: MessageThought;
 };
 export const EvidenceSchema = z.object({
   objectiveId: z.string(),
@@ -229,6 +240,13 @@ export const EvidenceSchema = z.object({
 });
 export const StudentReplySchema = z.object({
   studentMessage: z.string().min(1).max(500),
+  emotion: ThoughtEmotionSchema,
+  // Normalize before applying display limits so an overlong reason cannot fail a turn.
+  reason: z
+    .string()
+    .describe(
+      "One learner-facing sentence, at most 40 words and 300 characters",
+    ),
   move: z.enum([
     "ask_explanation",
     "probe_mechanism",

@@ -6,7 +6,14 @@ import { CustomSelect } from "./custom-select";
 import { useI18n } from "@/components/locale-context";
 import { useConfirmation } from "./confirmation";
 import { useId, useState } from "react";
-import { Maximize2 } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Maximize2,
+  Network,
+  PenLine,
+  Sparkles,
+  Table,
+} from "lucide-react";
 import { Board, BoardSubmission } from "@/lib/contracts";
 import { validateWorkspaceSubmission } from "@/lib/boards";
 import type { Workspace } from "./use-board-workspace";
@@ -108,11 +115,31 @@ export function TeachingBoard({
           disabled={disabled || attaching}
           value={workspace.active}
           options={[
-            { value: "suggested", label: t("Suggested activity") },
-            { value: "sketch", label: t("Sketch and diagram") },
-            { value: "concept_map", label: t("Concept map") },
-            { value: "matching", label: t("Matching pairs") },
-            { value: "table", label: t("Comparison table") },
+            {
+              value: "suggested",
+              label: t("Suggested activity"),
+              icon: <Sparkles size={16} />,
+            },
+            {
+              value: "sketch",
+              label: t("Sketch and diagram"),
+              icon: <PenLine size={16} />,
+            },
+            {
+              value: "concept_map",
+              label: t("Concept map"),
+              icon: <Network size={16} />,
+            },
+            {
+              value: "matching",
+              label: t("Matching pairs"),
+              icon: <ArrowLeftRight size={16} />,
+            },
+            {
+              value: "table",
+              label: t("Comparison table"),
+              icon: <Table size={16} />,
+            },
           ]}
           onChange={(value) => {
             const active = value as Workspace["active"];

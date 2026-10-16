@@ -87,7 +87,7 @@ export function validatePng(base64: string): Buffer {
   return bytes;
 }
 export function modelMessages(messages: Message[]) {
-  return messages.map((message) => {
+  return messages.map(({ thought: _thought, ...message }) => {
     if (!message.board) return message;
     if (message.board.version !== 2) {
       const { kind, verified, display = [] } = message.board;

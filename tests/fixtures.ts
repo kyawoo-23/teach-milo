@@ -132,10 +132,7 @@ export function lessonFixture(): Lesson {
         "A cyclist rides at a constant 6 m/s for 25 s. How far do they travel, and what would change if they rode for twice as long? Explain why.",
       expected:
         "6 × 25 = 150 m. Riding twice as long at the same speed doubles the distance to 300 m, because distance is proportional to time at constant speed.",
-      criteria: [
-        "150 m",
-        "Doubling time doubles distance at constant speed",
-      ],
+      criteria: ["150 m", "Doubling time doubles distance at constant speed"],
       numeric: numericFixture(),
     },
     board: boardFixture(),
@@ -180,6 +177,10 @@ export function replyFixture(message: Message, complete = false): StudentReply {
       ? "Your example makes the difference clearer to me."
       : "Why does doubling the time double the distance?",
     move: complete ? "acknowledge" : "probe_mechanism",
+    emotion: complete ? "encouraged" : "puzzled",
+    reason: complete
+      ? "Your explanation is helping me connect the ideas."
+      : "I'm still wondering why it works that way.",
     evidence: ["o1", "o2"].map((objectiveId) => ({
       objectiveId,
       understanding: complete ? "supported" : "partial",

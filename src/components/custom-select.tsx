@@ -62,6 +62,7 @@ export function CustomSelect({
   const [position, setPosition] = useState<CSSProperties>({});
   const search = useRef({ text: "", time: 0 });
   const selected = options.findIndex((option) => option.value === value);
+  const leadingIcon = icon ?? options[selected]?.icon;
   const expanded = open && !disabled;
   const panelId = `${id}-options`;
   const nativePopover =
@@ -272,9 +273,9 @@ export function CustomSelect({
           onBlur?.();
         }}
       >
-        {icon && (
+        {leadingIcon && (
           <span className="custom-select-icon" aria-hidden="true">
-            {icon}
+            {leadingIcon}
           </span>
         )}
         <span

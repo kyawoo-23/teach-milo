@@ -69,18 +69,41 @@ export const MapStateSchema = z
 export const MatchingStateSchema = z
   .object({
     kind: z.literal("matching"),
+    // Legacy activities have both sides on one record. New items can have either
+    // side independently; an omitted side is absent, while an empty string is a draft.
     pairs: z
-      .array(z.object({ id: key, term: label, description: label }).strict())
-      .max(10),
+      .array(
+        z
+          .object({
+            id: key,
+            term: label.optional(),
+            description: label.optional(),
+          })
+          .strict(),
+      )
+      .max(20),
     matches: z.record(key, key),
   })
   .strict()
   .superRefine((s, ctx) => {
     const ids = new Set(s.pairs.map((p) => p.id));
+    const terms = new Set(
+      s.pairs.filter((p) => p.term !== undefined).map((p) => p.id),
+    );
+    const descriptions = new Set(
+      s.pairs.filter((p) => p.description !== undefined).map((p) => p.id),
+    );
     if (
       ids.size !== s.pairs.length ||
+      terms.size > 10 ||
+      descriptions.size > 10 ||
+      s.pairs.some(
+        (p) => p.term === undefined && p.description === undefined,
+      ) ||
       Object.keys(s.matches).length > 10 ||
-      Object.entries(s.matches).some(([a, b]) => !ids.has(a) || !ids.has(b)) ||
+      Object.entries(s.matches).some(
+        ([a, b]) => !terms.has(a) || !descriptions.has(b),
+      ) ||
       new Set(Object.values(s.matches)).size !== Object.values(s.matches).length
     )
       ctx.addIssue({ code: "custom", message: "Invalid matching choices." });
