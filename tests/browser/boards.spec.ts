@@ -810,6 +810,148 @@ test("matching pairs support tap connections and keyboard reconnection", async (
   ).toBeVisible();
   await expect(firstDescription).toBeDisabled();
 });
+test("matching terms and descriptions can be added and deleted independently", async ({
+  page,
+}, info) => {
+  const definition = catalogBoard();
+  definition.state = [];
+  definition.derived = [];
+  definition.code = "";
+  definition.nodes = [catalogNode("main", "Stack", {}, "")];
+  definition.suggestedTool = { kind: "matching", columns: [], items: steps };
+  await setup(page, false, definition);
+  let board = await expanded(page);
+  await board.getByRole("button", { name: "First step", exact: true }).click();
+  await board.getByRole("button", { name: "Start here", exact: true }).click();
+  await board.getByRole("button", { name: "Second step", exact: true }).click();
+  await board
+    .getByRole("button", { name: "Continue here", exact: true })
+    .click();
+  await board.getByRole("button", { name: "Edit", exact: true }).click();
+  await board
+    .getByRole("button", { name: "Delete term 1", exact: true })
+    .click();
+  await expect(
+    board.getByRole("button", { name: "Term 1: Second step", exact: true }),
+  ).toBeFocused();
+  await expect(
+    board.getByRole("button", {
+      name: "Description 1: Start here",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect
+    .poll(
+      async () =>
+        (await saved(page))?.workspace.tools.suggested.pairs.filter(
+          (p: any) => p.term !== undefined,
+        ).length,
+    )
+    .toBe(2);
+  let draft = (await saved(page)).workspace.tools.suggested;
+  expect(draft.pairs.filter((p: any) => p.term !== undefined)).toHaveLength(2);
+  expect(
+    draft.pairs.filter((p: any) => p.description !== undefined),
+  ).toHaveLength(3);
+  expect(Object.keys(draft.matches)).toHaveLength(1);
+  await board
+    .getByRole("button", { name: "Delete description 2", exact: true })
+    .click();
+  await expect(
+    board.getByRole("button", { name: "Term 1: Second step", exact: true }),
+  ).toBeVisible();
+  await board.getByRole("button", { name: "Add term", exact: true }).click();
+  const term = board.getByRole("textbox", { name: "Term 3", exact: true });
+  await expect(term).toBeFocused();
+  await term.fill("New term");
+  await term.press("Enter");
+  await expect
+    .poll(async () =>
+      (await saved(page))?.workspace.tools.suggested.pairs.some(
+        (p: any) => p.term === "New term",
+      ),
+    )
+    .toBe(true);
+  draft = (await saved(page)).workspace.tools.suggested;
+  expect(
+    draft.pairs.filter((p: any) => p.description !== undefined),
+  ).toHaveLength(2);
+  expect(draft.matches).toEqual({});
+  await board
+    .getByRole("button", { name: "Add description", exact: true })
+    .click();
+  const description = board.getByRole("textbox", {
+    name: "Description 3",
+    exact: true,
+  });
+  await expect(description).toBeFocused();
+  await description.fill("New description");
+  await description.press("Enter");
+  await expect
+    .poll(async () =>
+      (await saved(page))?.workspace.tools.suggested.pairs.some(
+        (p: any) => p.description === "New description",
+      ),
+    )
+    .toBe(true);
+  await page.screenshot({ path: info.outputPath("independent-matching.png") });
+  await board.getByRole("button", { name: "Done", exact: true }).click();
+  const descriptionOrder = async () =>
+    board
+      .locator("[data-match-description]")
+      .evaluateAll((items) =>
+        items.map((item) => item.getAttribute("aria-label")),
+      );
+  expect(await descriptionOrder()).toEqual([
+    "Start here",
+    "Finish here",
+    "New description",
+  ]);
+  await board.getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(
+    board.getByRole("button", {
+      name: "Description 3: New description",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await board.getByRole("button", { name: "Done", exact: true }).click();
+  expect(await descriptionOrder()).toEqual([
+    "Start here",
+    "Finish here",
+    "New description",
+  ]);
+  await page.reload();
+  board = await expanded(page);
+  expect(await descriptionOrder()).toEqual([
+    "Start here",
+    "Finish here",
+    "New description",
+  ]);
+  await board.getByRole("button", { name: "New term", exact: true }).click();
+  await board.getByRole("button", { name: "Start here", exact: true }).click();
+  await expect(
+    board.getByText("1 of 3 connected", { exact: true }),
+  ).toBeVisible();
+  await expect
+    .poll(
+      async () =>
+        Object.keys(
+          (await saved(page))?.workspace.tools.suggested.matches ?? {},
+        ).length,
+    )
+    .toBe(1);
+  draft = (await saved(page)).workspace.tools.suggested;
+  const newTerm = draft.pairs.find((p: any) => p.term === "New term");
+  const preservedDescription = draft.pairs.find(
+    (p: any) => p.description === "Start here",
+  );
+  expect(preservedDescription).not.toHaveProperty("term");
+  expect(draft.matches[newTerm.id]).toBe(preservedDescription.id);
+  expect(
+    draft.pairs.some((p: any) => p.description === "New description"),
+  ).toBe(true);
+});
+
 test("concept maps, matching and comparison tables work with keyboard controls", async ({
   page,
 }) => {
@@ -846,14 +988,13 @@ test("concept maps, matching and comparison tables work with keyboard controls",
   ).toBeVisible();
   await chooseTool(page, board, "matching");
   for (let n = 1; n <= 2; n++) {
-    await board.getByRole("button", { name: "Add pair", exact: true }).click();
-    // A new pair opens its term for editing in place.
+    await board.getByRole("button", { name: "Add term", exact: true }).click();
     const term = board.getByRole("textbox", { name: `Term ${n}`, exact: true });
     await expect(term).toBeFocused();
     await term.fill(n === 1 ? "Evaporation" : "Condensation");
     await page.keyboard.press("Enter");
     await board
-      .getByRole("button", { name: `Description ${n}`, exact: true })
+      .getByRole("button", { name: "Add description", exact: true })
       .click();
     await board
       .getByRole("textbox", { name: `Description ${n}`, exact: true })

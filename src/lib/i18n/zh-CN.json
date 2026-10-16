@@ -1,4 +1,6 @@
 {
+  "Enter fullscreen": "进入全屏",
+  "Exit fullscreen": "退出全屏",
   "You’re signed in.": "你已登录。",
   "You’re signed out.": "你已退出登录。",
   "Close notification": "关闭通知",
@@ -715,5 +717,21 @@
   "No readable text was extracted from this slide.": "未从此幻灯片中提取到可读文本。",
   "This presentation has too little readable text. Upload a PDF to include visual content, or paste your notes.": "此演示文稿的可读文本过少。请上传 PDF 以包含可视内容，或粘贴笔记。",
   "Choose a PPTX with 50 slides or fewer.": "请选择不超过 50 张幻灯片的 PPTX。",
-  "Guest mode": "访客模式"
+  "Guest mode": "访客模式",
+  "Curious": "好奇",
+  "Puzzled": "困惑",
+  "Encouraged": "受到鼓舞",
+  "Unsure": "不太确定",
+  "I'm curious to hear how you explain this.": "我很好奇你会怎样解释这个。",
+  "I want to understand your explanation a little better.": "我想再听懂一点你的解释。",
+  "I'm still wondering why it works that way.": "我还在想为什么会这样。",
+  "I think a small example would help me follow your idea.": "我觉得一个小例子能帮我跟上你的思路。",
+  "I'm unsure whether my idea makes sense.": "我不太确定自己的想法是否说得通。",
+  "Your explanation is helping me connect the ideas.": "你的解释正在帮我把这些想法联系起来。",
+  "Milo’s thought: {emotion}": "Milo 的想法：{emotion}",
+  "Milo’s thought": "Milo 的想法",
+  "Add term": "添加术语",
+  "Add description": "添加描述",
+  "Delete term {number}": "删除术语 {number}",
+  "Delete description {number}": "删除描述 {number}"
 }

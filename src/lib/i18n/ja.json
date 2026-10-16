@@ -1,4 +1,6 @@
 {
+  "Enter fullscreen": "全画面表示にする",
+  "Exit fullscreen": "全画面表示を終了",
   "You’re signed in.": "ログインしました。",
   "You’re signed out.": "ログアウトしました。",
   "Close notification": "通知を閉じる",
@@ -715,5 +717,21 @@
   "No readable text was extracted from this slide.": "このスライドから読み取り可能なテキストは抽出されませんでした。",
   "This presentation has too little readable text. Upload a PDF to include visual content, or paste your notes.": "このプレゼンテーションには読み取り可能なテキストが少なすぎます。PDF をアップロードするか、ノートを貼り付けてください。",
   "Choose a PPTX with 50 slides or fewer.": "スライドが 50 枚以下の PPTX を選択してください。",
-  "Guest mode": "ゲストモード"
+  "Guest mode": "ゲストモード",
+  "Curious": "興味津々",
+  "Puzzled": "考え中",
+  "Encouraged": "手応えを感じている",
+  "Unsure": "自信がない",
+  "I'm curious to hear how you explain this.": "どう説明してくれるのか気になっているよ。",
+  "I want to understand your explanation a little better.": "君の説明をもう少しよく理解したいな。",
+  "I'm still wondering why it works that way.": "どうしてそうなるのか、まだ気になっているんだ。",
+  "I think a small example would help me follow your idea.": "小さな例があると、君の考えを追いやすくなりそう。",
+  "I'm unsure whether my idea makes sense.": "僕の考えが筋の通ったものか、まだ自信がないんだ。",
+  "Your explanation is helping me connect the ideas.": "君の説明で、考え同士がつながってきているよ。",
+  "Milo’s thought: {emotion}": "Miloの気持ち：{emotion}",
+  "Milo’s thought": "Miloの気持ち",
+  "Add term": "用語を追加",
+  "Add description": "説明を追加",
+  "Delete term {number}": "用語{number}を削除",
+  "Delete description {number}": "説明{number}を削除"
 }

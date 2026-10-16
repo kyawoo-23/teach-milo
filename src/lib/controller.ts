@@ -1,5 +1,6 @@
 import { lessonLanguage, type TeachingLanguage } from "./i18n/locales";
-import { translateTeaching } from "./i18n/messages";
+import { translateTeaching, type TranslationKey } from "./i18n/messages";
+import { ThoughtEmotionSchema } from "./contracts";
 import {
   Citation,
   Ledger,
@@ -66,6 +67,46 @@ function limitReply(text: string, language?: TeachingLanguage) {
   const words = replyWords(text, language);
   return words.length > 65 ? text.slice(0, words[65].index).trim() : text;
 }
+const thoughtFallbacks: Record<StudentReply["move"], TranslationKey> = {
+  ask_explanation: "I want to understand your explanation a little better.",
+  probe_mechanism: "I'm still wondering why it works that way.",
+  request_example: "I think a small example would help me follow your idea.",
+  request_demo: "I think a small example would help me follow your idea.",
+  surface_misconception: "I'm unsure whether my idea makes sense.",
+  acknowledge: "Your explanation is helping me connect the ideas.",
+  redirect: "I want to understand your explanation a little better.",
+};
+// Check the whole reason before shortening it, including schema names with altered separators.
+const privateThought =
+  /ledger|transfer|rubric|score|citation|ready|readiness|phase|misconception|script|planted|assess|grading|\bgrade\b|evidence|mechanism|demonstration|unresolved[\s_-]*error|objective[\s_-]*id|message[\s_-]*id|student[\s_-]*message|allowed[\s_-]*moves?|challenge[\s_-]*used|hint[\s_-]*used|summary|knowledge|criterion|criteria|\bunderstanding\b|\bmove\b|\bquote\b|评估|评分|准备好|误解|台账|評価|採点|誤解|ルーブリック|평가|점수|오개념|เกณฑ์|คะแนน/iu;
+
+function normalizeThoughtReason(
+  reason: string,
+  move: StudentReply["move"],
+  language?: TeachingLanguage,
+) {
+  const clean = reason
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!clean || privateThought.test(clean))
+    return translateTeaching(language, thoughtFallbacks[move]);
+  // Keep a single sentence, using the lesson language's word and sentence boundaries.
+  const first =
+    new Intl.Segmenter(lessonLanguage(language), { granularity: "sentence" })
+      .segment(clean)
+      [Symbol.iterator]()
+      .next()
+      .value?.segment.trim() || clean;
+  const words = replyWords(first, language);
+  const bounded =
+    words.length > 40 ? first.slice(0, words[40].index).trim() : first;
+  const chars = Array.from(bounded);
+  return chars.length > 300
+    ? chars.slice(0, 299).join("").trimEnd() + "…"
+    : bounded;
+}
 export function normalizeStudentReply(
   reply: StudentReply,
   session: Session,
@@ -113,6 +154,8 @@ export function normalizeStudentReply(
   return {
     ...reply,
     move,
+    emotion: ThoughtEmotionSchema.safeParse(reply.emotion).data ?? "curious",
+    reason: normalizeThoughtReason(reply.reason, move, lesson.teachingLanguage),
     studentMessage:
       studentMessage ||
       translateTeaching(
@@ -194,7 +237,13 @@ export function validateStudent(
       "Milo returned incomplete learning evidence. Please retry.",
       502,
     );
-  const { studentMessage: _message, move: _move, ...ledger } = reply;
+  const {
+    studentMessage: _message,
+    move: _move,
+    emotion: _emotion,
+    reason: _reason,
+    ...ledger
+  } = reply;
   return ledger;
 }
 export function readyForCheck(session: Session, lesson: Lesson) {

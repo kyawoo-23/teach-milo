@@ -1,5 +1,17 @@
 export const teachingPhrases = {
   vi: {
+    "I'm curious to hear how you explain this.":
+      "Mình tò mò muốn nghe bạn giải thích điều này như thế nào.",
+    "I want to understand your explanation a little better.":
+      "Mình muốn hiểu lời giải thích của bạn rõ hơn một chút.",
+    "I'm still wondering why it works that way.":
+      "Mình vẫn thắc mắc vì sao lại như vậy.",
+    "I think a small example would help me follow your idea.":
+      "Mình nghĩ một ví dụ nhỏ sẽ giúp mình theo kịp ý bạn.",
+    "I'm unsure whether my idea makes sense.":
+      "Mình chưa chắc ý của mình có hợp lý không.",
+    "Your explanation is helping me connect the ideas.":
+      "Lời giải thích của bạn đang giúp mình kết nối các ý tưởng.",
     "Before you start, here’s what I think:":
       "Trước khi bắt đầu, mình nghĩ thế này:",
     "Is that right?": "Đúng không?",
@@ -20,6 +32,18 @@ export const teachingPhrases = {
     Off: "Tắt",
   },
   id: {
+    "I'm curious to hear how you explain this.":
+      "Aku penasaran bagaimana kamu menjelaskan ini.",
+    "I want to understand your explanation a little better.":
+      "Aku ingin memahami penjelasanmu sedikit lebih baik.",
+    "I'm still wondering why it works that way.":
+      "Aku masih bertanya-tanya mengapa bisa begitu.",
+    "I think a small example would help me follow your idea.":
+      "Kurasa contoh kecil akan membantuku mengikuti idemu.",
+    "I'm unsure whether my idea makes sense.":
+      "Aku belum yakin apakah pikiranku masuk akal.",
+    "Your explanation is helping me connect the ideas.":
+      "Penjelasanmu membantuku menghubungkan ide-idenya.",
     "Before you start, here’s what I think:":
       "Sebelum mulai, begini pendapatku:",
     "Is that right?": "Benar begitu?",
@@ -40,6 +64,18 @@ export const teachingPhrases = {
     Off: "Nonaktif",
   },
   ms: {
+    "I'm curious to hear how you explain this.":
+      "Saya ingin tahu bagaimana anda menerangkan perkara ini.",
+    "I want to understand your explanation a little better.":
+      "Saya mahu memahami penerangan anda dengan lebih baik.",
+    "I'm still wondering why it works that way.":
+      "Saya masih tertanya-tanya mengapa ia berlaku begitu.",
+    "I think a small example would help me follow your idea.":
+      "Saya rasa contoh kecil akan membantu saya mengikuti idea anda.",
+    "I'm unsure whether my idea makes sense.":
+      "Saya belum pasti sama ada idea saya masuk akal.",
+    "Your explanation is helping me connect the ideas.":
+      "Penerangan anda membantu saya menghubungkan idea-idea ini.",
     "Before you start, here’s what I think:":
       "Sebelum bermula, inilah yang saya fikir:",
     "Is that right?": "Betul tak?",
@@ -60,6 +96,18 @@ export const teachingPhrases = {
     Off: "Mati",
   },
   my: {
+    "I'm curious to hear how you explain this.":
+      "ဒီအကြောင်း ဘယ်လိုရှင်းပြမလဲဆိုတာ သိချင်ပါတယ်။",
+    "I want to understand your explanation a little better.":
+      "ရှင်းပြချက်ကို နည်းနည်း ပိုနားလည်ချင်ပါတယ်။",
+    "I'm still wondering why it works that way.":
+      "ဘာကြောင့် အဲဒီလိုဖြစ်တာလဲဆိုတာ သိချင်နေတုန်းပါ။",
+    "I think a small example would help me follow your idea.":
+      "ဥပမာသေးသေးတစ်ခုက သင့်အတွေးကို လိုက်နားလည်ဖို့ ကူညီမယ်ထင်ပါတယ်။",
+    "I'm unsure whether my idea makes sense.":
+      "ကျွန်တော့်အတွေးက ယုတ္တိရှိမရှိ မသေချာသေးပါ။",
+    "Your explanation is helping me connect the ideas.":
+      "ရှင်းပြချက်က အယူအဆတွေကို ချိတ်ဆက်နားလည်ဖို့ ကူညီနေပါတယ်။",
     "Before you start, here’s what I think:":
       "မစခင်၊ ကျွန်တော် ဒီလို ထင်ပါတယ်:",
     "Is that right?": "မှန်ပါသလား?",

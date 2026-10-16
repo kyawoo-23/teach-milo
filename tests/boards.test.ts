@@ -50,6 +50,85 @@ const toolBoard = (kind: Board["suggestedTool"]["kind"]): Board => ({
   },
 });
 describe("interactive board contracts", () => {
+  it("accepts independent matching sides and legacy paired records", () => {
+    const state = ToolStateSchema.parse({
+      kind: "matching",
+      pairs: [
+        {
+          id: "legacy",
+          term: "Existing term",
+          description: "Existing description",
+        },
+        { id: "term", term: "New term" },
+        { id: "description", description: "New description" },
+        { id: "extra", description: "Another description" },
+      ],
+      matches: { term: "legacy", legacy: "description" },
+    });
+    expect(
+      validateWorkspaceSubmission({ version: 2, inputs: {}, state }).state,
+    ).toEqual(state);
+  });
+  it("rejects matching connections to the wrong side or an absent item", () => {
+    const state = {
+      kind: "matching",
+      pairs: [
+        { id: "term", term: "A" },
+        { id: "description", description: "B" },
+      ],
+      matches: {},
+    };
+    for (const matches of [
+      { description: "term" },
+      { term: "term" },
+      { description: "description" },
+      { term: "missing" },
+    ])
+      expect(ToolStateSchema.safeParse({ ...state, matches }).success).toBe(
+        false,
+      );
+    expect(
+      ToolStateSchema.safeParse({ ...state, pairs: [{ id: "empty" }] }).success,
+    ).toBe(false);
+  });
+  it("limits each matching side to ten items independently", () => {
+    const terms = Array.from({ length: 10 }, (_, i) => ({
+      id: `t${i}`,
+      term: `Term ${i}`,
+    }));
+    const descriptions = Array.from({ length: 10 }, (_, i) => ({
+      id: `d${i}`,
+      description: `Description ${i}`,
+    }));
+    const state = {
+      kind: "matching",
+      pairs: [...terms, ...descriptions],
+      matches: {},
+    };
+    expect(ToolStateSchema.safeParse(state).success).toBe(true);
+    expect(
+      ToolStateSchema.safeParse({
+        ...state,
+        pairs: [...terms, { id: "extra", term: "Extra" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      ToolStateSchema.safeParse({
+        ...state,
+        pairs: [...descriptions, { id: "extra", description: "Extra" }],
+      }).success,
+    ).toBe(false);
+    expect(() =>
+      validateWorkspaceSubmission({
+        version: 2,
+        inputs: {},
+        state: ToolStateSchema.parse({
+          ...state,
+          pairs: [{ id: "draft", term: "" }],
+        }),
+      }),
+    ).toThrow("Complete the labels");
+  });
   it("does not count text found only inside a drawing as cited learner reasoning", () => {
     const lesson = lessonFixture(),
       session = sessionFixture(lesson),

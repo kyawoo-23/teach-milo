@@ -63,6 +63,101 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
     await createSession(id, lesson.id, ctx.ownerId);
     return { id, lesson };
   }
+  it("persists safe thoughts and replaces them when the server writes Milo's line", async () => {
+    const { id, lesson } = await setup();
+    let session = await publicSession(id, ctx.ownerId);
+    expect(session.messages[0].thought).toEqual({
+      emotion: "curious",
+      reason: "I'm curious to hear how you explain this.",
+    });
+    let turns = 0;
+    const model: Model = {
+      async generate(schema, _system, data) {
+        turns++;
+        expect(JSON.stringify(data)).not.toContain('"thought"');
+        const messages = (data as { messages: Message[] }).messages;
+        const learner = messages.filter((m) => m.role === "learner").at(-1)!;
+        return schema.parse({
+          ...replyFixture(learner, turns === 3),
+          move:
+            turns === 2
+              ? "surface_misconception"
+              : turns === 3
+                ? "acknowledge"
+                : "probe_mechanism",
+          emotion: "puzzled",
+          reason: "I would like to see another example.",
+        });
+      },
+    };
+    for (let turn = 1; turn <= 3; turn++) {
+      await submitTurn(
+        id,
+        {
+          operationId: randomUUID(),
+          revision: session.revision,
+          text: messageFixture().text,
+        },
+        ctx,
+        model,
+      );
+      session = await publicSession(id, ctx.ownerId);
+      const reply = session.messages.at(-1)!;
+      expect(session.messages.at(-2)).not.toHaveProperty("thought");
+      expect(reply.thought).toEqual(
+        turn === 1
+          ? {
+              emotion: "puzzled",
+              reason: "I would like to see another example.",
+            }
+          : turn === 2
+            ? {
+                emotion: "unsure",
+                reason: "I'm unsure whether my idea makes sense.",
+              }
+            : {
+                emotion: "encouraged",
+                reason: "Your explanation is helping me connect the ideas.",
+              },
+      );
+      if (turn === 2) expect(reply.text).toBe(lesson.misconception);
+      const stored = await readOwned<Session>("sessions", id, ctx.ownerId);
+      expect(stored.ledger).not.toHaveProperty("emotion");
+      expect(stored.ledger).not.toHaveProperty("reason");
+    }
+    expect(session.phase).toBe("ready_for_check");
+    await sessionAction(
+      id,
+      { operationId: randomUUID(), revision: session.revision, action: "hint" },
+      ctx,
+    );
+    session = await publicSession(id, ctx.ownerId);
+    expect(session.messages.at(-1)!.thought).toEqual({
+      emotion: "curious",
+      reason: "I think a small example would help me follow your idea.",
+    });
+    const savedThoughts = session.messages.map((m) => m.thought);
+    const reportModel: Model = {
+      async generate(schema, _system, data) {
+        expect(JSON.stringify(data)).not.toMatch(
+          /"thought"|"emotion"|"reason"/,
+        );
+        const learner = (data as { messages: Message[] }).messages.find(
+          (m) => m.role === "learner",
+        )!;
+        return schema.parse(reportFixture(learner));
+      },
+    };
+    await sessionAction(
+      id,
+      { operationId: randomUUID(), revision: session.revision, action: "end" },
+      ctx,
+      reportModel,
+    );
+    const completed = await publicSession(id, ctx.ownerId);
+    expect(completed.phase).toBe("report");
+    expect(completed.messages.map((m) => m.thought)).toEqual(savedThoughts);
+  });
   it("resumes validated OCR batches, reuses identical uploads, and isolates owners and expiry", async () => {
     const ownerId = randomUUID();
     const anotherOwner = randomUUID();

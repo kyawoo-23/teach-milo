@@ -19,27 +19,54 @@ export function MatchingBoard({
   const id = useId();
   const [selected, setSelected] = useState("");
   const [editing, setEditing] = useState(state.pairs.length === 0);
+  const terms = state.pairs.filter((p) => p.term !== undefined);
+  const descriptions = state.pairs.filter((p) => p.description !== undefined);
   // The card being edited in place, as "<pairId>-term" or "<pairId>-description".
   const [active, setActive] = useState("");
   const refocus = useRef("");
   useEffect(() => {
     if (active) document.getElementById(`${id}-${active}`)?.focus();
     else if (refocus.current) {
-      document.getElementById(`${id}-${refocus.current}-button`)?.focus();
+      document.getElementById(refocus.current)?.focus();
       refocus.current = "";
     }
-  }, [active, id]);
-  const shuffledDescriptions = [...state.pairs].sort(
-    (a, b) => hash(a.id) - hash(b.id),
-  );
-  if (
-    shuffledDescriptions.length > 1 &&
-    shuffledDescriptions.every((p, n) => p.id === state.pairs[n].id)
-  )
-    shuffledDescriptions.push(shuffledDescriptions.shift()!);
-  const descriptionItems = editing ? state.pairs : shuffledDescriptions;
-  const numbers = new Map(state.pairs.map((p, n) => [p.id, n + 1]));
-  const filled = (value: string) => value.trim().length > 0;
+  }, [active, id, state.pairs]);
+  const numbers = new Map(terms.map((p, n) => [p.id, n + 1]));
+  const descriptionNumbers = new Map(descriptions.map((p, n) => [p.id, n + 1]));
+  const filled = (value?: string) => Boolean(value?.trim());
+  const addItem = (side: "term" | "description") => {
+    const itemId = crypto.randomUUID();
+    onChange({ ...state, pairs: [...state.pairs, { id: itemId, [side]: "" }] });
+    setSelected("");
+    setActive(`${itemId}-${side}`);
+  };
+  const deleteItem = (itemId: string, side: "term" | "description") => {
+    const items = side === "term" ? terms : descriptions;
+    const index = items.findIndex((p) => p.id === itemId);
+    const neighbor = items[index + 1] ?? items[index - 1];
+    refocus.current = neighbor
+      ? `${id}-${neighbor.id}-${side}-button`
+      : `${id}-add-${side}`;
+    setActive("");
+    if (side === "term" && selected === itemId) setSelected("");
+    onChange({
+      ...state,
+      pairs: state.pairs.flatMap((p) => {
+        if (p.id !== itemId) return [p];
+        const remaining = { ...p };
+        delete remaining[side];
+        return remaining.term !== undefined ||
+          remaining.description !== undefined
+          ? [remaining]
+          : [];
+      }),
+      matches: Object.fromEntries(
+        Object.entries(state.matches).filter(([term, description]) =>
+          side === "term" ? term !== itemId : description !== itemId,
+        ),
+      ),
+    });
+  };
   const match = (term: string, description: string) => {
     const termPair = state.pairs.find((p) => p.id === term);
     const descriptionPair = state.pairs.find((p) => p.id === description);
@@ -71,7 +98,7 @@ export function MatchingBoard({
     const label = t(
       side === "term" ? "Term {number}" : "Description {number}",
       {
-        number: numbers.get(p.id)!,
+        number: (side === "term" ? numbers : descriptionNumbers).get(p.id)!,
       },
     );
     if (active === key)
@@ -89,7 +116,7 @@ export function MatchingBoard({
             ) {
               e.preventDefault();
               e.stopPropagation();
-              refocus.current = key;
+              refocus.current = `${id}-${key}-button`;
               setActive("");
             }
           }}
@@ -104,7 +131,7 @@ export function MatchingBoard({
             rows={side === "term" ? 2 : 3}
             maxLength={300}
             disabled={disabled}
-            value={p[side]}
+            value={p[side] ?? ""}
             onChange={(event) => {
               const value = event.currentTarget.value;
               onChange({
@@ -136,6 +163,46 @@ export function MatchingBoard({
       </button>
     );
   };
+  const addButton = (side: "term" | "description") => (
+    <button
+      type="button"
+      id={`${id}-add-${side}`}
+      className="icon-button matching-add"
+      aria-label={t(side === "term" ? "Add term" : "Add description")}
+      title={t(side === "term" ? "Add term" : "Add description")}
+      disabled={
+        disabled || (side === "term" ? terms.length : descriptions.length) >= 10
+      }
+      onPointerDown={(event) => event.preventDefault()}
+      onClick={() => addItem(side)}
+    >
+      <Plus size={16} aria-hidden="true" />
+    </button>
+  );
+  const editableRow = (
+    p: MatchingState["pairs"][number],
+    side: "term" | "description",
+  ) => (
+    <div className="matching-term-row" key={p.id}>
+      {editable(p, side)}
+      <button
+        type="button"
+        className="icon-button matching-delete"
+        disabled={disabled}
+        aria-label={t(
+          side === "term"
+            ? "Delete term {number}"
+            : "Delete description {number}",
+          {
+            number: (side === "term" ? numbers : descriptionNumbers).get(p.id)!,
+          },
+        )}
+        onClick={() => deleteItem(p.id, side)}
+      >
+        <Trash2 size={15} aria-hidden="true" />
+      </button>
+    </div>
+  );
   return (
     <div className="matching-editor">
       <div className="matching-toolbar">
@@ -150,29 +217,6 @@ export function MatchingBoard({
           aria-label={t("Matching pairs")}
         >
           <div className="sketch-tool-group">
-            <button
-              type="button"
-              title={t("Add pair")}
-              aria-label={t("Add pair")}
-              disabled={disabled || state.pairs.length >= 10}
-              onPointerDown={(event) => event.preventDefault()}
-              onClick={() => {
-                const pairId = crypto.randomUUID();
-                onChange({
-                  ...state,
-                  pairs: [
-                    ...state.pairs,
-                    { id: pairId, term: "", description: "" },
-                  ],
-                });
-                setEditing(true);
-                setSelected("");
-                setActive(`${pairId}-term`);
-              }}
-            >
-              <Plus size={18} aria-hidden="true" />
-              <span className="visually-hidden">{t("Add pair")}</span>
-            </button>
             <button
               type="button"
               title={editing ? t("Done") : t("Edit")}
@@ -201,10 +245,10 @@ export function MatchingBoard({
       <p className="tool-progress" role="status">
         {t("{count} of {total} connected", {
           count: Object.keys(state.matches).length,
-          total: state.pairs.length,
+          total: terms.length,
         })}
       </p>
-      {!editing && state.pairs.length > 0 && (
+      {!editing && terms.length > 0 && (
         <p className="matching-next-step" id={`${id}-next-step`} role="status">
           {selected
             ? t("Choose a description for {term}.", {
@@ -212,7 +256,7 @@ export function MatchingBoard({
                   state.pairs.find((pair) => pair.id === selected)?.term ||
                   t("Term"),
               })
-            : Object.keys(state.matches).length === state.pairs.length
+            : Object.keys(state.matches).length === terms.length
               ? t("All pairs connected. Explain why they belong together.")
               : t(
                   "Choose a term to start. Select a connected term to change its match.",
@@ -223,37 +267,17 @@ export function MatchingBoard({
         className={`matching-columns${editing ? " matching-columns-editing" : ""}`}
       >
         <div>
-          {state.pairs.length > 0 && (
-            <p className="matching-column-label">
-              {editing ? t("Terms") : t("1. Choose a term")}
-            </p>
+          {(editing || terms.length > 0) && (
+            <div className="matching-column-heading">
+              <p className="matching-column-label">
+                {editing ? t("Terms") : t("1. Choose a term")}
+              </p>
+              {editing && addButton("term")}
+            </div>
           )}
-          {state.pairs.map((p) =>
+          {terms.map((p) =>
             editing ? (
-              <div className="matching-term-row" key={p.id}>
-                {editable(p, "term")}
-                <button
-                  type="button"
-                  className="icon-button matching-delete"
-                  disabled={disabled}
-                  aria-label={t("Delete pair {number}", {
-                    number: numbers.get(p.id)!,
-                  })}
-                  onClick={() =>
-                    onChange({
-                      ...state,
-                      pairs: state.pairs.filter((a) => a.id !== p.id),
-                      matches: Object.fromEntries(
-                        Object.entries(state.matches).filter(
-                          ([k, v]) => k !== p.id && v !== p.id,
-                        ),
-                      ),
-                    })
-                  }
-                >
-                  <Trash2 size={15} />
-                </button>
-              </div>
+              editableRow(p, "term")
             ) : (
               <div className="matching-term-row" key={p.id}>
                 <button
@@ -296,20 +320,24 @@ export function MatchingBoard({
           )}
         </div>
         <div>
-          {state.pairs.length > 0 && (
-            <p className="matching-column-label">
-              {editing ? t("Descriptions") : t("2. Choose its description")}
-            </p>
+          {(editing || descriptions.length > 0) && (
+            <div className="matching-column-heading">
+              <p className="matching-column-label">
+                {editing ? t("Descriptions") : t("2. Choose its description")}
+              </p>
+              {editing && addButton("description")}
+            </div>
           )}
-          {descriptionItems.map((p) =>
+          {descriptions.map((p) =>
             editing ? (
-              <div key={p.id}>{editable(p, "description")}</div>
+              editableRow(p, "description")
             ) : (
               <button
                 type="button"
                 key={p.id}
                 className="matching-choice"
                 data-match-description={p.id}
+                data-empty={!filled(p.description)}
                 data-connected={Object.values(state.matches).includes(p.id)}
                 data-ready={Boolean(selected)}
                 disabled={disabled || !selected || !filled(p.description)}
@@ -366,12 +394,6 @@ export function MatchingBoard({
     </div>
   );
 }
-function hash(value: string) {
-  let result = 2166136261;
-  for (const character of value)
-    result = Math.imul(result ^ character.charCodeAt(0), 16777619);
-  return result >>> 0;
-}
 export function ComparisonTable({
   state,
   onChange,
@@ -418,51 +440,51 @@ export function ComparisonTable({
           aria-hidden={!editingColumns}
         >
           <div className="board-column-fields">
-          {state.columns.map((column, index) => (
-            <div className="tool-field" key={index}>
-              <label htmlFor={`${tableId}-column-${index}`}>
-                {t("Column {number}", { number: index + 1 })}
-              </label>
-              <div className="board-column-input">
-                <input
-                  id={`${tableId}-column-${index}`}
-                  type="text"
-                  value={column}
-                  maxLength={60}
-                  disabled={disabled}
-                  onChange={(event) => {
-                    const value = event.currentTarget.value;
-                    onChange({
-                      ...state,
-                      columns: state.columns.map((column, i) =>
-                        i === index ? value : column,
-                      ),
-                    });
-                  }}
-                />
-                <button
-                  type="button"
-                  className="icon-button"
-                  disabled={disabled || state.columns.length <= 2}
-                  aria-label={t("Delete column {number}", {
-                    number: index + 1,
-                  })}
-                  onClick={() =>
-                    onChange({
-                      ...state,
-                      columns: state.columns.filter((_, i) => i !== index),
-                      rows: state.rows.map((row) => ({
-                        ...row,
-                        cells: row.cells.filter((_, i) => i !== index),
-                      })),
-                    })
-                  }
-                >
-                  <Trash2 size={16} aria-hidden="true" />
-                </button>
+            {state.columns.map((column, index) => (
+              <div className="tool-field" key={index}>
+                <label htmlFor={`${tableId}-column-${index}`}>
+                  {t("Column {number}", { number: index + 1 })}
+                </label>
+                <div className="board-column-input">
+                  <input
+                    id={`${tableId}-column-${index}`}
+                    type="text"
+                    value={column}
+                    maxLength={60}
+                    disabled={disabled}
+                    onChange={(event) => {
+                      const value = event.currentTarget.value;
+                      onChange({
+                        ...state,
+                        columns: state.columns.map((column, i) =>
+                          i === index ? value : column,
+                        ),
+                      });
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="icon-button"
+                    disabled={disabled || state.columns.length <= 2}
+                    aria-label={t("Delete column {number}", {
+                      number: index + 1,
+                    })}
+                    onClick={() =>
+                      onChange({
+                        ...state,
+                        columns: state.columns.filter((_, i) => i !== index),
+                        rows: state.rows.map((row) => ({
+                          ...row,
+                          cells: row.cells.filter((_, i) => i !== index),
+                        })),
+                      })
+                    }
+                  >
+                    <Trash2 size={16} aria-hidden="true" />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
           </div>
         </div>
       </section>
@@ -503,7 +525,9 @@ export function ComparisonTable({
                     <div
                       id={`${tableId}-${r.id}-cell-${i}`}
                       className="board-cell-editor"
-                      data-collapsed={collapsedRows.has(r.id) ? "true" : "false"}
+                      data-collapsed={
+                        collapsedRows.has(r.id) ? "true" : "false"
+                      }
                       aria-hidden={collapsedRows.has(r.id)}
                     >
                       <textarea

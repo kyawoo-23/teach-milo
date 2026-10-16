@@ -10,6 +10,8 @@ import {
 import { validateCalculation } from "@/lib/custom-code";
 import { StudentReplySchema, LessonGeneratedSchema } from "@/lib/contracts";
 import { z } from "zod";
+import { modelMessages } from "@/server/board-media";
+import { translateTeaching } from "@/lib/i18n/messages";
 import {
   lessonFixture,
   messageFixture,
@@ -17,6 +19,93 @@ import {
   reportFixture,
   sessionFixture,
 } from "./fixtures";
+
+describe("learner-facing thoughts", () => {
+  const lesson = lessonFixture();
+  const session = sessionFixture(lesson);
+  const message = messageFixture();
+  const normalize = (reason: string) =>
+    normalizeStudentReply(
+      { ...replyFixture(message), emotion: "puzzled", reason },
+      session,
+      lesson,
+      [message],
+    );
+
+  it("preserves a safe feeling and a single concise sentence", () => {
+    const reply = normalize(
+      "  I wonder why that happens. I want to know more.  ",
+    );
+    expect(reply.emotion).toBe("puzzled");
+    expect(reply.reason).toBe("I wonder why that happens.");
+  });
+  it.each([
+    "The ledger shows enough evidence.",
+    "I am ready_for_check.",
+    "I chose surface_misconception.",
+    "The transfer question is hidden.",
+    "The rubric score has improved.",
+    "misconceptionCorrection is empty.",
+    "unresolvedErrorDetail needs updating.",
+    "allowedMoves contains request_demo.",
+    "My readiness phase changed.",
+    "I'm ready for the independent check.",
+    "The understanding field is supported.",
+    "I have a planted belief.",
+    "The ｌｅｄｇｅｒ was updated.",
+    "The led\u200bger was updated.",
+    "I wonder why. " + "A".repeat(350) + " transfer",
+    " ",
+  ])(
+    "replaces private or empty copy without failing the turn: %s",
+    (reason) => {
+      const reply = normalize(reason);
+      expect(reply.reason).toBe("I'm still wondering why it works that way.");
+      expect(() =>
+        validateStudent(reply, session, lesson, [message]),
+      ).not.toThrow();
+    },
+  );
+  it("accepts an overlong model reason and trims it to both limits", () => {
+    const long = "wondering ".repeat(90);
+    const raw = StudentReplySchema.parse({
+      ...replyFixture(message),
+      reason: long,
+    });
+    const reply = normalize(raw.reason);
+    expect(reply.reason.length).toBeLessThanOrEqual(300);
+    expect(reply.reason.length).toBeGreaterThan(0);
+    expect(reply.reason.trim().split(/\s+/).length).toBeLessThanOrEqual(40);
+    const words = normalize("why ".repeat(90)).reason;
+    expect(words.split(/\s+/)).toHaveLength(40);
+  });
+  it("uses translated move-based fallback copy", () => {
+    const localized = { ...lesson, teachingLanguage: "vi" as const };
+    const reply = normalizeStudentReply(
+      { ...replyFixture(message), move: "request_example", reason: "ledger" },
+      session,
+      localized,
+      [message],
+    );
+    expect(reply.reason).toBe(
+      translateTeaching(
+        "vi",
+        "I think a small example would help me follow your idea.",
+      ),
+    );
+    expect(reply.reason).not.toMatch(/example/);
+  });
+  it("keeps thoughts out of the ledger and all model conversation input", () => {
+    const reply = normalize("I wonder why that happens.");
+    const ledger = validateStudent(reply, session, lesson, [message]);
+    expect(ledger).not.toHaveProperty("emotion");
+    expect(ledger).not.toHaveProperty("reason");
+    const thought = { emotion: reply.emotion, reason: reply.reason };
+    const stored = { ...message, role: "student" as const, thought };
+    expect(modelMessages([stored])[0]).not.toHaveProperty("thought");
+    expect(stored.thought).toEqual(thought);
+  });
+});
 
 describe("server-owned readiness", () => {
   it("requires an interpreted demonstration and complete objective evidence", () => {
