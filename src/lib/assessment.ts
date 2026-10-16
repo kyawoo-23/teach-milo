@@ -1,15 +1,46 @@
 import { dictionaryLocale } from "./i18n/locales";
 import { translate, localize } from "./i18n/messages";
 import {
+  CitationSchema,
   Dimension,
+  DimensionSchema,
   dimensions,
   Lesson,
   Message,
   ReportGenerated,
+  ReportGeneratedSchema,
   SessionReport,
 } from "./contracts";
+import { z } from "zod";
 import { validCitations } from "./controller";
 import { formatBoardNumber } from "./boards";
+
+// Constrain citation selection before generation, as well as validating it
+// afterwards. Transfer evidence must never supply a teaching skill's score.
+export function reportSchemaForMessages(messages: Message[]) {
+  const forKind = (kind: "teaching" | "transfer") => {
+    const ids = messages
+      .filter((m) => m.role === "learner" && (m.kind || "teaching") === kind)
+      .map((m) => m.id);
+    return ids.length
+      ? DimensionSchema.extend({
+          citations: z
+            .array(CitationSchema.extend({ messageId: z.enum(ids) }))
+            .max(3),
+        })
+      : DimensionSchema;
+  };
+  const teaching = forKind("teaching");
+  return ReportGeneratedSchema.extend({
+    scores: z.object({
+      accuracy: teaching,
+      mechanism: teaching,
+      evidence: teaching,
+      misconception: teaching,
+      transfer: forKind("transfer"),
+    }),
+  });
+}
 
 export const withinTolerance = (
   value: number,

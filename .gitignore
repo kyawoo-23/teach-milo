@@ -12,3 +12,5 @@ coverage/
 .cursor/
 graphify-out/
 .pnpm-store/
+tmp/
+output/

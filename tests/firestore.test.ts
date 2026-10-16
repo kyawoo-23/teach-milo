@@ -283,6 +283,7 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
           const input = data as {
             teachingLanguage: string;
             messages?: Message[];
+            transferAnswer?: Message;
             skipped?: boolean;
           };
           expect(input.teachingLanguage).toBe(locale);
@@ -295,12 +296,7 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
           )!;
           if ("skipped" in input) {
             calls.push("report");
-            return schema.parse(
-              reportFixture(
-                teaching,
-                input.messages.find((m) => m.kind === "transfer"),
-              ),
-            );
+            return schema.parse(reportFixture(teaching, input.transferAnswer));
           }
           calls.push("student");
           return schema.parse({
@@ -486,7 +482,11 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
     let reportCalls = 0;
     const model: Model = {
       async generate(schema, _system, data) {
-        const input = data as { messages: Message[]; skipped?: boolean };
+        const input = data as {
+          messages: Message[];
+          transferAnswer?: Message;
+          skipped?: boolean;
+        };
         if ("skipped" in input) {
           reportCalls++;
           return schema.parse(
@@ -494,7 +494,7 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
               input.messages.find(
                 (m) => m.role === "learner" && m.kind === "teaching",
               )!,
-              input.messages.find((m) => m.kind === "transfer"),
+              input.transferAnswer,
             ),
           );
         }
