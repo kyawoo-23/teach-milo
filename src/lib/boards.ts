@@ -115,7 +115,11 @@ export function validateBoardValues(
       "The board inputs have changed. Reset the board.",
     );
   if (!compiled.interactive) throw reset();
-  if (Object.keys(submission.state).some((id) => !board.state.some((s) => s.id === id)))
+  if (
+    Object.keys(submission.state).some(
+      (id) => !board.state.some((s) => s.id === id),
+    )
+  )
     throw reset();
   const state: Record<string, number> = {};
   for (const s of board.state) {
@@ -132,7 +136,11 @@ export function validateBoardValues(
     state[s.id] = value;
   }
   const nodes = composites(compiled);
-  if (Object.keys(submission.composites).some((id) => !nodes.some((n) => n.id === id)))
+  if (
+    Object.keys(submission.composites).some(
+      (id) => !nodes.some((n) => n.id === id),
+    )
+  )
     throw reset();
   const values: BoardValues["composites"] = {};
   for (const node of nodes) {
@@ -193,7 +201,11 @@ export function validateWorkspaceSubmission(
     (state.kind === "concept_map" &&
       state.nodes.some((n) => !n.label.trim())) ||
     (state.kind === "matching" &&
-      state.pairs.some((p) => !p.term.trim() || !p.description.trim())) ||
+      state.pairs.some(
+        (p) =>
+          (p.term !== undefined && !p.term.trim()) ||
+          (p.description !== undefined && !p.description.trim()),
+      )) ||
     (state.kind === "table" && state.columns.some((c) => !c.trim()))
   )
     throw new AppError(

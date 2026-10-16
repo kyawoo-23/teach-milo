@@ -22,22 +22,15 @@
 .connections button:hover:not(:disabled) {
   background: var(--lavender);
 }
-.connections .addAction,
-.popup :global(.primary-button) {
+.connections .addAction {
   background: var(--surface);
   border: 1px solid var(--purple-dark);
   color: var(--purple-dark);
   box-shadow: none;
 }
-.connections .addAction:hover:not(:disabled),
-.popup :global(.primary-button:hover:not(:disabled)) {
+.connections .addAction:hover:not(:disabled) {
   background: var(--lavender);
   box-shadow: none;
-}
-.popup :global(.secondary-button) {
-  background: var(--surface);
-  border-color: var(--purple-dark);
-  color: var(--purple-dark);
 }
 .popup :global(.danger-button) {
   border: 1px solid light-dark(#a94d52, #ed9ba1);
@@ -189,9 +182,9 @@
   padding: 4px;
 }
 .footer {
-  margin-top: 8px;
-  padding-top: 0;
-  border-top: 0;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
 }
 .field {
   display: grid;
@@ -254,14 +247,15 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
   border-top: 0;
-  padding-top: 16px;
+  padding-top: 0;
 }
 .popup .actions button {
-  height: 32px;
-  min-height: 32px;
+  flex: 1 1 140px;
+  height: 44px;
+  min-height: 44px;
   padding: 0 12px;
   display: inline-flex;
   align-items: center;
@@ -270,6 +264,7 @@
   font-size: 14px;
 }
 .actions .deleteButton {
+  flex: 0 0 auto;
   margin-inline-end: auto;
 }
 .menu {

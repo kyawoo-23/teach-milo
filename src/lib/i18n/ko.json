@@ -1,4 +1,6 @@
 {
+  "Enter fullscreen": "전체 화면으로 보기",
+  "Exit fullscreen": "전체 화면 종료",
   "You’re signed in.": "로그인되었습니다.",
   "You’re signed out.": "로그아웃되었습니다.",
   "Close notification": "알림 닫기",
@@ -715,5 +717,21 @@
   "No readable text was extracted from this slide.": "이 슬라이드에서 읽을 수 있는 텍스트를 추출하지 못했습니다.",
   "This presentation has too little readable text. Upload a PDF to include visual content, or paste your notes.": "이 프레젠테이션에는 읽을 수 있는 텍스트가 너무 적습니다. PDF를 업로드하거나 노트를 붙여 넣으세요.",
   "Choose a PPTX with 50 slides or fewer.": "슬라이드가 50개 이하인 PPTX를 선택하세요.",
-  "Guest mode": "게스트 모드"
+  "Guest mode": "게스트 모드",
+  "Curious": "궁금해요",
+  "Puzzled": "헷갈려요",
+  "Encouraged": "힘이 나요",
+  "Unsure": "확신이 없어요",
+  "I'm curious to hear how you explain this.": "어떻게 설명해 줄지 궁금해요.",
+  "I want to understand your explanation a little better.": "설명을 조금 더 잘 이해하고 싶어요.",
+  "I'm still wondering why it works that way.": "왜 그렇게 되는지 아직 궁금해요.",
+  "I think a small example would help me follow your idea.": "작은 예시가 있으면 생각을 따라가는 데 도움이 될 것 같아요.",
+  "I'm unsure whether my idea makes sense.": "제 생각이 말이 되는지 확신이 없어요.",
+  "Your explanation is helping me connect the ideas.": "설명 덕분에 생각들이 서로 연결되고 있어요.",
+  "Milo’s thought: {emotion}": "Milo의 생각: {emotion}",
+  "Milo’s thought": "Milo의 생각",
+  "Add term": "용어 추가",
+  "Add description": "설명 추가",
+  "Delete term {number}": "용어 {number} 삭제",
+  "Delete description {number}": "설명 {number} 삭제"
 }

@@ -4,10 +4,19 @@ import { FormulaBlock } from "./formula-text";
 import { lessonLanguage, type TeachingLanguage } from "@/lib/i18n/locales";
 import { useI18n } from "@/components/locale-context";
 import { memo, useEffect, useState } from "react";
-import { Check, Copy, Layers3 } from "lucide-react";
-import type { Message, UserPublic } from "@/lib/contracts";
+import { Check, ChevronDown, Cloud, Copy, Layers3 } from "lucide-react";
+import { visibleThought } from "@/lib/message-thought";
+import type { Message, MessageThought, UserPublic } from "@/lib/contracts";
+import type { TranslationKey } from "@/lib/i18n/messages";
 import { Milo } from "./milo";
 import { BoardPreview } from "./board-preview";
+
+const emotionLabels: Record<MessageThought["emotion"], TranslationKey> = {
+  curious: "Curious",
+  puzzled: "Puzzled",
+  encouraged: "Encouraged",
+  unsure: "Unsure",
+};
 
 export const ConversationMessage = memo(function ConversationMessage({
   message,
@@ -21,6 +30,7 @@ export const ConversationMessage = memo(function ConversationMessage({
   user: UserPublic | null;
 }) {
   const { t } = useI18n();
+  const thought = visibleThought(message, teachingLanguage);
   const showTimestamp =
     !previousMessage ||
     Date.parse(message.createdAt) - Date.parse(previousMessage.createdAt) >=
@@ -64,6 +74,44 @@ export const ConversationMessage = memo(function ConversationMessage({
           {message.role === "student" && (
             <div className="message-footer">
               <CopyButton text={message.text} />
+              {thought && (
+                <details
+                  className="message-thought"
+                  data-emotion={thought.emotion}
+                  onToggle={(event) => {
+                    if (event.currentTarget.open)
+                      event.currentTarget.querySelector("p")?.scrollIntoView({
+                        block: "nearest",
+                        behavior: "instant",
+                      });
+                  }}
+                >
+                  <summary
+                    aria-label={t("Milo’s thought: {emotion}", {
+                      emotion: t(emotionLabels[thought.emotion]),
+                    })}
+                    title={t("Milo’s thought")}
+                  >
+                    <span className="message-thought-mark" aria-hidden="true">
+                      <Cloud size={14} strokeWidth={1.75} />
+                    </span>
+                    <span className="message-thought-emotion">
+                      {t(emotionLabels[thought.emotion])}
+                    </span>
+                    <ChevronDown
+                      className="message-thought-chevron"
+                      size={12}
+                      strokeWidth={2.25}
+                      aria-hidden="true"
+                    />
+                  </summary>
+                  <div className="message-thought-body">
+                    <p lang={lessonLanguage(teachingLanguage)}>
+                      {thought.reason}
+                    </p>
+                  </div>
+                </details>
+              )}
             </div>
           )}
           {message.board && (

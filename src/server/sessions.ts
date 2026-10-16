@@ -126,6 +126,15 @@ export async function createSession(
       createdAt: now,
       sequence: 0,
       kind: "teaching",
+      thought: {
+        emotion: mode === "correct" ? "unsure" : "curious",
+        reason: translateTeaching(
+          lesson.teachingLanguage,
+          mode === "correct"
+            ? "I'm unsure whether my idea makes sense."
+            : "I'm curious to hear how you explain this.",
+        ),
+      },
     };
     batch.create(
       f.collection("sessions").doc(id).collection("messages").doc(greeting.id),
@@ -436,6 +445,24 @@ export async function submitTurn(
                   "Your explanation has helped me connect the key ideas. Would you like to try a new example on your own, or keep teaching me?",
                 )
               : replyData.studentMessage,
+        thought:
+          replyData.move === "surface_misconception"
+            ? {
+                emotion: "unsure",
+                reason: translateTeaching(
+                  lesson.teachingLanguage,
+                  "I'm unsure whether my idea makes sense.",
+                ),
+              }
+            : next.phase === "ready_for_check"
+              ? {
+                  emotion: "encouraged",
+                  reason: translateTeaching(
+                    lesson.teachingLanguage,
+                    "Your explanation is helping me connect the ideas.",
+                  ),
+                }
+              : { emotion: replyData.emotion, reason: replyData.reason },
         createdAt: new Date().toISOString(),
         sequence: session.nextSequence + 1,
         kind: "teaching",
@@ -584,6 +611,13 @@ export async function sessionAction(
               createdAt: new Date().toISOString(),
               sequence: session.nextSequence,
               kind: "hint",
+              thought: {
+                emotion: "curious",
+                reason: translateTeaching(
+                  lesson.teachingLanguage,
+                  "I think a small example would help me follow your idea.",
+                ),
+              },
             },
           ],
         };

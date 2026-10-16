@@ -1,4 +1,6 @@
 {
+  "Enter fullscreen": "เข้าสู่โหมดเต็มหน้าจอ",
+  "Exit fullscreen": "ออกจากโหมดเต็มหน้าจอ",
   "You’re signed in.": "เข้าสู่ระบบแล้ว",
   "You’re signed out.": "ออกจากระบบแล้ว",
   "Close notification": "ปิดการแจ้งเตือน",
@@ -715,5 +717,21 @@
   "No readable text was extracted from this slide.": "ไม่พบข้อความที่อ่านได้ในสไลด์นี้",
   "This presentation has too little readable text. Upload a PDF to include visual content, or paste your notes.": "งานนำเสนอนี้มีข้อความที่อ่านได้น้อยเกินไป ให้อัปโหลด PDF เพื่อรวมเนื้อหาภาพ หรือวางโน้ตของคุณ",
   "Choose a PPTX with 50 slides or fewer.": "เลือก PPTX ที่มีไม่เกิน 50 สไลด์",
-  "Guest mode": "โหมดผู้เยี่ยมชม"
+  "Guest mode": "โหมดผู้เยี่ยมชม",
+  "Curious": "อยากรู้",
+  "Puzzled": "สงสัย",
+  "Encouraged": "มีกำลังใจ",
+  "Unsure": "ไม่แน่ใจ",
+  "I'm curious to hear how you explain this.": "ผมอยากรู้ว่าคุณจะอธิบายเรื่องนี้อย่างไร",
+  "I want to understand your explanation a little better.": "ผมอยากเข้าใจคำอธิบายของคุณให้ดีขึ้นอีกหน่อย",
+  "I'm still wondering why it works that way.": "ผมยังสงสัยว่าทำไมจึงเป็นแบบนั้น",
+  "I think a small example would help me follow your idea.": "ผมคิดว่าตัวอย่างเล็ก ๆ จะช่วยให้ผมตามความคิดของคุณได้",
+  "I'm unsure whether my idea makes sense.": "ผมยังไม่แน่ใจว่าความคิดของผมสมเหตุสมผลหรือเปล่า",
+  "Your explanation is helping me connect the ideas.": "คำอธิบายของคุณกำลังช่วยให้ผมเชื่อมโยงแนวคิดต่าง ๆ เข้าด้วยกัน",
+  "Milo’s thought: {emotion}": "ความคิดของ Milo: {emotion}",
+  "Milo’s thought": "ความคิดของ Milo",
+  "Add term": "เพิ่มคำศัพท์",
+  "Add description": "เพิ่มคำอธิบาย",
+  "Delete term {number}": "ลบคำศัพท์ {number}",
+  "Delete description {number}": "ลบคำอธิบาย {number}"
 }

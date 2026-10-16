@@ -572,9 +572,14 @@
   padding: 0;
 }
 .sketch-label-modal .confirmation-actions button {
-  height: 32px;
-  min-height: 32px;
+  height: 44px;
+  min-height: 44px;
   padding-block: 0;
+}
+.sketch-label-modal .modal-body {
+  /* Leave room for the 3px focus outline and its 4px offset inside the scroller. */
+  margin: -8px;
+  padding: 8px;
 }
 .sketch-label-modal .sketch-label-form input {
   width: 100%;
@@ -1912,6 +1917,22 @@ input::placeholder {
   min-height: 100dvh;
   background: var(--background);
 }
+.session-focused > .session-header,
+.session-focused .teacher-note,
+.session-focused .composer-footnote {
+  display: none;
+}
+.session-focused .classroom {
+  max-width: none;
+}
+html:has(.session-focused) {
+  scrollbar-gutter: auto;
+}
+.classroom-fullscreen-button {
+  flex: none;
+  width: 32px;
+  min-height: 32px;
+}
 /* The classroom is an app shell: the window does not scroll, the thread does. */
 html:has(.classroom, .completed-session),
 body:has(.classroom, .completed-session) {
@@ -2168,9 +2189,129 @@ body:has(.classroom, .completed-session) {
 }
 .message-footer {
   display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 100%;
+  margin: 0;
+}
+.message-footer:has(.message-thought) {
+  margin-top: 10px;
+}
+.message-thought {
+  --thought-outline: light-dark(#c4bfdb, #665f7d);
+  flex: 0 1 auto;
+  width: fit-content;
+  min-width: 0;
+  max-width: min(100%, 60ch);
+  border: 1px dashed var(--thought-outline);
+  border-radius: 16px;
+  background: light-dark(#fcfbff, #20212c);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.message-thought summary {
+  display: flex;
   align-items: center;
   gap: 6px;
-  margin: 4px 2px 0;
+  width: 100%;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 15px;
+  list-style: none;
+  cursor: pointer;
+  color: var(--muted);
+  opacity: 1;
+  transition:
+    opacity 0.15s ease,
+    color 0.2s ease,
+    background 0.15s ease;
+}
+.message-thought summary::-webkit-details-marker {
+  display: none;
+}
+.message-thought summary:hover,
+.message-thought summary:focus-visible {
+  opacity: 1;
+  background: light-dark(#f5f3fc, #29263a);
+  color: light-dark(#5c5670, #c0bad8);
+}
+.message-thought[open] summary {
+  opacity: 1;
+  background: transparent;
+  color: light-dark(#5c5670, #c0bad8);
+}
+.message-thought-mark {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: transparent;
+  color: light-dark(#8b8799, #9f9bae);
+}
+.message-thought summary:hover .message-thought-mark,
+.message-thought summary:focus-visible .message-thought-mark,
+.message-thought[open] .message-thought-mark {
+  color: var(--purple-dark);
+}
+.message-thought[data-emotion="curious"] .message-thought-mark {
+  color: light-dark(#6a84ad, #8fadd6);
+}
+.message-thought[data-emotion="puzzled"] .message-thought-mark {
+  color: light-dark(#7a7199, #a89fd0);
+}
+.message-thought[data-emotion="encouraged"] .message-thought-mark {
+  color: light-dark(#756db8, #a39de8);
+}
+.message-thought[data-emotion="unsure"] .message-thought-mark {
+  color: light-dark(#8b8799, #a5a2b5);
+}
+.message-thought-emotion {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.message-thought-chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: light-dark(#8b8799, #9f9bae);
+  transition:
+    transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.15s ease;
+}
+.message-thought summary:hover .message-thought-chevron,
+.message-thought summary:focus-visible .message-thought-chevron,
+.message-thought[open] .message-thought-chevron {
+  color: light-dark(#5c5670, #c0bad8);
+}
+.message-thought[open] .message-thought-chevron {
+  transform: rotate(180deg);
+}
+.message-thought summary:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 2px;
+}
+/* Native disclosure sizing keeps the whole thought visible above the composer. */
+.message-thought-body p {
+  max-width: 60ch;
+  scroll-margin-block: 12px;
+  margin: 0;
+  padding: 0 16px 8px;
+  color: light-dark(#51566f, #b9c0dd);
+  font-size: 13px;
+  line-height: 1.8;
+}
+@media (prefers-reduced-motion: reduce) {
+  .message-thought summary,
+  .message-thought-chevron {
+    transition: none;
+  }
 }
 .message-timestamp {
   display: block;
@@ -2186,7 +2327,10 @@ body:has(.classroom, .completed-session) {
   align-items: center;
   justify-content: center;
   margin: 0;
-  padding: 2px;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  padding: 0;
   border-radius: 4px;
   background: transparent;
   color: light-dark(#8b8799, #9f9bae);
@@ -2194,18 +2338,15 @@ body:has(.classroom, .completed-session) {
   opacity: 0.55;
   transition:
     opacity 0.15s ease,
-    background 0.15s ease,
     color 0.15s ease;
 }
-.message:hover .message-copy,
-.message-copy:hover,
-.message-copy:focus-visible {
+.message:hover .message-copy {
   opacity: 1;
 }
 .message-copy:hover,
 .message-copy:focus-visible {
-  background: light-dark(#ebe9f2, #322d3f);
-  color: light-dark(#5c5670, #c0bad8);
+  opacity: 1;
+  color: var(--purple);
 }
 .message.learner {
   margin-left: auto;
