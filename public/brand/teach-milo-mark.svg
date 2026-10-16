@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <title>Teach Milo</title>
+  <path d="m23 20-5-10m23 10 6-11" stroke="#9290E9" stroke-width="6" stroke-linecap="round"/>
+  <path d="M6 34c0-12 9-19 26-19s26 7 26 19v4c0 8-4 13-11 16l-1 6c-.2 1-1.4 1.4-2.1.7L36 55h-4C15 55 6 48 6 38v-4Z" fill="#655DCC"/>
+  <rect x="13" y="25" width="38" height="22" rx="11" fill="#F3F2FF"/>
+  <path d="M23 32v5m18-5v5" stroke="#31355E" stroke-width="4.5" stroke-linecap="round"/>
+  <path d="M28 40q4 4 8 0" stroke="#655DCC" stroke-width="2.5" stroke-linecap="round"/>
+</svg>
