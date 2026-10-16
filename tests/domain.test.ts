@@ -66,6 +66,34 @@ describe("server-owned readiness", () => {
     expect(readyForCheck(s, l)).toBe(false);
     expect(allowedMoves(s)).not.toContain("surface_misconception");
   });
+  it("retains a cited correction across an unrelated follow-up", () => {
+    const l = lessonFixture();
+    const s = sessionFixture(l);
+    const earlier = messageFixture(
+      "Twice the speed gives twice the distance, not four times, because distance equals speed times time.",
+    );
+    s.ledger.misconceptionCorrection = [
+      { messageId: earlier.id, quote: earlier.text },
+    ];
+    const current = messageFixture(
+      "For 6 metres per second over 25 seconds, distance is 150 metres.",
+    );
+    const reply = replyFixture(current, true);
+    reply.misconceptionCorrection = [];
+    expect(
+      normalizeStudentReply(reply, s, l, [earlier, current])
+        .misconceptionCorrection,
+    ).toEqual(s.ledger.misconceptionCorrection);
+    expect(
+      normalizeStudentReply({ ...reply, unresolvedError: true }, s, l, [
+        earlier,
+        current,
+      ]).misconceptionCorrection,
+    ).toEqual([]);
+    expect(
+      normalizeStudentReply(reply, s, l, [current]).misconceptionCorrection,
+    ).toEqual([]);
+  });
   it("rejects invented citations, multiple questions, and invalid moves", () => {
     const l = lessonFixture();
     const s = sessionFixture(l);

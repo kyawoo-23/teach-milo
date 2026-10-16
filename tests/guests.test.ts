@@ -162,14 +162,18 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)(
       const context = { ownerId: guest.id, network: randomUUID() };
       const model: Model = {
         async generate(schema, _system, data) {
-          const input = data as { messages: Message[]; skipped?: boolean };
+          const input = data as {
+            messages: Message[];
+            transferAnswer?: Message;
+            skipped?: boolean;
+          };
           return schema.parse(
             "skipped" in input
               ? reportFixture(
                   input.messages.find(
                     (m) => m.role === "learner" && m.kind === "teaching",
                   )!,
-                  input.messages.find((m) => m.kind === "transfer"),
+                  input.transferAnswer,
                 )
               : replyFixture(input.messages.at(-1)!, true),
           );
