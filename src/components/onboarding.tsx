@@ -706,6 +706,19 @@ export function Onboarding() {
                 </p>
               </form>
             </section>
+            <section className="home-video" aria-labelledby="home-video-title">
+              <h2 id="home-video-title">{t("See how it works")}</h2>
+              <div className="home-video-frame">
+                <iframe
+                  src="https://www.youtube-nocookie.com/embed/ZchsNx0_S80"
+                  title={t("See how it works")}
+                  loading="lazy"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              </div>
+            </section>
             <HomeFaq />
           </>
         ) : (

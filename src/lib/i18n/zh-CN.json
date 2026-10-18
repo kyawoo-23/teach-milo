@@ -659,6 +659,7 @@
   "Display formula": "独立公式",
   "This formula could not be drawn. Retry or edit the label.": "无法绘制此公式。请重试或编辑标签。",
   "Native equations in this DOCX were not extracted. Add them as LaTeX during review, or upload a PDF.": "此 DOCX 中包含无法提取的原生公式。请在检查时以 LaTeX 补充，或上传 PDF。",
+  "See how it works": "看看它是如何运作的",
   "Frequently asked questions": "常见问题",
   "Who is Milo?": "Milo 是谁？",
   "Milo is an AI student. You teach by explaining in your own words, while Milo asks questions that help you spot gaps in your understanding.": "Milo 是一位 AI 学生。你用自己的话讲解，Milo 会通过提问帮助你发现理解中的不足。",

@@ -659,6 +659,7 @@
   "Display formula": "別行の数式",
   "This formula could not be drawn. Retry or edit the label.": "数式を描画できませんでした。再試行するか、ラベルを編集してください。",
   "Native equations in this DOCX were not extracted. Add them as LaTeX during review, or upload a PDF.": "この DOCX のネイティブ数式は抽出されませんでした。確認画面で LaTeX を追加するか、PDF をアップロードしてください。",
+  "See how it works": "使い方を見る",
   "Frequently asked questions": "よくある質問",
   "Who is Milo?": "Milo とは？",
   "Milo is an AI student. You teach by explaining in your own words, while Milo asks questions that help you spot gaps in your understanding.": "Milo は AI の生徒です。自分の言葉で説明すると、Milo が質問して、理解が足りない部分を見つける手助けをします。",

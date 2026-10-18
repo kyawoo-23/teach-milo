@@ -11,7 +11,7 @@ const contentSecurityPolicy = [
   "img-src 'self' data: blob: https:",
   "font-src 'self'",
   `connect-src 'self'${isDev ? " ws: wss:" : ""}`,
-  "frame-src 'self'",
+  "frame-src 'self' https://www.youtube-nocookie.com",
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'none'",
