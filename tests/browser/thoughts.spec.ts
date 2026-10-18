@@ -82,7 +82,7 @@ for (const phase of ["teaching", "report"] as const) {
         : {}),
     };
     await context.addCookies([
-      { name: "teachback-locale", value: "en", url: "http://127.0.0.1:3000" },
+      { name: "teach-milo-locale", value: "en", url: "http://127.0.0.1:3000" },
     ]);
     await page.route("**/api/**", async (route) => {
       const path = new URL(route.request().url()).pathname;

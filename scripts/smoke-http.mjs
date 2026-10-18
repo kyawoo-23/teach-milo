@@ -12,7 +12,7 @@ const origin = process.env.APP_ORIGIN || "http://127.0.0.1:3000";
 if (!["localhost", "127.0.0.1"].includes(new URL(origin).hostname))
   throw new Error("HTTP smoke tests only run against localhost.");
 initializeApp({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT || "demo-teachback",
+  projectId: process.env.GOOGLE_CLOUD_PROJECT || "demo-teach-milo",
 });
 const db = getFirestore();
 const operationId = randomUUID();
@@ -41,13 +41,13 @@ const signup = async () => {
   assert.equal(response.status, 201);
   const header = response.headers.get("set-cookie");
   assert.match(header, /httponly/i);
-  const token = header.match(/teachback_auth=([^;]+)/)[1];
+  const token = header.match(/teach-milo_auth=([^;]+)/)[1];
   const { user } = await response.json();
   users.push({
     id: user.id,
     session: createHash("sha256").update(token).digest("hex"),
   });
-  return `teachback_auth=${token}`;
+  return `teach-milo_auth=${token}`;
 };
 try {
   assert.equal(

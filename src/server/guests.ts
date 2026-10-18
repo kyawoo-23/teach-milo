@@ -13,8 +13,8 @@ import { database, decode, encode } from "./db";
 
 export const GUEST_COOKIE_NAME =
   process.env.NODE_ENV === "production"
-    ? "__Host-teachback_guest"
-    : "teachback_guest";
+    ? "__Host-teach-milo_guest"
+    : "teach-milo_guest";
 const digest = (token: string) =>
   createHash("sha256").update(token).digest("hex");
 const cookieOptions = {
@@ -214,7 +214,7 @@ export async function claimGuest(userId: string) {
   return result;
 }
 
-const OAUTH_COOKIE = "teachback_google_state";
+const OAUTH_COOKIE = "teach-milo_google_state";
 export async function createGoogleState(returnTo: string) {
   const token = randomBytes(32).toString("base64url");
   const expiry = new Date(Date.now() + 10 * 60_000);

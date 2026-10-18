@@ -41,7 +41,7 @@ export const localeNames: Record<Locale, string> = {
   ko: teachingLanguageNames.ko,
   th: teachingLanguageNames.th,
 };
-export const LOCALE_COOKIE = "teachback-locale";
+export const LOCALE_COOKIE = "teach-milo-locale";
 export function isLocale(value: unknown): value is Locale {
   return typeof value === "string" && locales.includes(value as Locale);
 }

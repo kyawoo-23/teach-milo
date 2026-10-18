@@ -258,7 +258,7 @@ test("the selected teaching language survives a sign-in redirect", async ({
   expect(
     await page.evaluate(
       () =>
-        JSON.parse(sessionStorage.getItem("teachback:material-draft")!)
+        JSON.parse(sessionStorage.getItem("teach-milo:material-draft")!)
           .teachingLanguage,
     ),
   ).toBe("ja");

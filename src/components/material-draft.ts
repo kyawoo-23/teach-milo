@@ -17,8 +17,8 @@ export type MaterialDraft = {
   };
 };
 
-const KEY = "teachback:material-draft";
-const DB = "teachback-drafts";
+const KEY = "teach-milo:material-draft";
+const DB = "teach-milo-drafts";
 const STORE = "files";
 
 function openDb(): Promise<IDBDatabase> {

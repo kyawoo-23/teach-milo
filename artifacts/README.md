@@ -1,6 +1,6 @@
 # Recorded demonstration — scripted responses
 
-`teachback-scripted-walkthrough.webm` is a 32-second backup walkthrough of the implemented interface. The visible label identifies its controlled responses. It is **not live Gemini inference** and does not demonstrate the quality of live OCR or assessment.
+`teach-milo-scripted-walkthrough.webm` is a 32-second backup walkthrough of the implemented interface. The visible label identifies its controlled responses. It is **not live Gemini inference** and does not demonstrate the quality of live OCR or assessment.
 
 The recording shows pasted material, extraction review, lesson confirmation, Milo's follow-up and misconception, the deterministic CNN board, an independent check with practice aids hidden, and an evidence-linked report.
 

@@ -1,0 +1,23 @@
+{
+  "text": "{\n  \"scores\": {\n    \"accuracy\": {\n      \"score\": 2,\n      \"status\": \"assessed\",\n      \"explanation\": \"The learner correctly states that distance is speed times time and explains proportional scaling accurately.\",\n      \"citations\": [\n        {\n          \"messageId\": \"00000000-0000-4000-8000-000000000002\",\n          \"quote\": \"Distance is speed times time because speed is the distance covered each second.\"\n        }\n      ]\n    },\n    \"mechanism\": {\n      \"score\": 2,\n      \"status\": \"assessed\",\n      \"explanation\": \"The learner provides clear causal reasoning explaining why distance grows proportionally with speed and time.\",\n      \"citations\": [\n        {\n          \"messageId\": \"00000000-0000-4000-8000-000000000002\",\n          \"quote\": \"Doubling speed also doubles distance, not four times, because the relationship is proportional.\"\n        }\n      ]\n    },\n    \"evidence\": {\n      \"score\": 2,\n      \"status\": \"assessed\",\n      \"explanation\": \"The learner includes a worked example using 10 m/s for 10 s to equal 100 m, with correct interpretation.\",\n      \"citations\": [\n        {\n          \"messageId\": \"00000000-0000-4000-8000-000000000002\",\n          \"quote\": \"At 10 m/s for 10 s, distance is 100 m. Doubling time to 20 s gives 200 m.\"\n        }\n      ]\n    },\n    \"misconception\": {\n      \"score\": 2,\n      \"status\": \"assessed\",\n      \"explanation\": \"The learner explicitly detects and corrects Milo's misconception about doubling speed resulting in four times the distance.\",\n      \"citations\": [\n        {\n          \"messageId\": \"00000000-0000-4000-8000-000000000002\",\n          \"quote\": \"Doubling speed also doubles distance, not four times, because the relationship is proportional.\"\n        }\n      ]\n    },\n    \"transfer\": {\n      \"score\": 2,\n      \"status\": \"assessed\",\n      \"explanation\": \"The learner successfully applies the concept to a new scenario involving a cyclist riding for 25 seconds and doubling the time.\",\n      \"citations\": [\n        {\n          \"messageId\": \"00000000-0000-4000-8000-000000000003\",\n          \"quote\": \"At 6 m/s for 25 s the cyclist travels 150 m. Twice as long gives 300 m, because each second adds the same 6 m and doubling the number of seconds doubles the distance.\"\n        }\n      ]\n    }\n  },\n  \"criticalMisconception\": false,\n  \"strengths\": [\n    {\n      \"text\": \"The learner accurately explains that distance is the product of speed and time and supports it with a concrete numerical example.\",\n      \"citations\": [\n        {\n          \"messageId\": \"00000000-0000-4000-8000-000000000002\",\n          \"quote\": \"At 10 m/s for 10 s, distance is 100 m.\"\n        }\n      ]\n    },\n    {\n      \"text\": \"The learner correctly corrects the proportional scaling misconception regarding doubled speed.\",\n      \"citations\": [\n        {\n          \"messageId\": \"00000000-0000-4000-8000-000000000002\",\n          \"quote\": \"Doubling speed also doubles distance, not four times, because the relationship is proportional.\"\n        }\n      ]\n    }\n  ],\n  \"nextSteps\": [\n    {\n      \"text\": \"Continue practicing scenarios involving simultaneous changes in both speed and time to further solidify proportional reasoning.\",\n      \"citations\": [\n        {\n          \"messageId\": \"00000000-0000-4000-8000-000000000002\",\n          \"quote\": \"Doubling time to 20 s gives 200 m.\"\n        }\n      ]\n    }\n  ],\n  \"transferReasoning\": {\n    \"score\": 2,\n    \"status\": \"assessed\",\n    \"explanation\": \"The learner provides sound conceptual reasoning by explaining that each second adds a constant distance, meaning doubling the time doubles the total distance.\",\n    \"citations\": [\n      {\n        \"messageId\": \"00000000-0000-4000-8000-000000000003\",\n        \"quote\": \"Twice as long gives 300 m, because each second adds the same 6 m and doubling the number of seconds doubles the distance.\"\n      }\n    ]\n  }\n}",
+  "usage": {
+    "promptTokenCount": 1283,
+    "candidatesTokenCount": 1258,
+    "totalTokenCount": 2541,
+    "cachedContentTokenCount": 615,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 1283
+      }
+    ],
+    "cacheTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 615
+      }
+    ],
+    "serviceTier": "standard"
+  },
+  "finishReason": "STOP"
+}

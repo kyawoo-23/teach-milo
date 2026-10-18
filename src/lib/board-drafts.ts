@@ -1,8 +1,8 @@
-export const BOARD_DRAFT_PREFIX = "teachback-board:";
+export const BOARD_DRAFT_PREFIX = "teach-milo-board:";
 export function moveBoardDrafts(fromOwnerId: string, toOwnerId: string) {
   if (fromOwnerId === toOwnerId) return;
   window.dispatchEvent(
-    new CustomEvent("teachback-board-migrating", {
+    new CustomEvent("teach-milo-board-migrating", {
       detail: { fromOwnerId, toOwnerId },
     }),
   );
@@ -35,7 +35,7 @@ export function clearBoardDrafts(ownerId?: string, sessionId?: string) {
     /* Storage can be disabled; in-memory work remains usable. */
   }
   window.dispatchEvent(
-    new CustomEvent("teachback-board-cleared", {
+    new CustomEvent("teach-milo-board-cleared", {
       detail: { ownerId, sessionId },
     }),
   );

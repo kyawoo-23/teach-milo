@@ -17,7 +17,7 @@ import { formatBoardNumber } from "./boards";
 
 // Constrain citation selection before generation, as well as validating it
 // afterwards. Transfer evidence must never supply a teaching skill's score.
-export function reportSchemaForMessages(messages: Message[]) {
+export function reportSchemaForMessages(messages: Message[], numeric = false) {
   const forKind = (kind: "teaching" | "transfer") => {
     const ids = messages
       .filter((m) => m.role === "learner" && (m.kind || "teaching") === kind)
@@ -31,7 +31,7 @@ export function reportSchemaForMessages(messages: Message[]) {
       : DimensionSchema;
   };
   const teaching = forKind("teaching");
-  return ReportGeneratedSchema.extend({
+  const schema = ReportGeneratedSchema.extend({
     scores: z.object({
       accuracy: teaching,
       mechanism: teaching,
@@ -40,6 +40,11 @@ export function reportSchemaForMessages(messages: Message[]) {
       transfer: forKind("transfer"),
     }),
   });
+  // Internal only: arithmetic is assessed by the server, independently of this
+  // cited judgment of the requested reasoning.
+  return numeric
+    ? schema.extend({ transferReasoning: forKind("transfer") })
+    : schema;
 }
 
 export const withinTolerance = (
@@ -57,9 +62,12 @@ export function finalizeReport(
   skipped: boolean,
   answers?: Record<string, number>,
   excluded: Dimension[] = [],
+  transferReasoning?: SessionReport["scores"]["transfer"],
 ): SessionReport {
   const locale = dictionaryLocale(lesson.teachingLanguage);
-  const report = structuredClone(raw);
+  const report = ReportGeneratedSchema.parse(raw);
+  if (lesson.transfer.numeric?.fields.length && transferReasoning)
+    report.scores.transfer = structuredClone(transferReasoning);
   for (const name of dimensions) {
     const item = report.scores[name];
     item.citations = validCitations(
@@ -119,6 +127,8 @@ export function finalizeReport(
               expected: `${formatBoardNumber(f.expected, 6)}${f.unit ? ` ${f.unit}` : ""}`,
             },
           );
+        } else {
+          dimension.explanation += ` ${f.label} = ${formatBoardNumber(f.expected, 12)}${f.unit ? ` ${f.unit}` : ""}.`;
         }
   }
   report.strengths = report.strengths

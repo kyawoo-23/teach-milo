@@ -197,7 +197,9 @@ export function replyFixture(message: Message, complete = false): StudentReply {
 export function reportFixture(
   teaching: Message,
   transfer?: Message,
-): ReportGenerated {
+): ReportGenerated & {
+  transferReasoning: ReportGenerated["scores"]["transfer"];
+} {
   const score = (m?: Message) => ({
     score: m ? (2 as const) : null,
     status: m ? ("assessed" as const) : ("insufficient_evidence" as const),
@@ -214,6 +216,7 @@ export function reportFixture(
       misconception: score(teaching),
       transfer: score(transfer),
     },
+    transferReasoning: score(transfer),
     criticalMisconception: false,
     strengths: [
       {

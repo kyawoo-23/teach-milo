@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "./locale-context";
 
-const STORAGE_KEY = "teachback-board-width";
+const STORAGE_KEY = "teach-milo-board-width";
 const MIN_BOARD = 280;
 const MIN_CHAT = 420;
 const KEY_STEP = 24;

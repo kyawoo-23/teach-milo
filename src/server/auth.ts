@@ -39,7 +39,7 @@ export type UserPublic = {
   hasPassword: boolean;
 };
 
-export const AUTH_COOKIE_NAME = "teachback_auth";
+export const AUTH_COOKIE_NAME = "teach-milo_auth";
 const SESSION_EXPIRY_DAYS = 30;
 
 export function hashPassword(password: string): { hash: string; salt: string } {

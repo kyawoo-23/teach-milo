@@ -46,16 +46,16 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 function preparationOwner(ownerId?: string, transferredFrom?: string) {
   try {
-    const previous = sessionStorage.getItem("teachback:preparation-owner");
+    const previous = sessionStorage.getItem("teach-milo:preparation-owner");
     if (
       !ownerId ||
       (previous && previous !== ownerId && previous !== transferredFrom)
     ) {
       sessionStorage.removeItem("operation:preparation");
-      window.dispatchEvent(new Event("teachback-preparation-reset"));
+      window.dispatchEvent(new Event("teach-milo-preparation-reset"));
     }
-    if (ownerId) sessionStorage.setItem("teachback:preparation-owner", ownerId);
-    else sessionStorage.removeItem("teachback:preparation-owner");
+    if (ownerId) sessionStorage.setItem("teach-milo:preparation-owner", ownerId);
+    else sessionStorage.removeItem("teach-milo:preparation-owner");
   } catch {
     // In-memory operation IDs still work when browser storage is unavailable.
   }
@@ -198,7 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // callers always share this promise, including browsers without Web Locks.
     identityCreation.current = (
       navigator.locks
-        ? navigator.locks.request("teachback-guest", create)
+        ? navigator.locks.request("teach-milo-guest", create)
         : create()
     ).finally(() => {
       identityCreation.current = null;

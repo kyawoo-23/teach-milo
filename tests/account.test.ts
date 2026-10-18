@@ -20,7 +20,7 @@ const store = vi.hoisted(() => ({
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (name: string) =>
-      name === "teachback_auth" && store.token
+      name === "teach-milo_auth" && store.token
         ? { value: store.token }
         : undefined,
     set: (_name: string, token: string) => {

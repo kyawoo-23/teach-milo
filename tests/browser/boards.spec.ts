@@ -4,7 +4,7 @@ import { writeFile } from "node:fs/promises";
 import type { Board, BoardNode } from "../../src/lib/contracts";
 const id = "11111111-1111-4111-8111-111111111111";
 const owner = "board-learner";
-const key = `teachback-board:${owner}:${id}`;
+const key = `teach-milo-board:${owner}:${id}`;
 async function setup(page: Page, failTurn = false, definition?: Board) {
   const state: any = {
     id,

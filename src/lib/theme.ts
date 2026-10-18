@@ -1,4 +1,4 @@
-export const THEME_COOKIE = "teachback-theme";
+export const THEME_COOKIE = "teach-milo-theme";
 export const themes = ["system", "light", "dark"] as const;
 export type Theme = (typeof themes)[number];
 export function isTheme(value: unknown): value is Theme {
