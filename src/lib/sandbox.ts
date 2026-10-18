@@ -1,5 +1,5 @@
 // Only this app-owned bootstrap executes in the frame. Generated calculations execute in a worker.
-export const calculationSandbox = `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-teachback-runner'; worker-src blob:; connect-src 'none'; img-src 'none'; style-src 'none'; base-uri 'none'; form-action 'none'"></head><body><script nonce="teachback-runner">
+export const calculationSandbox = `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-teach-milo-runner'; worker-src blob:; connect-src 'none'; img-src 'none'; style-src 'none'; base-uri 'none'; form-action 'none'"></head><body><script nonce="teach-milo-runner">
 let worker, timer;
 window.addEventListener('message', event => {
   if (event.source !== parent || !event.data || event.data.type !== 'calculate') return;

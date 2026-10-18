@@ -14,7 +14,7 @@ test.skip(
 function db() {
   const app =
     getApps().find((a) => a.name === "guest-browser-tests") ??
-    initializeApp({ projectId: "demo-teachback" }, "guest-browser-tests");
+    initializeApp({ projectId: "demo-teach-milo" }, "guest-browser-tests");
   return getFirestore(app);
 }
 async function startLesson(page: Page, upload = false) {
@@ -82,7 +82,7 @@ for (const upload of [false, true]) {
   }) => {
     const id = await startLesson(page, upload);
     const cookies = await context.cookies();
-    expect(cookies.find((c) => c.name === "teachback_guest")).toMatchObject({
+    expect(cookies.find((c) => c.name === "teach-milo_guest")).toMatchObject({
       httpOnly: true,
       sameSite: "Lax",
     });
@@ -143,7 +143,7 @@ test("real signup transfers the open guest session and browser draft without cha
       // A second session's unsent workspace exercises namespace migration while
       // the visible workspace continues to be saved by its own React hook.
       localStorage.setItem(
-        `teachback-board:${ownerId}:${id}-draft`,
+        `teach-milo-board:${ownerId}:${id}-draft`,
         JSON.stringify({ marker: "keep me" }),
       );
     },
@@ -183,7 +183,7 @@ test("real signup transfers the open guest session and browser draft without cha
   expect(
     await page.evaluate(
       ({ ownerId, id }) =>
-        localStorage.getItem(`teachback-board:${ownerId}:${id}-draft`),
+        localStorage.getItem(`teach-milo-board:${ownerId}:${id}-draft`),
       { ownerId: identity.user.id, id },
     ),
   ).toContain("keep me");

@@ -2231,3 +2231,49 @@ test("fetching cannot replace a new login with a delayed old auth response", asy
   await page.getByRole("button", { name: "Close dialog" }).click();
   await expect(page.locator(".user-display-name")).toHaveText("New owner");
 });
+
+for (const [score, status, word] of [
+  [2, "assessed", "Strong"],
+  [1, "assessed", "Getting there"],
+  [0, "assessed", "Not yet"],
+  [null, "uncertain", "Couldn’t judge"],
+  [null, "insufficient_evidence", "Not shown yet"],
+] as const) {
+  test(`independent-check report verdict agrees with skill row: ${word}`, async ({
+    page,
+  }) => {
+    const { state } = await fixtures(page);
+    state.phase = "report";
+    const dimension = {
+      score,
+      status,
+      explanation: "Shared assessment.",
+      citations: [],
+    };
+    state.report = {
+      scores: Object.fromEntries(
+        ["accuracy", "mechanism", "evidence", "misconception", "transfer"].map(
+          (name) => [name, dimension],
+        ),
+      ),
+      total: score === null ? null : score * 5,
+      earnedPoints: (score ?? 0) * 5,
+      availablePoints: score === null ? 0 : 10,
+      maxTotal: 10,
+      overallLabel: "developing",
+      criticalMisconception: false,
+      transferCorrect: score === null ? null : score === 2,
+      strengths: [],
+      nextSteps: [{ text: "Try a new example.", citations: [] }],
+      expectedTransferExplanation: "O = 18; P = 114; M = 34992",
+    };
+    await page.goto(`/session/${sessionId}/report`);
+    const row = page
+      .locator(".rp-skills li")
+      .filter({ hasText: "Applying it on your own" });
+    await expect(row.getByText(word, { exact: true })).toBeVisible();
+    await expect(
+      page.locator(".rp-check-head").getByText(word, { exact: true }),
+    ).toBeVisible();
+  });
+}

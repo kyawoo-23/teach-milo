@@ -195,9 +195,9 @@ export function useOperationId(scope = "preparation") {
     const reset = () => {
       operation.current = null;
     };
-    window.addEventListener("teachback-preparation-reset", reset);
+    window.addEventListener("teach-milo-preparation-reset", reset);
     return () =>
-      window.removeEventListener("teachback-preparation-reset", reset);
+      window.removeEventListener("teach-milo-preparation-reset", reset);
   }, [scope]);
   return (key: string) => {
     if (!operation.current) {

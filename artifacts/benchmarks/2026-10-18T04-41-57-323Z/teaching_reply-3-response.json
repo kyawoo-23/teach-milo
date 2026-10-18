@@ -1,0 +1,16 @@
+{
+  "text": "{\n  \"studentMessage\": \"That makes complete sense! Could you show me how doubling both speed and time at the same time affects the distance using the table tool?\",\n  \"emotion\": \"encouraged\",\n  \"reason\": \"I am excited to see a demonstration of how changing multiple variables affects distance.\",\n  \"move\": \"request_demo\",\n  \"evidence\": [\n    {\n      \"objectiveId\": \"o1\",\n      \"understanding\": \"supported\",\n      \"citations\": [\n        {\n          \"messageId\": \"00000000-0000-4000-8000-000000000002\",\n          \"quote\": \"Distance is speed times time because speed is the distance covered each second.\"\n        }\n      ]\n    },\n    {\n      \"objectiveId\": \"o2\",\n      \"understanding\": \"supported\",\n      \"citations\": [\n        {\n          \"messageId\": \"00000000-0000-4000-8000-000000000002\",\n          \"quote\": \"Doubling time to 20 s gives 200 m. Doubling speed also doubles distance, not four times, because the relationship is proportional.\"\n        }\n      ]\n    }\n  ],\n  \"mechanism\": [\n    {\n      \"messageId\": \"00000000-0000-4000-8000-000000000002\",\n      \"quote\": \"speed is the distance covered each second\"\n    }\n  ],\n  \"demonstration\": [],\n  \"misconceptionCorrection\": [\n    {\n      \"messageId\": \"00000000-0000-4000-8000-000000000002\",\n      \"quote\": \"Doubling speed also doubles distance, not four times, because the relationship is proportional.\"\n    }\n  ],\n  \"unresolvedError\": false,\n  \"unresolvedErrorDetail\": \"\",\n  \"summary\": \"The learner correctly explained that distance equals speed multiplied by time and recognized that doubling speed or time doubles the distance proportionally rather than quadrupling it.\"\n}",
+  "usage": {
+    "promptTokenCount": 1171,
+    "candidatesTokenCount": 527,
+    "totalTokenCount": 1698,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 1171
+      }
+    ],
+    "serviceTier": "standard"
+  },
+  "finishReason": "STOP"
+}

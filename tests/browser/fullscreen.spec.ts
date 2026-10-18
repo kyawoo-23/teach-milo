@@ -7,7 +7,7 @@ const id = "11111111-1111-4111-8111-111111111111";
 test.beforeEach(async ({ page, context }) => {
   const lesson = lessonFixture();
   await context.addCookies([
-    { name: "teachback-locale", value: "en", url: "http://127.0.0.1:3000" },
+    { name: "teach-milo-locale", value: "en", url: "http://127.0.0.1:3000" },
   ]);
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;

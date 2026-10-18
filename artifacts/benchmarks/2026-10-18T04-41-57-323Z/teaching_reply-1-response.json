@@ -1,0 +1,16 @@
+{
+  "text": "{\n  \"studentMessage\": \"That makes complete sense! Could you show me how a comparison table on the teaching board would look for doubling the speed versus doubling the time?\",\n  \"emotion\": \"encouraged\",\n  \"reason\": \"I am glad the explanation is clear and want to see a table comparing speed and time changes.\",\n  \"move\": \"request_demo\",\n  \"evidence\": [\n    {\n      \"objectiveId\": \"o1\",\n      \"understanding\": \"supported\",\n      \"citations\": [\n        {\n          \"messageId\": \"00000000-0000-4000-8000-000000000002\",\n          \"quote\": \"Distance is speed times time because speed is the distance covered each second.\"\n        }\n      ]\n    },\n    {\n      \"objectiveId\": \"o2\",\n      \"understanding\": \"supported\",\n      \"citations\": [\n        {\n          \"messageId\": \"00000000-0000-4000-8000-000000000002\",\n          \"quote\": \"Doubling time to 20 s gives 200 m. Doubling speed also doubles distance, not four times, because the relationship is proportional.\"\n        }\n      ]\n    }\n  ],\n  \"mechanism\": [\n    {\n      \"messageId\": \"00000000-0000-4000-8000-000000000002\",\n      \"quote\": \"At 10 m/s for 10 s, distance is 100 m. Doubling time to 20 s gives 200 m.\"\n    }\n  ],\n  \"demonstration\": [],\n  \"misconceptionCorrection\": [\n    {\n      \"messageId\": \"00000000-0000-4000-8000-000000000002\",\n      \"quote\": \"Doubling speed also doubles distance, not four times, because the relationship is proportional.\"\n    }\n  ],\n  \"unresolvedError\": false,\n  \"unresolvedErrorDetail\": \"\",\n  \"summary\": \"The learner correctly explained that distance equals speed multiplied by time, illustrated it with a numeric example, and accurately resolved the misconception by stating that doubling the speed doubles the distance rather than quadrupling it.\"\n}",
+  "usage": {
+    "promptTokenCount": 1171,
+    "candidatesTokenCount": 571,
+    "totalTokenCount": 1742,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 1171
+      }
+    ],
+    "serviceTier": "standard"
+  },
+  "finishReason": "STOP"
+}

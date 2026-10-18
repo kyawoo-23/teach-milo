@@ -1,0 +1,71 @@
+{
+  "startedAt": "2026-10-18T04:41:57.323Z",
+  "endedAt": "2026-10-18T04:45:12.914Z",
+  "elapsedSeconds": 195.591,
+  "output": "/Users/kko/VSCode/Kko/TeachBack AI /artifacts/benchmarks/2026-10-18T04-41-57-323Z",
+  "attempted": 9,
+  "requested": 9,
+  "apiSuccesses": 9,
+  "stoppedOnError": false,
+  "pacedSuccessfulCallsPerMinute": 2.7608632299032165,
+  "workloads": [
+    {
+      "name": "lesson_preparation",
+      "attempts": 3,
+      "apiSuccesses": 3,
+      "schemaPasses": 3,
+      "fixtureCheckPasses": 3,
+      "latencyMs": {
+        "min": 4558.52,
+        "p50": 5198.17,
+        "max": 5796.75
+      },
+      "promptTokens": 5793,
+      "outputTokens": 5008,
+      "thinkingTokens": 0,
+      "paidEquivalentUsd": 0.0140149,
+      "cachedInputTokens": 900
+    },
+    {
+      "name": "teaching_reply",
+      "attempts": 3,
+      "apiSuccesses": 3,
+      "schemaPasses": 3,
+      "fixtureCheckPasses": 3,
+      "latencyMs": {
+        "min": 2398.71,
+        "p50": 2502.44,
+        "max": 2697.85
+      },
+      "promptTokens": 3513,
+      "outputTokens": 1624,
+      "thinkingTokens": 0,
+      "paidEquivalentUsd": 0.005113899999999999,
+      "cachedInputTokens": 0
+    },
+    {
+      "name": "report_evaluation",
+      "attempts": 3,
+      "apiSuccesses": 3,
+      "schemaPasses": 3,
+      "fixtureCheckPasses": 3,
+      "latencyMs": {
+        "min": 4073.88,
+        "p50": 4074.27,
+        "max": 4208.91
+      },
+      "promptTokens": 3849,
+      "outputTokens": 3918,
+      "thinkingTokens": 0,
+      "paidEquivalentUsd": 0.01078365,
+      "cachedInputTokens": 615
+    }
+  ],
+  "limitations": [
+    "Direct Gemini SDK component benchmark. Excludes browser, Next.js, HTTP route, Firestore, full session, PDF OCR, repair calls, concurrent load, and learning outcomes.",
+    "Tiny repeated single-topic synthetic sample. No general factual-accuracy or learning-gain estimate.",
+    "Account tier and project quotas not verified in AI Studio. Results use current API access without requesting higher limits.",
+    "Paid equivalent uses published standard rates, not billed cost or measured session cost. Free charge is conditional on free-tier eligibility.",
+    "The app's global daily model-call guard is bypassed because this script calls Gemini directly. No production records are created."
+  ]
+}

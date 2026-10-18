@@ -18,7 +18,7 @@ import { AUTH_COOKIE_NAME, hash, type User } from "./auth";
 import { database, decode, encode } from "./db";
 import { callContext } from "./usage";
 
-const BROWSER_COOKIE = "teachback_passkey";
+const BROWSER_COOKIE = "teach-milo_passkey";
 const CHALLENGE_TTL = 5 * 60_000;
 const MAX_PASSKEYS = 20;
 type ManagementSession = {

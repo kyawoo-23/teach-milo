@@ -242,7 +242,7 @@ async function enroll() {
   return { ceremonyId, options, credential, result: await verified.json() };
 }
 async function loginOptions() {
-  store.cookies.delete("teachback_auth");
+  store.cookies.delete("teach-milo_auth");
   const response = await authenticationOptions(
     request("authentication/options"),
   );
@@ -255,7 +255,7 @@ beforeEach(() => {
   store.docs.clear();
   store.cookies.clear();
   store.cookieOptions.clear();
-  store.cookies.set("teachback_auth", "a".repeat(43));
+  store.cookies.set("teach-milo_auth", "a".repeat(43));
   store.docs.set("users/ada", {
     id: userId,
     email: "ada@example.test",
@@ -283,7 +283,7 @@ describe("passkey registration and authentication (real ES256 signatures)", () =
       { id, name: "Personal laptop", createdAt: expect.any(String) },
     ]);
     expect(JSON.stringify(result)).not.toContain("publicKey");
-    expect(store.cookieOptions.get("teachback_passkey")).toMatchObject({
+    expect(store.cookieOptions.get("teach-milo_passkey")).toMatchObject({
       httpOnly: true,
       sameSite: "strict",
       secure: true,
@@ -351,7 +351,7 @@ describe("passkey registration and authentication (real ES256 signatures)", () =
     expect(store.docs.has(`passkey_challenges/${login.ceremonyId}`)).toBe(
       false,
     );
-    expect(store.cookies.has("teachback_auth")).toBe(false);
+    expect(store.cookies.has("teach-milo_auth")).toBe(false);
     expect(
       (
         await authenticationVerify(
@@ -420,12 +420,12 @@ describe("passkey registration and authentication (real ES256 signatures)", () =
       credential: attestation(options.challenge),
       name: "Laptop",
     };
-    const browser = store.cookies.get("teachback_passkey")!;
-    store.cookies.set("teachback_passkey", "b".repeat(43));
+    const browser = store.cookies.get("teach-milo_passkey")!;
+    store.cookies.set("teach-milo_passkey", "b".repeat(43));
     expect(
       (await registrationVerify(request("registration/verify", body))).status,
     ).toBe(401);
-    store.cookies.set("teachback_passkey", browser);
+    store.cookies.set("teach-milo_passkey", browser);
     expect(
       (
         await authenticationVerify(

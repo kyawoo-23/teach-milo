@@ -3694,6 +3694,15 @@ input[type="range"] {
   line-height: 1.7;
   margin: 14px 0 6px;
 }
+.rp-check > div:not(.rp-check-head) {
+  margin-top: 14px;
+}
+.rp-check .formula-content p {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.7;
+  margin: 0 0 6px;
+}
 .evidence-quote {
   display: flex;
   text-align: left;

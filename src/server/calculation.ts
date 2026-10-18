@@ -15,7 +15,6 @@ import type {
 } from "@/lib/contracts";
 import type { TeachingLanguage } from "@/lib/i18n/locales";
 import { AppError } from "@/lib/errors";
-import { withinTolerance } from "@/lib/assessment";
 
 // The code is validated to a tiny arithmetic language before it gets here; the
 // fresh vm context, frozen inputs and terminable worker are defence in depth.
@@ -57,7 +56,10 @@ export async function runCalculation(
     const worker = new Worker(source, {
       eval: true,
       workerData: { code, inputs, outputIds },
-      resourceLimits: { maxOldGenerationSizeMb: 32, maxYoungGenerationSizeMb: 8 },
+      resourceLimits: {
+        maxOldGenerationSizeMb: 32,
+        maxYoungGenerationSizeMb: 8,
+      },
     });
     const finish = (fn: () => void) => {
       clearTimeout(timer);
@@ -68,12 +70,14 @@ export async function runCalculation(
       () => finish(() => reject(new Error("calculate() timed out"))),
       1_000,
     );
-    worker.once("message", (message: { metrics?: Record<string, number>; error?: string }) =>
-      finish(() =>
-        message.metrics
-          ? resolve(message.metrics)
-          : reject(new Error(message.error ?? "calculate() failed")),
-      ),
+    worker.once(
+      "message",
+      (message: { metrics?: Record<string, number>; error?: string }) =>
+        finish(() =>
+          message.metrics
+            ? resolve(message.metrics)
+            : reject(new Error(message.error ?? "calculate() failed")),
+        ),
     );
     worker.once("error", (error) => finish(() => reject(error)));
   });
@@ -113,11 +117,14 @@ export async function verifyBoardSubmission(
 }
 
 const NONE: NumericTransfer = { fields: [], inputs: [], code: "" };
-// A model-written key is kept only when its own calculation reproduces every
-// expected value, so assessment never grades against an unverified number.
+// Executed metrics are authoritative; model-written numbers are only used to
+// detect whether the reference prose also needs correction.
 export async function verifyNumericTransfer(
   numeric: NumericTransfer,
-): Promise<{ numeric: NumericTransfer; outcome: "none" | "verified" | "dropped" }> {
+): Promise<{
+  numeric: NumericTransfer;
+  outcome: "none" | "verified" | "corrected" | "invalid";
+}> {
   if (!numeric.fields.length) return { numeric: NONE, outcome: "none" };
   const ids = numeric.fields.map((f) => f.id);
   const inputs = Object.fromEntries(numeric.inputs.map((i) => [i.id, i.value]));
@@ -133,16 +140,20 @@ export async function verifyNumericTransfer(
     ) ||
     numeric.inputs.some((i) => !Number.isFinite(i.value))
   )
-    return { numeric: NONE, outcome: "dropped" };
+    return { numeric: NONE, outcome: "invalid" };
   try {
     const computed = await runCalculation(numeric.code, inputs, ids);
-    const fields = numeric.fields.map((f) => ({ ...f, expected: computed[f.id] }));
-    return numeric.fields.every((f) =>
-      withinTolerance(computed[f.id], f.expected, f.tolerance),
-    )
-      ? { numeric: { ...numeric, fields }, outcome: "verified" }
-      : { numeric: NONE, outcome: "dropped" };
+    const fields = numeric.fields.map((f) => ({
+      ...f,
+      expected: computed[f.id],
+    }));
+    return {
+      numeric: { ...numeric, fields },
+      outcome: numeric.fields.every((f) => computed[f.id] === f.expected)
+        ? "verified"
+        : "corrected",
+    };
   } catch {
-    return { numeric: NONE, outcome: "dropped" };
+    return { numeric: NONE, outcome: "invalid" };
   }
 }

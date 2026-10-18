@@ -13,7 +13,7 @@ import { exampleBoard } from "@/lib/boards";
 import { compileBoard } from "@/lib/board-catalog";
 import { AppError } from "@/lib/errors";
 import { lessonLanguage, type TeachingLanguage } from "@/lib/i18n/locales";
-import { verifyNumericTransfer } from "./calculation";
+import { prepareTransferReference } from "./transfer-reference";
 import { PREPARE_PROMPT, languageInstruction } from "@/content/prompts";
 import {
   assertGuestWritable,
@@ -99,7 +99,12 @@ export async function prepareLesson(
       "The lesson could not be linked to your material. Please retry.",
       502,
     );
-  const numeric = await verifyNumericTransfer(result.transfer.numeric);
+  const reference = await prepareTransferReference(
+    result.transfer,
+    ctx,
+    model,
+    input.teachingLanguage,
+  );
   const { board, outcome: boardOutcome } = await prepareBoard(
     result.board,
     result.title,
@@ -110,7 +115,7 @@ export async function prepareLesson(
   // OCR warnings are surfaced for learner review; unresolved factual concerns remain private grading constraints.
   const lesson: Lesson = {
     ...result,
-    transfer: { ...result.transfer, numeric: numeric.numeric },
+    transfer: reference.transfer,
     board,
     id,
     ownerId: ctx.ownerId,
@@ -128,9 +133,9 @@ export async function prepareLesson(
   });
   await Promise.all([
     event(id, `board_prepared_${boardOutcome}`, id),
-    ...(numeric.outcome === "none"
+    ...(reference.outcome === "none"
       ? []
-      : [event(id, `transfer_numeric_${numeric.outcome}`, id)]),
+      : [event(id, `transfer_numeric_${reference.outcome}`, id)]),
   ]);
   return id;
 }

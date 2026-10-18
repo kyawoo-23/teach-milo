@@ -281,12 +281,7 @@ export function ReportView({
               : "{count} skills still need evidence.",
             { count: items.length - scored },
           );
-  const transferStatus: Status =
-    report.transferCorrect === null
-      ? "missing"
-      : report.transferCorrect
-        ? "strong"
-        : "notyet";
+  const transferStatus = statusOf(report.scores.transfer);
 
   return (
     <div className="report-main">

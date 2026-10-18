@@ -210,11 +210,11 @@ export function useBoardWorkspace({
       }
     };
     const timer = setTimeout(save, 150);
-    window.addEventListener("teachback-board-migrating", save);
+    window.addEventListener("teach-milo-board-migrating", save);
     window.addEventListener("pagehide", save);
     return () => {
       clearTimeout(timer);
-      window.removeEventListener("teachback-board-migrating", save);
+      window.removeEventListener("teach-milo-board-migrating", save);
       window.removeEventListener("pagehide", save);
     };
   }, [key, workspace, expiresAt, terminal, attachment, explanation]);
@@ -233,8 +233,8 @@ export function useBoardWorkspace({
         setWorkspace(null);
       }
     };
-    window.addEventListener("teachback-board-cleared", clear);
-    return () => window.removeEventListener("teachback-board-cleared", clear);
+    window.addEventListener("teach-milo-board-cleared", clear);
+    return () => window.removeEventListener("teach-milo-board-cleared", clear);
   }, [key, ownerId, sessionId]);
   const update = useCallback((value: Workspace) => setWorkspace(value), []);
   return { workspace, update, storageUnavailable };

@@ -273,7 +273,7 @@ describe("server calculation", () => {
       ),
     ).toBe(false);
   });
-  it("keeps a numeric key only when its calculation reproduces it", async () => {
+  it("uses executed numeric values even when model expectations disagree", async () => {
     await expect(
       verifyNumericTransfer(numericFixture()),
     ).resolves.toMatchObject({
@@ -282,14 +282,14 @@ describe("server calculation", () => {
     });
     const wrong = numericFixture();
     wrong.fields[0].expected = 160;
-    await expect(verifyNumericTransfer(wrong)).resolves.toEqual({
-      outcome: "dropped",
-      numeric: { fields: [], inputs: [], code: "" },
+    await expect(verifyNumericTransfer(wrong)).resolves.toMatchObject({
+      outcome: "corrected",
+      numeric: { fields: [{ expected: 150 }] },
     });
     const broken = numericFixture();
     broken.code = "function calculate(inputs) { return 1; }";
     await expect(verifyNumericTransfer(broken)).resolves.toMatchObject({
-      outcome: "dropped",
+      outcome: "invalid",
     });
     await expect(
       verifyNumericTransfer({ fields: [], inputs: [], code: "" }),

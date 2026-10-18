@@ -1,5 +1,5 @@
 {
-  "name": "teachback-ai",
+  "name": "teach-milo",
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@11.21.0",
@@ -13,9 +13,9 @@
     "typecheck": "tsc --noEmit --incremental false",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:integration": "firebase emulators:exec --only firestore --project demo-teachback 'vitest run tests/firestore.test.ts tests/guests.test.ts tests/auth.test.ts'",
+    "test:integration": "firebase emulators:exec --only firestore --project demo-teach-milo 'vitest run tests/firestore.test.ts tests/guests.test.ts tests/auth.test.ts'",
     "test:e2e": "playwright test",
-    "emulators": "firebase emulators:start --only firestore --project demo-teachback --import=.emulator-data --export-on-exit=.emulator-data",
+    "emulators": "firebase emulators:start --only firestore --project demo-teach-milo --import=.emulator-data --export-on-exit=.emulator-data",
     "doctor": "node scripts/doctor.mjs",
     "cleanup": "node scripts/cleanup.mjs",
     "format": "prettier --write src tests scripts *.ts *.json *.yaml deploy README.md",

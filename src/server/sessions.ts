@@ -12,6 +12,7 @@ import {
   Session,
   SessionMode,
   SessionPublic,
+  SessionReport,
   SessionUpdate,
   StudentReplySchema,
   TransferSchema,
@@ -28,7 +29,11 @@ import {
 import { lessonBoard } from "@/lib/boards";
 import { modelMessages, publicMessages, validatePng } from "./board-media";
 import { verifyBoardSubmission } from "./calculation";
-import { finalizeReport, reportSchemaForMessages } from "@/lib/assessment";
+import {
+  finalizeReport,
+  reportSchemaForMessages,
+  withinTolerance,
+} from "@/lib/assessment";
 import { AppError } from "@/lib/errors";
 import {
   EVALUATE_PROMPT,
@@ -499,7 +504,7 @@ export async function evaluateSessionReport(
 ) {
   const fields = numericFields(lesson);
   const raw = await model.generate(
-    reportSchemaForMessages(messages),
+    reportSchemaForMessages(messages, fields.length > 0),
     EVALUATE_PROMPT + languageInstruction(lesson.teachingLanguage),
     {
       teachingLanguage: lessonLanguage(lesson.teachingLanguage),
@@ -532,6 +537,9 @@ export async function evaluateSessionReport(
               expected,
               tolerance,
               submitted: answers?.[id] ?? null,
+              matches:
+                answers?.[id] !== undefined &&
+                withinTolerance(answers[id], expected, tolerance),
             })),
           }
         : {
@@ -548,6 +556,9 @@ export async function evaluateSessionReport(
     skipped,
     answers,
     session.mode === "teach" ? ["misconception"] : [],
+    "transferReasoning" in raw
+      ? (raw.transferReasoning as SessionReport["scores"]["transfer"])
+      : undefined,
   );
   if (session.ledger.unresolvedError) {
     report.criticalMisconception = true;

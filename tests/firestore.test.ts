@@ -419,7 +419,8 @@ describe.skipIf(!enabled)("Firestore persistence and session lifecycle", () => {
       const saved = await readOwned<Lesson>("lessons", lessonId, ctx.ownerId);
       expect(saved.teachingLanguage).toBe(locale);
       expect(saved.board).toEqual(boardFixture());
-      expect(saved.transfer).toEqual(generated.transfer);
+      expect(saved.transfer.numeric).toEqual(generated.transfer.numeric);
+      expect(saved.transfer.expected).toContain("150");
       await createSession(id, lessonId, ctx.ownerId);
       let session = await publicSession(id, ctx.ownerId);
       expect(session.lesson.teachingLanguage).toBe(locale);

@@ -445,7 +445,7 @@ describe.skipIf(!process.env.FIRESTORE_EMULATOR_HOST)(
         status: 401,
       });
       const another = await createGoogleState("/");
-      browser.cookies.delete("teachback_google_state");
+      browser.cookies.delete("teach-milo_google_state");
       await expect(consumeGoogleState(another)).rejects.toMatchObject({
         status: 401,
       });

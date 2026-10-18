@@ -11,10 +11,10 @@ import { AppError } from "@/lib/errors";
 // Route bundles and development reloads share the Admin client. Its settings
 // must be applied exactly once, before any bundle starts using it.
 const state = globalThis as typeof globalThis & {
-  teachbackFirestore?: Firestore;
+  teachMiloFirestore?: Firestore;
 };
 export function database() {
-  if (state.teachbackFirestore) return state.teachbackFirestore;
+  if (state.teachMiloFirestore) return state.teachMiloFirestore;
   const projectId = process.env.GOOGLE_CLOUD_PROJECT;
   if (!projectId)
     throw new AppError(
@@ -31,7 +31,7 @@ export function database() {
     });
   const firestore = getFirestore();
   firestore.settings({ ignoreUndefinedProperties: true });
-  state.teachbackFirestore = firestore;
+  state.teachMiloFirestore = firestore;
   return firestore;
 }
 export function encode<T extends object>(value: T) {
