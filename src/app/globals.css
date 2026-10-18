@@ -3870,7 +3870,7 @@ input[type="range"] {
     max-width: 640px;
     gap: 32px;
   }
-  .home-faq {
+  .home-video {
     margin-top: 48px;
   }
   .home-intro h1 {
@@ -6506,11 +6506,31 @@ textarea.md-rich-source {
   max-height: 180px;
   overflow: auto;
 }
+.home-video,
 .home-faq {
   grid-column: 1 / -1;
   width: 100%;
   max-width: 800px;
   margin-inline: auto;
+}
+.home-video h2 {
+  margin-bottom: 16px;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.5px;
+}
+.home-video-frame {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  border-radius: 22px;
+  overflow: hidden;
+  background: light-dark(#eeecfa, #2e2a41);
+}
+.home-video-frame iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
 }
 .home-faq h2 {
   margin-bottom: 24px;

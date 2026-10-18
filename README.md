@@ -1,12 +1,175 @@
+<p align="center">
+  <img src="public/neural-nuggets.png" alt="Neural Nuggets" width="520">
+</p>
+
 # Teach Milo
 
-Learn by teaching Milo, a curious AI student. Bring PDF, DOCX, PPTX, TXT, or pasted notes; review extraction; confirm a focused lesson; teach with an interactive board; and optionally take an independent application check before receiving evidence-linked feedback.
+**AI Builder Cup 2026** · Team **Neural Nuggets** · Team lead Kyaw Kyaw Oo
 
-This implements the revised, general-subject MVP. There is no preset topic catalog, topic-specific code path, or teaching-turn cap.
+Teach Milo is a web app where a learner teaches a curious AI student from their own notes. Milo asks about gaps, holds a misconception to correct, and can offer a fresh task. The report quotes the learner’s own explanation.
+
+**Problem statement:** Media, Content & Digital Experiences — personalized learning by teaching an AI student.
+
+**Who it is for:** students and self-learners who want to practise explaining and applying a concept.
+
+| Resource        | Link                                                                                                     |
+| --------------- | -------------------------------------------------------------------------------------------------------- |
+| Live app        | [teach-milo-86758133633.asia-southeast1.run.app](https://teach-milo-86758133633.asia-southeast1.run.app) |
+| YouTube (3 min) | [https://youtu.be/ZchsNx0_S80](https://youtu.be/ZchsNx0_S80)                                             |
+| Repository      | [github.com/kyawoo-23/teach-milo](https://github.com/kyawoo-23/teach-milo)                               |
+| Submission deck | [Teach Milo - AI Builder Cup 2026.pdf](public/Teach%20Milo%20-%20AI%20Builder%20Cup%202026.pdf)          |
+
+Guests can start without an account. The working app calls Gemini. A missing key, exhausted quota, or model failure returns an error. It does not substitute a simulated answer.
+
+## Quick overview
+
+| Question                               | Answer                                                                                                                                                                                       |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| What problem does it address?          | Recognizing an explanation does not show whether a learner can explain the mechanism or apply it independently. Teach Milo makes that understanding visible through the learner’s own words. |
+| What does the learner do?              | Bring notes, review the extraction, choose a focus, teach Milo, correct a misconception, and optionally attempt a new application task.                                                      |
+| What makes the experience distinctive? | The learner is the teacher. Milo plays the student; a server-side evidence ledger controls readiness, and the report links feedback to stored learner quotes.                                |
+| Where is AI used?                      | Gemini handles uncertain PDF extraction, lesson and board generation, student dialogue, and report generation. The server validates structured output and checks calculations.               |
+| What works today?                      | An implemented web prototype with guest access, document upload, interactive teaching tools, an independent check, and a cited report.                                                       |
+| What has been measured?                | Nine isolated Gemini component calls passed the benchmark’s fixture checks. Learning gains, full-session latency, and production capacity have not been established.                         |
+
+**Reading paths:** [Try the demo](#try-the-demo) · [Inspect the assessment](#how-assessment-works) · [Verify implementation claims](#implementation-evidence) · [Review architecture](#architecture) · [Review measurements](#observed-model-timing) · [Check limitations](#boundaries) · [Run locally](#run-locally)
+
+## Try the demo
+
+Use the [live app](https://teach-milo-86758133633.asia-southeast1.run.app). No account or local setup is required. For a short overview first, watch the [3-minute video](https://youtu.be/ZchsNx0_S80) or open the [submission deck](public/Teach%20Milo%20-%20AI%20Builder%20Cup%202026.pdf).
+
+The sample below is a repeatable starting point; you can also prepare lessons from your own supported documents.
+
+1. On the home screen, choose **Upload a document**.
+2. Upload [`public/samples/convolution-teaching-notes.docx`](public/samples/convolution-teaching-notes.docx). The running app also serves it at `/samples/convolution-teaching-notes.docx`.
+3. Review the extracted text before teaching, including the worked case that starts at an 8×8 image.
+4. Prepare a lesson. A useful focus is: “Why a larger image needs more computation but not more learned weights.”
+5. Explain the idea to Milo and correct the misconception. Attach a board or sketch if it helps the explanation.
+6. When the evidence supports it, the session offers an independent check. The check is optional. Ending the session still produces feedback.
+7. Read the report and confirm the feedback cites what you wrote.
+
+### What to verify during the demo
+
+| Stage              | Expected behavior                                                                                                                                                         | What it lets you evaluate                                              |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Material review    | Extracted text is editable before preparation. Inputs are PDF, DOCX, PPTX, TXT, or pasted notes; one upload up to 10 MB, PDFs up to 50 pages.                             | Whether the lesson starts from the learner’s actual material.          |
+| Lesson preparation | The learner chooses focus, depth, and Milo’s language. Prep generates the lesson and board together.                                                                      | Whether the lesson fits the chosen learning goal.                      |
+| Teaching           | Milo asks follow-up questions and presents a misconception to correct. The learner can attach a board, concept map, matching pairs, table, or sketch with an explanation. | Whether the dialogue elicits reasoning and examples.                   |
+| Readiness          | The independent check is offered when the evidence requirements are met. There is no fixed number of teaching turns.                                                      | Whether progress reflects demonstrated understanding.                  |
+| Independent check  | A fresh application task appears with practice aids hidden. It can be skipped.                                                                                            | Whether the learner can apply the idea without those aids.             |
+| Report             | Feedback cites learner messages; missing evidence leaves dimensions unscored.                                                                                             | Whether each judgment can be traced to what the learner actually said. |
+
+**Visual preview:** [Teaching screen](artifacts/classroom-desktop.png) · [Report](artifacts/report-desktop.png) · [Mobile layout](artifacts/classroom-mobile.png). These screenshots and the [backup walkthrough](artifacts/teach-milo-scripted-walkthrough.webm) use controlled browser-test responses, as explained in the [artifact notes](artifacts/README.md). Evaluate live model behavior in the app.
+
+Lessons and boards come from the uploaded material. There is no preset topic catalog, no per-subject code path, and no teaching-turn cap.
+
+## How a session moves
+
+`preparing → baseline → teaching → ready_for_check → transfer → report`
+
+`preparing` is a durable operation before a session exists. `ready_for_check` is the “Milo understood” step. `transfer` is the independent check.
+
+An offer to take the check requires supported objectives, mechanism and demonstration evidence, correction of any introduced misconception, and no unresolved source or conceptual error. The learner can keep teaching or end the session. A hint is available once.
+
+## How assessment works
+
+The report covers **accuracy, mechanism, evidence, misconception correction, and independent application**. Each dimension can receive a score of 0–2 or remain unscored when evidence is insufficient or uncertain. These are session feedback scores, not a validated measure of learning gains.
+
+- **Readiness:** the server requires cited support for every lesson objective, mechanism and demonstration evidence, correction of any introduced misconception, and no unresolved error.
+- **Evidence:** report citations are checked against stored learner messages. Teaching dimensions use teaching messages; independent application uses the check response. A skipped check stays unscored.
+- **Arithmetic:** generated board calculations are re-run on the server. Numeric check answers are compared with a verified calculation and tolerance; an incorrect numeric answer caps that dimension’s score at 1. Gemini assesses the reasoning.
+- **Uncertainty:** source concerns can leave accuracy and application unscored. A fluent conversation alone does not establish mastery.
+
+## Implementation evidence
+
+These links point to the mechanisms behind the demo. Test files show the intended coverage; they are not a claim that every suite has passed in the current deployment.
+
+| Claim to inspect                                        | Implementation                                                                                   | Relevant tests or evidence                                                                                                                                   |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Reviewable document extraction                          | [Material pipeline](src/server/materials.ts), [OCR design](docs/ocr-extraction.md)               | [Extraction tests](tests/extraction.test.ts)                                                                                                                 |
+| Evidence controls readiness                             | [Session controller](src/lib/controller.ts), [session orchestration](src/server/sessions.ts)     | [Domain tests](tests/domain.test.ts)                                                                                                                         |
+| Reports require learner citations                       | [Assessment validation](src/lib/assessment.ts), [report contracts](src/lib/contracts.ts)         | [Report assessment tests](tests/report-assessment.test.ts)                                                                                                   |
+| Boards use a shared component catalog                   | [Catalog and compiler](src/lib/board-catalog.ts), [server calculator](src/server/calculation.ts) | [Catalog tests](tests/board-catalog.test.ts), [board tests](tests/boards.test.ts)                                                                            |
+| Numeric checks use verified reference values            | [Transfer reference validation](src/server/transfer-reference.ts)                                | [Transfer reference tests](tests/transfer-reference.test.ts)                                                                                                 |
+| Guest work stays private and can transfer to an account | [Guest ownership](src/server/guests.ts), [authentication](src/server/auth.ts)                    | [Guest integration tests](tests/guests.test.ts), [browser coverage](tests/browser/guests.spec.ts)                                                            |
+| Model timing has recorded evidence                      | [Benchmark script](scripts/benchmark-gemini.ts)                                                  | [Method and limitations](artifacts/benchmarks/2026-10-18T04-41-57-323Z/README.md), [raw summary](artifacts/benchmarks/2026-10-18T04-41-57-323Z/summary.json) |
+
+## What is included
+
+| Learning                                     | Platform                                                    |
+| -------------------------------------------- | ----------------------------------------------------------- |
+| Upload or paste, then correct the extraction | Structured replies checked with Zod                         |
+| Focus, depth, and teaching language          | Board and transfer arithmetic re-run on the server          |
+| Explain, and correct Milo’s misconception    | API keys in Secret Manager; passwords stored as hashes      |
+| Boards, maps, matching, tables, and sketches | Guest or account; learning data expires in 7 days           |
+| Independent check and cited feedback         | 5 interface languages, 9 teaching languages, light and dark |
+
+## Architecture
+
+```mermaid
+flowchart LR
+  browser[Browser]
+  run[Cloud Run / Next.js]
+  gemini[Gemini API]
+  firestore[Cloud Firestore]
+  secrets[Secret Manager]
+
+  browser --> run
+  run --> gemini
+  run --> firestore
+  run --> secrets
+```
+
+The browser is the learner interface. Cloud Run hosts the Next.js app. The server validates model replies, decides readiness, and re-runs board and transfer calculations. Gemini prepares lessons, replies in chat, and writes feedback. Firestore stores material, lessons, conversations, and evidence. Secret Manager holds server-side credentials. Cloud Build and Artifact Registry deploy the container to Cloud Run in Singapore.
+
+| Technology                        | Role                                                        |
+| --------------------------------- | ----------------------------------------------------------- |
+| Gemini and the Google Gen AI SDK  | Extraction, lessons, activities, chat, and feedback         |
+| Next.js, React, and TypeScript    | Site and API routes                                         |
+| Cloud Run                         | Container hosting in Singapore                              |
+| Cloud Firestore                   | Material, lessons, conversations, and evidence, with expiry |
+| Cloud Build and Artifact Registry | Image build and deploy                                      |
+| Secret Manager                    | API keys and auth secrets                                   |
+| Zod and a calculation sandbox     | Structured replies and numeric checks                       |
+
+### Where the code lives
+
+- `src/app` — routes and API handlers
+- `src/components` — preparation, chat, boards, the check, and the report
+- `src/lib` — Zod contracts, the 17-component board catalog and compiler, grading, and board validation
+- `src/server` — ownership, Firestore, operations, extraction, lesson preparation, Gemini, and session orchestration (`server-only`)
+- `src/content` — private prompts
+- `scripts/extract-worker.mjs` — document parsing with memory and time limits
+
+## Languages
+
+The site UI is English, Simplified Chinese, Japanese, Korean, and Thai. The selector stores the choice in this browser for one year. With no saved choice, the browser language picks the first visit. URLs stay the same.
+
+Choose Milo’s language before preparing a lesson. It starts from the site language and stays with the lesson across sign-in. Lesson text, Milo’s messages, the independent check, and feedback stay in that language when the site language changes. Teaching languages also include Vietnamese, Indonesian, Malay, and Burmese. Existing lessons default to English. Source text and learner quotes are left as written. Prepare a new lesson to change Milo’s language.
+
+Translations live in `src/lib/i18n`. Add the same keys and interpolation parameters to every UI dictionary. English is the key set.
+
+## Observed model timing
+
+The [benchmark evidence and methodology](artifacts/benchmarks/2026-10-18T04-41-57-323Z/README.md) record measurements with direct Gemini SDK calls to `gemini-3.5-flash-lite` on 18 Oct 2026 (`n=9`, one call at a time). This excludes app and HTTP time, PDF OCR, and concurrent load. Structured JSON and fixture checks were 9/9. It is not a claim about general accuracy or capacity.
+
+| Workload           | API OK | p50 / max       | Input / output tokens |
+| ------------------ | ------ | --------------- | --------------------- |
+| Lesson preparation | 3/3    | 5.20 s / 5.80 s | 5,793 / 5,008         |
+| Teaching reply     | 3/3    | 2.50 s / 2.70 s | 3,513 / 1,624         |
+| Report evaluation  | 3/3    | 4.07 s / 4.21 s | 3,849 / 3,918         |
+
+Paced throughput in that run was 2.76 successful calls per minute with 20-second gaps. The paid-equivalent API cost for those nine calls was about US$0.03. An illustrative 1,000-session estimate in the [submission deck](public/Teach%20Milo%20-%20AI%20Builder%20Cup%202026.pdf) is about US$0.019 of Gemini usage per session at the stated token assumptions. Hosting and Firestore are separate. Free-tier charge is US$0 only when the account is eligible.
+
+## Boundaries
+
+Custom material is checked against the source and the model’s knowledge, not against an external fact base. Ambiguous material can leave a criterion unscored. A generated board can be numerically bounded and still be a weak scientific model. Source assumptions and the learner’s interpretation still matter.
+
+Inputs are PDF, DOCX, PPTX, TXT, and pasted notes. Voice, web search, standalone images, and recordings are out of scope. PPTX yields slide text only (up to 50 slides). Images, charts, diagrams, native equations, and speaker notes in a PPTX are skipped; use a PDF when the visual layout matters.
 
 ## Run locally
 
-Requirements: Node **24.15+**, pnpm **11.21**, JDK **21+**, and a Gemini API key with access to the configured model. Firebase CLI is a project dependency. No cloud Firestore project is needed for local development.
+Requirements: Node **24.15+**, pnpm **11.21**, JDK **21+**, and a Gemini API key for a model that supports structured JSON and PDF vision. Firebase CLI is a project dependency. Local development uses the Firestore emulator.
 
 ```sh
 corepack enable
@@ -15,9 +178,9 @@ pnpm install --frozen-lockfile
 cp .env.example .env.local
 ```
 
-Set `GEMINI_API_KEY` in `.env.local`. Keep the key server-side. The default model is `gemini-3.8-flash`; change `GEMINI_MODEL` if your account uses a different model with structured JSON and PDF vision support.
+Set `GEMINI_API_KEY` in `.env.local` and keep it server-side. The example environment selects `GEMINI_MODEL=gemini-3.5-flash-lite`; if that variable is unset, the code falls back to `gemini-3.8-flash`. Use a model available to your account that supports the required structured output and PDF vision.
 
-Start Firestore and the application in separate terminals:
+Start the emulator and the app in two terminals:
 
 ```sh
 pnpm emulators
@@ -27,126 +190,71 @@ pnpm emulators
 pnpm dev
 ```
 
-Open **http://127.0.0.1:3000**. Use this hostname consistently: sign-in cookies and request-origin checks are scoped to it. Firestore's local UI is **http://127.0.0.1:4000**. `pnpm doctor` checks prerequisites without printing credentials.
+Open **http://127.0.0.1:3000**. Sign-in cookies and origin checks are tied to that host. The emulator UI is **http://127.0.0.1:4000**. `pnpm doctor` checks prerequisites and does not print credentials. The emulator writes `.emulator-data` on a clean shutdown. `pnpm cleanup` removes expired local records.
 
-The working app always calls real Gemini. Missing keys, exhausted quota, and model failures produce actionable errors; they never switch to simulated answers. The local emulator persists data in `.emulator-data` on clean shutdown. Use `pnpm cleanup` to remove expired records locally.
-
-## Checks
+### Checks
 
 ```sh
 pnpm typecheck
-pnpm test                     # unit/extraction tests; emulator tests skip if no emulator is configured
-pnpm test:integration         # starts its own emulator; stop an existing one first
+pnpm test                     # unit and extraction; emulator suites skip until an emulator is configured
+pnpm test:integration         # starts its own emulator; stop any emulator already running
 pnpm exec playwright install chromium
 pnpm test:e2e                 # browser fixtures, desktop and mobile; starts the app if needed
-pnpm test:http                # real local API smoke; requires the app and emulator running
-pnpm record:walkthrough       # paced, explicitly labeled scripted recording
+pnpm test:http                # local API smoke; needs the app and emulator
+pnpm record:walkthrough       # paced, labeled scripted recording
 pnpm build
 ```
 
-To test against an already-running emulator:
+Against an emulator that is already running:
 
 ```sh
 GOOGLE_CLOUD_PROJECT=demo-teach-milo FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pnpm test
 ```
 
-Browser tests use intercepted API responses to exercise the complete UI. Integration tests use real Firestore emulator transactions and a controlled model implementation. Neither requires paid model calls. A real-Gemini smoke test is still required after adding a key: upload mixed/scanned material, inspect OCR, complete a custom lesson, and review cited assessment evidence.
+Browser tests intercept API responses. Integration tests use the Firestore emulator and a controlled model. Neither spends on Gemini. After a real key is added, smoke-test with mixed or scanned material, a custom lesson, and a report that cites the learner.
 
-`artifacts/` contains screenshots and an explicitly labeled scripted walkthrough recording produced by the browser tests. It is a demonstration backup, not a recording of live inference.
+`artifacts/` holds screenshots and a labeled scripted walkthrough from the browser tests. That recording is a demonstration backup, not live inference.
 
-## Architecture
+Guest browser coverage, with the emulator and the app at `http://127.0.0.1:3000`:
 
-- `src/app`: Next.js routes and server API handlers.
-- `src/components`: material preparation, chat, boards, transfer, and report interfaces.
-- `src/lib`: shared Zod contracts, the board component catalog and compiler, and pure controller, grading, and board validation.
-- `src/server`: account ownership, Firestore, operations, extraction, lesson preparation, Gemini calls, and session orchestration. Imports are protected by `server-only`.
-- `src/content`: private prompts.
-- `scripts/extract-worker.mjs`: memory/time-bounded document parsing worker.
+```sh
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pnpm exec playwright test tests/browser/guests.spec.ts
+```
 
-Client data entry uses React Hook Form with Zod resolvers: account access, material preparation and source review, chat explanations, independent checks, and board editors. Client schemas in `src/lib/form-schemas.ts` reuse the API contracts; server validation remains authoritative. `schema-form.tsx` provides localized, linked field errors and controlled board fields. Board gestures and shared workspace drafts stay separate from form interaction state, so edits and failed submissions remain recoverable.
+Those tests script lesson generation and call the real guest, account, material, and session APIs.
 
-The backend owns phases: `preparing → baseline → teaching → ready_for_check → transfer → report`. `preparing` is represented by durable lesson-preparation operations before a session is created. Teaching tracks objective evidence rather than counting turns. An offer to take the check requires supported objectives, mechanism and demonstration evidence, correction of any introduced misconception, and no unresolved source or conceptual error. Learners can continue or end manually. A hint is available once.
+## Materials and boards
 
-Preparation freezes the source snapshot, private knowledge card, objective criteria, misconception, and novel transfer task. Student calls receive no transfer answer. The controller validates allowed moves and exact learner citations. Recent history plus a bounded evidence ledger keeps requests bounded during long conversations. Reports use stored quoted evidence and a separate model call. Unassessable dimensions remain null; a `/10` total appears only when all dimensions are assessable.
+PDF.js inspects each page. Clean prose uses native text. Confirmed blank pages skip OCR. Uncertain pages go to Gemini in batches of up to five, with original page numbers kept. OCR uncertainty is visible in the review. Original bytes exist only during processing. They are not stored in Firestore and are not sent to the Gemini Files API. See [OCR extraction](docs/ocr-extraction.md).
 
-### Materials
+Validated PDF extractions are cached by user, exact bytes, model, prompt, and extraction version. A renamed file still hits the cache. Interrupted uploads resume after successful batches. Cache lifetime starts at first extraction and is not renewed by reuse.
 
-One upload, 10 MB maximum; PDFs have a 50-page cap; extracted content has a 50,000-character cap. Multipart limits apply while streaming. PDF.js checks each page's text, drawing operations, annotations and reading order. Clean prose pages use native text and confirmed blank pages skip OCR; scans, diagrams, formulas and uncertain layouts go to Gemini in batches of up to five selected pages, retaining original page references. OCR uncertainty is shown in the editable review. Original bytes are held only during processing and are not stored in Firestore or uploaded to the Gemini Files API. Gemini still processes the inline content under the configured API service's terms.
+DOCX archives pass a streamed ZIP preflight (500 entries, 25 MB decompressed) before plain-text extraction. TXT must be valid UTF-8. Password-protected PDFs and damaged files return a clear error. Uploaded documents are source material, never system instructions.
 
-Validated extraction results are cached in `extraction_cache` by user, exact file bytes, model, prompt and extraction version. Repeat PDF uploads (including renamed files) reuse completed extraction, and interrupted uploads resume after successful batches. Concurrent uploads of the same document share a transactional lease and return a busy response while extraction is running. Cache retention starts at first extraction and is never renewed by reuse; expiry checks, TTL and `pnpm cleanup` cover these records. Extracted text and warnings are retained, never original bytes. See [OCR extraction research and behavior](docs/ocr-extraction.md).
+Each lesson board is composed in the same Gemini call from 17 catalog components in `src/lib/board-catalog.ts`: layout (Stack, Row, Card), content (Heading, Text, Callout), inputs (Slider, NumberInput, Toggle, Select), displays (Metric, Bar, Grid, LineChart), and composites (SortableList, Buckets, CompareCards). A board declares up to 8 named state variables, derived values, and at most one `calculate(inputs)` function. Components bind to those ids. Boards without interactive components can seed a concept map, matching pairs, or a table. The board is frozen with the lesson.
 
-DOCX archives undergo streamed ZIP preflight (500 entries / 25 MB decompressed maximum) before plain-text extraction. PPTX uses the same ZIP limits and extracts slide text in presentation order (up to 50 slides), retaining blank slides with warnings. Images, charts, diagrams, native equations, and speaker notes are not extracted; upload a PDF for visual content. TXT requires valid UTF-8. Password-protected PDFs and damaged files produce clear errors. Long OCR runs time out with a request to use fewer pages. Do not use learner-uploaded documents as system instructions.
+`compileBoard` checks every node, drops unknown pieces with diagnostics, and enforces 40 nodes, 8 state variables, and 4 levels of nesting. A fatal board gets one repair call, then an editable example table. `calculate` allows arithmetic, approved `Math` functions, locals, and conditionals. Imports, loops, recursion, strings, constructors, arbitrary property access, and globals are rejected.
 
-### Boards
+In the browser, React renders the controls. Only `calculate` runs, inside a worker in a sandboxed frame, and the worker is stopped after 500 ms. The server re-runs `calculate` and stores a verified snapshot. Milo and the evaluator see labelled `{label, value, unit}` entries. Board values illustrate the idea. They are not the assessment key.
 
-Lesson preparation composes each board, in the same Gemini call, from a catalog of 17 components that Teach Milo owns (`src/lib/board-catalog.ts`): layout (Stack, Row, Card), content (Heading, Text, Callout), inputs (Slider, NumberInput, Toggle, Select), displays (Metric, Bar, Grid, LineChart), and composites (SortableList, Buckets, CompareCards). The board section of the prompt is generated from that registry. A board declares named, typed state (up to 8 variables), derived values, and at most one `calculate(inputs)` function; components bind to state and derived ids, never to inline expressions. Boards without interactive components can instead seed a concept map, matching pairs, or a table. The board is frozen with the lesson.
+When the transfer question asks for numbers, prep also writes up to four expected fields, the question inputs, and a `calculate` function. The server keeps that key only when the function reproduces every expected value. A learner entry outside tolerance caps the transfer score at 1 and is explained in the report. The model still scores the reasoning.
 
-`compileBoard` validates every node against the catalog. It drops unknown components and invalid props with diagnostics and enforces limits of 40 nodes, 8 state variables, and 4 levels of nesting. A board with a fatal problem gets one repair call that includes the diagnostics, then falls back to an editable example table. Calculations use a deliberately small JavaScript language: arithmetic, approved Math functions, locals, and conditionals. Imports, loops, recursion, strings, constructors, arbitrary property access, and globals are rejected by AST validation.
+The tool selector always offers a sketchpad, concept map, matching pairs, and a comparison table. Attaching a board or sketch requires an explanation. Drawings add context. Readiness and assessment still use the learner’s words. Lessons stored before the catalog show the example table.
 
-In the browser, trusted React components render every control and display. Only `calculate` runs, in a worker created by an app-owned bootstrap inside an opaque sandboxed frame; CSP disables network access, and the worker is terminated after 500 ms. Updates are debounced, and a failed update keeps the last good values on screen. When a board is attached, the server re-runs `calculate` in a resource-limited worker thread and stores a verified snapshot. Milo and the evaluator see only labelled `{label, value, unit}` entries. Board values are illustrative, never assessment keys.
+## Access, expiry, and deploy
 
-### Numeric transfer checks
+The first material submission creates a private guest. Ordinary page visits do not. Guest work uses the same ownership checks as an account. Optional sign-in is email and password, Google, or a passkey enrolled after sign-in. Signing in moves the guest’s unexpired material onto the account and does not extend the 7-day learning-data retention. Auth cookies last 30 days. Firestore rules deny direct browser access. Mutation requests check `Origin`.
 
-When the transfer question asks for specific numbers, lesson prep also writes a numeric key: up to 4 fields with expected values and tolerances, the inputs from the question, and a `calculate` function. The server runs that function and keeps the key only if it reproduces every expected value; otherwise the lesson has no numeric check. During the check, the learner enters one value per field. A value outside tolerance caps the transfer score at 1 and is explained in the report; the model evaluates the reasoning separately.
+Session history returns 20 sessions per page. Seven-day expiry is enforced on every read. TTL is asynchronous, so the app also checks expiry, and production should run `node scripts/cleanup.mjs` daily.
 
-The board tool selector always offers a sketchpad, concept map, matching pairs, and comparison table. The fixed sketch canvas supports pen, eraser, labels, arrows, shapes, selection, movement, and undo/redo. Desktop, expanded, and mobile views share one workspace. Unfinished tools and pending attachments are saved in this browser by account and session; expiry, deletion, sign-out, and leaving teaching clear them. Storage failures preserve in-memory work and display a notice.
+`next.config.ts` sends a Content Security Policy on every route. Gemini, Firestore, and Google token requests stay on the server. Browser coverage is in `tests/browser/csp.spec.ts`.
 
-Attaching freezes the current state; an explanation is required to send it. Version-2 snapshots accept up to 48 KiB of structured state and a 128 KiB PNG. The newest relevant sketch is sent inline with the existing Gemini teaching call, while base64 is excluded from model JSON and public chat/history. PNG previews use an ownership-checked endpoint and the message's existing retention. Drawings contextualize explanations; readiness and assessment still require exact learner quotes. Interactive boards attach as version-3 snapshots of raw state. Lessons whose stored board predates the catalog show the example table instead; they are not migrated.
+**Passkeys on a laptop:** WebAuthn needs `APP_ORIGIN=http://localhost:3000` and `pnpm exec next dev --webpack --hostname localhost`. The usual `127.0.0.1` origin cannot be a WebAuthn RP ID. Match the Google redirect URI if you test Google sign-in at the same time.
 
-### Access, retries, and expiry
-
-Visitors can complete the learning flow without an account. The first material submission automatically creates a private guest identity through `POST /api/auth/guest`; ordinary page visits and `GET /api/auth/me` never create identities. Guest uploads, notes, boards, chat, reports, and history use the same ownership checks as accounts. A seven-day HttpOnly, SameSite=Lax guest cookie (`__Host-teach-milo_guest` over production HTTPS, `teach-milo_guest` locally) maps to a token hash in `guests`. Browser history access ends if the cookie expires or is cleared. Guest access does not renew its expiry. Optional sign-in supports email/password, Google, or a previously enrolled passkey. An opaque HttpOnly, SameSite=Lax `teach-milo_auth` cookie maps to a server-side session token hash. IDs alone grant no access. Mutation endpoints check Origin; Firestore rules deny all direct browser access. Production requires HTTPS and a strong `RATE_LIMIT_SECRET`.
-
-Successful sign-in binds the browser’s guest to that account and moves unexpired materials, lessons, sessions, and owner-scoped retry records in resumable batches of 50. `GET /api/auth/me` returns `user`, `guest`, and optional `claim` state; `POST /api/auth/guest/claim` advances a pending transfer and requires account authentication plus Origin validation. The UI automatically resumes interrupted transfers. Transactional guest fences stop older writes and cleanup from restoring guest ownership, and current-day guest usage is added to the account exactly once. IDs, child messages, pending answers, reports, and original expiry dates remain unchanged. Local board drafts move to the account namespace. Signing in enables access across devices without extending learning-data retention. Extraction caches expire under their original guest owner. Google callbacks require a ten-minute browser-bound, single-use state stored with TTL in `user_sessions`.
-
-Passkeys are added, renamed, and removed under **Account settings → Passkeys** after signing in within the last 10 minutes. Create the account with email/password or Google first; those methods remain available for recovery. Passkey login supports an explicit button and conditional browser autofill, native WebAuthn JSON serialization with compatibility polyfills, and optional Signal API synchronization with password managers. Device PIN/biometric verification and discoverable credentials are required; security keys and cross-device authenticators are allowed. SimpleWebAuthn verifies signatures, origin, RP ID, challenge, and authenticator counters. Five-minute, browser-bound challenges are consumed transactionally before verification, and challenge generation is rate-limited. Public keys and metadata persist in `passkeys`; no biometric data or private keys reach the server. `passkey_challenges` have TTL and cleanup coverage.
-
-The RP ID is the hostname of the configured `APP_ORIGIN`; keep that hostname stable in production. **For local passkey testing**, set `APP_ORIGIN=http://localhost:3000`, start Next with `pnpm exec next dev --webpack --hostname localhost`, and open that exact URL. The normal `127.0.0.1` development origin cannot serve as a WebAuthn RP ID. Update the Google OAuth authorized redirect URI to match if also testing Google sign-in. Deploy the challenge TTL with `pnpm exec firebase deploy --only firestore:indexes`; no Firestore rules change is needed.
-
-Durable operation IDs, payload fingerprints, revisions, and transactional leases prevent duplicate stored turns and overlapping calls. Pending teaching/transfer input is stored with the operation before generation/evaluation. Failed calls leave the phase unchanged. Retries reuse the operation ID; expired leases can be recovered. An external provider request whose result is lost during a server crash can still incur a second charge on retry—Firestore cannot make the external API exactly-once.
-
-Daily per-identity, network, and global call budgets are transactional and configurable; guests and accounts both default to 100 model calls per day, with 300 per network and 1,000 globally. They pause requests rather than end lessons. The default network bucket is shared, which is conservative. Only enable `TRUST_PROXY=true` behind a proxy whose forwarded-address behavior you control; otherwise leave the shared bucket enabled. Telemetry stores event names and session IDs, not source or conversation text.
-
-Seven-day expiry is checked on every access. Session history filters ownership and expiry in Firestore and orders active sessions newest first. `GET /api/sessions` returns up to 20 summaries and an optional `nextCursor`; pass it as `?cursor=...` to load the next page. Each request reads at most 21 session documents (one lookahead) and 20 distinct lesson documents, with summary-only projections. The modal appends pages with “Load more” and resets when reopened. Cursors use ordered field values, so deleting a boundary session does not break continuation. History is live: updates can move sessions between pages; reopen to refresh the newest entries. The document limit does not bound index entries scanned for expiry filtering.
-
-TTL policies cover parent records and message/operation subcollections because deleting a Firestore parent does not delete descendants. Account authentication sessions in `user_sessions` have their own 30-day expiry, TTL policy, and cleanup coverage; user accounts remain persistent. The cleanup script also recursively deletes expired parents and should run daily in production. Resetting or creating another lesson does not immediately delete prior materials; use session deletion for conversation removal and expiry for retained extracted sources.
-
-Large source, lesson, evidence, report, board, and pending-operation payloads are exempt from indexing because the app does not query those fields. Ownership, email, message-sequence, and cleanup expiry indexes remain available.
-
-### Content Security Policy
-
-`next.config.ts` sends an enforced starter `Content-Security-Policy` on all routes. Resources default to the app's own origin; plugins, base tags, external form submissions, and embedding the app are blocked. HTTPS images remain allowed for Google avatars and Markdown content. Fonts and browser API requests stay same-origin; Gemini, Firestore, and Google OAuth token requests run on the server and need no browser allowlist.
-
-Inline scripts remain allowed for Next.js hydration, and inline styles for React and KaTeX. This is a compatibility baseline, not a strict XSS policy. Development additionally permits `unsafe-eval` and WebSocket scheme sources for Next.js debugging and hot reload; these exceptions are omitted in production. The board calculator's `srcdoc` frame inherits the page policy, so blob workers are allowed; its existing inner policy still denies network access.
-
-For stricter script protection, first adapt the calculator and Next.js rendering to per-request nonces or script hashes, then validate a candidate policy in report-only mode before enforcing it. Trusted Types also requires checking React/KaTeX HTML sinks first. CSP changes take effect after restarting development or rebuilding production. Browser regression coverage lives in `tests/browser/csp.spec.ts`, alongside the board and formula fixtures.
-
-## Cloud Run preparation
-
-The Dockerfile builds Next's standalone server and includes the extraction worker's production dependencies. This environment uses Webpack because Turbopack's CSS subprocess requires local port permissions unavailable in the task sandbox.
+Build the production image with:
 
 ```sh
 docker build --platform linux/amd64 -t teach-milo .
 ```
 
-Before deployment, create a Firestore database, an Artifact Registry image repository, and a dedicated runtime service account. Give the runtime `roles/datastore.user` and Secret Manager accessor on: `teach-milo-gemini-key` (Gemini API key), `teach-milo-rate-limit-secret` (random 32+ character rate-limit secret), and—for Google Sign-In—`teach-milo-google-client-id` and `teach-milo-google-client-secret` from a Google Cloud OAuth **Web application** client. In that client, set the authorized redirect URI to `{_APP_ORIGIN}/api/auth/google/callback` (must match `APP_ORIGIN` exactly). Deploy with Cloud Build (`gcloud builds submit` or a trigger using `cloudbuild.yaml`). Set the `_APP_ORIGIN` substitution to the service HTTPS URL. Do not set `FIRESTORE_EMULATOR_HOST` in production.
-
-Deploy `firestore.rules` and `firestore.indexes.json`, including TTL fields. Before releasing the session-history query, confirm the target database edition and deploy indexes with `pnpm exec firebase deploy --only firestore:indexes --project YOUR_PROJECT_ID`; wait until the `sessions` composite indexes are ready, including the pagination index on `ownerId ASC`, `updatedAt DESC`, `expiresAt ASC`, and `__name__ ASC`. Emulator tests do not verify production index readiness. TTL deletion is asynchronous, so application expiry checks and scheduled cleanup remain necessary. Schedule a Cloud Run Job using the same image and `node scripts/cleanup.mjs` daily, with Firestore access. Public IAM access should be enabled only for the app service when you are ready to launch. No cloud deployment is performed by this repository's local commands.
-
-## Current boundaries
-
-English interface; no voice, web search, standalone images, slides, or recordings as inputs. Custom material checks use model knowledge and source evidence, not independently verified external facts. Ambiguous material can yield unscored criteria. A generated simulation can be mathematically bounded without being a scientifically valid model; source assumptions and learner interpretation remain essential.
-
-### Languages
-
-The website supports English, Simplified Chinese, and Japanese. The navigation selector remembers the website language in this browser for one year; without a saved choice, browser language preferences select the initial language. URLs stay unchanged.
-
-Choose what language Milo should use before preparing a lesson. It initially follows the website language and is preserved across sign-in. Lesson text, Milo’s messages, the independent check, and feedback stay in that language even when the website language changes. Existing lessons default to English; original material and learner quotes are never translated. Prepare a new lesson to change its teaching language.
-
-Translations live in `src/lib/i18n`; add matching keys and interpolation parameters to all four translated dictionaries (English uses the keys). User-facing API errors can include `messageKey` and `params` while retaining their English `message` and existing error code.
-
-### Guest mode release checks
-
-Run `pnpm typecheck`, `pnpm test`, and `pnpm test:integration`. With the Firestore emulator and app running at `http://127.0.0.1:3000`, run `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 pnpm exec playwright test tests/browser/guests.spec.ts` for desktop/mobile guest cookies, notes/uploads, reload, browser isolation, history/deletion, blocked cookies, and account transfer. Only lesson generation is scripted in these browser tests; the guest, account, material, and session APIs are real. Firestore integration tests cover interrupted multi-batch transfer, pending input, usage merging, OAuth state, and in-flight write fencing.
-
-Deploy with the existing Cloud Build / Cloud Run pipeline. Guest TTL, owner-field single indexes, and session history composites already exist; this feature needs no Firestore rules or index changes. Before judging, use a fresh private browser on the production origin to start a lesson, refresh, inspect history, and sign in to transfer it. The production network bucket is shared unless trusted proxy handling is explicitly configured.
+The image uses Webpack. Turbopack’s CSS subprocess needs local port permissions that this build environment does not have. Deploy with Cloud Build (`cloudbuild.yaml`). Set `_APP_ORIGIN` to the service HTTPS URL. Leave `FIRESTORE_EMULATOR_HOST` unset in production. Deploy Firestore rules and indexes, including TTL, and wait until the `sessions` composite indexes are ready before paginated history will succeed. Public access on the Cloud Run service is a launch choice. Local commands do not deploy to the cloud.

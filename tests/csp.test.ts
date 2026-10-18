@@ -36,7 +36,10 @@ describe("Starter CSP", () => {
       "blob:",
       "https:",
     ]);
-    expect(policy.get("frame-src")).toEqual(["'self'"]);
+    expect(policy.get("frame-src")).toEqual([
+      "'self'",
+      "https://www.youtube-nocookie.com",
+    ]);
     expect(policy.get("worker-src")).toEqual(["'self'", "blob:"]);
     for (const directive of ["object-src", "base-uri", "frame-ancestors"])
       expect(policy.get(directive)).toEqual(["'none'"]);
